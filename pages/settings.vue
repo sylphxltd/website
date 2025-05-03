@@ -74,21 +74,35 @@
         <div class="flex items-center mb-6">
           <div v-if="profileImageUrl" class="relative">
             <img :src="profileImageUrl" alt="Profile picture" class="w-20 h-20 rounded-full object-cover mr-6" />
-            <button 
-              @click="profileImageUrl = ''" 
-              class="absolute top-0 right-5 bg-red-500 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs"
+            <button
+              @click="removeProfileImage"
+              :disabled="imageLoading || profileLoading"
+              class="absolute top-0 right-5 bg-red-500 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Remove image"
-            >×</button>
+            >
+              <span v-if="imageLoading" class="i-carbon-circle-dash animate-spin text-xs"></span>
+              <span v-else>×</span>
+            </button>
           </div>
           <div v-else class="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-6">
             <span class="text-3xl text-gray-400 dark:text-gray-500">{{ (displayName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase() }}</span>
           </div>
           
-          <button 
-            @click="uploadProfileImage"
-            class="inline-flex items-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+          <!-- Hidden file input -->
+          <input
+            type="file"
+            ref="fileInput"
+            @change="handleFileChange"
+            accept="image/*"
+            class="hidden"
+          />
+          <button
+            @click="triggerFileInput"
+            :disabled="imageLoading || profileLoading"
+            class="inline-flex items-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span class="i-carbon-upload mr-2"></span>
+            <span v-if="imageLoading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+            <span v-else class="i-carbon-upload mr-2"></span>
             Change Picture
           </button>
         </div>
@@ -123,10 +137,10 @@
           <div class="flex justify-end pt-4">
             <button 
               type="submit"
-              :disabled="loading"
+              :disabled="profileLoading || imageLoading"
               class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+              <span v-if="profileLoading" class="i-carbon-circle-dash animate-spin mr-2"></span>
               Save Changes
             </button>
           </div>
@@ -759,18 +773,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { getAuth, 
-  updateProfile as firebaseUpdateProfile, 
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { getAuth,
+  updateProfile as firebaseUpdateProfile,
   updatePassword,
   EmailAuthProvider,
   reauthenticateWithCredential,
   linkWithPopup,
   GoogleAuthProvider,
   unlink,
-  deleteUser,
-  AuthErrorCodes
+  deleteUser
 } from 'firebase/auth'
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { useCurrentUser } from 'vuefire'
 import { useRouter } from 'vue-router'
 
@@ -778,16 +792,20 @@ const router = useRouter()
 const user = useCurrentUser()
 const auth = getAuth()
 
+const storage = getStorage()
+
 // UI state
 const activeTab = ref('profile')
-const loading = ref(false)
+const loading = ref(false) // General loading state
+const profileLoading = ref(false) // Specific loading for profile updates
+const imageLoading = ref(false) // Specific loading for image uploads
 const error = ref<Error | null>(null)
 const successMessage = ref('')
 const showDeleteConfirm = ref(false)
 
 // Form fields
 const displayName = ref('')
-const profileImageUrl = ref('')
+const profileImageUrl = ref<string | null>(null) // Allow null for initial state or removed image
 const socialPreferred = ref(true)
 const currentPassword = ref('')
 const newPassword = ref('')
@@ -851,7 +869,7 @@ const connectedDevices = ref([
 onMounted(() => {
   if (user.value) {
     displayName.value = user.value.displayName || ''
-    profileImageUrl.value = user.value.photoURL || ''
+    profileImageUrl.value = user.value.photoURL // Keep null if no photoURL exists
     
     // Check providers
     const providerData = user.value.providerData || []
@@ -919,54 +937,134 @@ function formatErrorMessage(err: Error): string {
 }
 
 // Functions
+// Hidden file input for triggering upload
+const fileInput = ref<HTMLInputElement | null>(null)
+
 async function updateProfile() {
   if (!user.value) return
   
-  if (!displayName.value.trim()) {
+  const trimmedDisplayName = displayName.value.trim()
+  if (!trimmedDisplayName) {
     error.value = new Error('Display name cannot be empty.')
     return
   }
   
-  loading.value = true
+  profileLoading.value = true // Use specific loading state
   error.value = null
   successMessage.value = ''
   
   try {
     await firebaseUpdateProfile(user.value, {
-      displayName: displayName.value,
-      photoURL: profileImageUrl.value
+      displayName: trimmedDisplayName,
+      // photoURL is updated separately after successful upload in handleFileChange
     })
     
-    successMessage.value = 'Profile updated successfully'
+    // If only display name changed (no image upload pending)
+    if (!imageLoading.value) {
+       successMessage.value = 'Display name updated successfully'
+    }
+    
   } catch (err) {
     error.value = err as Error
     console.error('Profile Update Error:', err)
   } finally {
-    loading.value = false
+    profileLoading.value = false
   }
 }
 
-async function uploadProfileImage() {
-  // In a real app, this would open a file picker and upload to Firebase Storage
-  // For now, we'll simulate the process
-  loading.value = true
-  successMessage.value = ''
-  error.value = null
+function triggerFileInput() {
+  fileInput.value?.click()
+}
+
+async function handleFileChange(event: Event) {
+  if (!user.value) return;
   
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  
+  if (!file) return;
+
+  // Basic validation (optional: add more checks like file size, type)
+  if (!file.type.startsWith('image/')) {
+    error.value = new Error('Please select an image file.');
+    return;
+  }
+
+  imageLoading.value = true; // Start image loading
+  profileLoading.value = true; // Also indicate general profile loading
+  error.value = null;
+  successMessage.value = '';
+
   try {
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Assign a random avatar from a public API
-    profileImageUrl.value = `https://i.pravatar.cc/300?u=${Date.now()}`
-    successMessage.value = 'Profile picture updated successfully'
+    // 1. Define storage path
+    const filePath = `profile_images/${user.value.uid}/${Date.now()}_${file.name}`;
+    const imageRef = storageRef(storage, filePath);
+
+    // 2. Upload the file
+    const snapshot = await uploadBytes(imageRef, file);
+    console.log('Uploaded a blob or file!', snapshot);
+
+    // 3. Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    // 4. Update the user's profile photoURL in Firebase Auth
+    await firebaseUpdateProfile(user.value, { photoURL: downloadURL });
+
+    // 5. Update local state
+    profileImageUrl.value = downloadURL;
+    successMessage.value = 'Profile picture updated successfully';
+
   } catch (err) {
-    error.value = err as Error
-    console.error('Profile Image Upload Error:', err)
+    error.value = err as Error;
+    console.error('Profile Image Upload Error:', err);
   } finally {
-    loading.value = false
+    imageLoading.value = false;
+    profileLoading.value = false;
+    // Reset file input value to allow re-uploading the same file
+    if (target) target.value = '';
   }
 }
+
+async function removeProfileImage() {
+  if (!user.value || !profileImageUrl.value) return;
+
+  imageLoading.value = true;
+  profileLoading.value = true;
+  error.value = null;
+  successMessage.value = '';
+
+  try {
+    // 1. Update Firebase Auth profile
+    await firebaseUpdateProfile(user.value, { photoURL: null });
+
+    // 2. (Optional but recommended) Delete the old image from Firebase Storage
+    try {
+      const oldImageRef = storageRef(storage, profileImageUrl.value);
+      await deleteObject(oldImageRef);
+      console.log('Old profile image deleted from storage.');
+    } catch (storageError: unknown) {
+      // Log deletion error but don't block the UI update
+      console.warn('Could not delete old profile image from storage:', storageError);
+      // Check if it's an object and has a code property before accessing
+      if (typeof storageError === 'object' && storageError !== null && (storageError as { code?: string }).code !== 'storage/object-not-found') {
+         // Optionally inform user if deletion failed for reasons other than not found
+         // e.g., error.value = new Error('Failed to remove old profile picture file.');
+      }
+    }
+
+    // 3. Update local state
+    profileImageUrl.value = null;
+    successMessage.value = 'Profile picture removed successfully';
+
+  } catch (err) {
+    error.value = err as Error;
+    console.error('Remove Profile Image Error:', err);
+  } finally {
+    imageLoading.value = false;
+    profileLoading.value = false;
+  }
+}
+
 
 async function changePassword() {
   if (!user.value || !emailPasswordProvider.value) return
