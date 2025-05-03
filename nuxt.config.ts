@@ -12,14 +12,17 @@ export default defineNuxtConfig({
       sessionCookie: true,
     },
     config: {
-      // Explicitly read from runtimeConfig.public for client-side config
-      apiKey: process.env.FIREBASE_API_KEY || useRuntimeConfig().public.firebaseApiKey,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || useRuntimeConfig().public.firebaseAuthDomain,
-      projectId: process.env.FIREBASE_PROJECT_ID || useRuntimeConfig().public.firebaseProjectId,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || useRuntimeConfig().public.firebaseStorageBucket,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || useRuntimeConfig().public.firebaseMessagingSenderId,
-      appId: process.env.FIREBASE_APP_ID || useRuntimeConfig().public.firebaseAppId,
-      measurementId: process.env.FIREBASE_MEASUREMENT_ID || useRuntimeConfig().public.firebaseMeasurementId,
+      // Rely on nuxt-vuefire automatically reading from runtimeConfig.public
+      // or directly from process.env.FIREBASE_...
+      // We keep the keys here mainly for potential type inference benefits,
+      // but the values assigned here might be ignored if runtimeConfig is used.
+      apiKey: process.env.FIREBASE_API_KEY,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.FIREBASE_APP_ID,
+      measurementId: process.env.FIREBASE_MEASUREMENT_ID,
     },
   },
   runtimeConfig: { // Use runtimeConfig to expose env variables
