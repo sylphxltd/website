@@ -1,18 +1,55 @@
 <template>
   <div class="flex items-center gap-3">
-    <div v-if="user" class="flex items-center gap-3">
-      <span class="text-sm text-gray-700 dark:text-gray-300 hidden sm:inline">
-        {{ user.displayName || user.email }}
-      </span>
+    <div v-if="user" class="relative user-dropdown-container">
       <button 
-        @click="signOutUser" 
-        class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition"
-        title="Sign Out"
+        @click="showUserMenu = !showUserMenu" 
+        class="flex items-center gap-2 hover:opacity-80 transition"
       >
-        <span class="i-carbon-logout text-lg"></span>
-        <span class="sr-only">Sign Out</span>
+        <div class="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+          <span v-if="user.photoURL">
+            <img :src="user.photoURL" alt="User avatar" class="w-8 h-8 rounded-full" />
+          </span>
+          <span v-else>{{ (user.displayName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase() }}</span>
+        </div>
+        <span class="text-sm text-gray-700 dark:text-gray-300 hidden sm:inline">
+          {{ user.displayName || user.email?.split('@')[0] }}
+        </span>
+        <div class="i-carbon-chevron-down text-sm"></div>
       </button>
+      
+      <!-- User menu dropdown -->
+      <div 
+        v-if="showUserMenu" 
+        class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-100 dark:border-gray-700"
+      >
+        <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
+          Signed in as<br/>
+          <span class="font-medium text-gray-900 dark:text-white">{{ user.email }}</span>
+        </p>
+        
+        <NuxtLink 
+          to="/settings"
+          @click="showUserMenu = false"
+          class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          <div class="flex items-center">
+            <span class="i-carbon-settings mr-2"></span>
+            Account Settings
+          </div>
+        </NuxtLink>
+        
+        <button 
+          @click="signOutUser" 
+          class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          <div class="flex items-center">
+            <span class="i-carbon-logout mr-2"></span>
+            Sign Out
+          </div>
+        </button>
+      </div>
     </div>
+    
     <NuxtLink 
       v-else 
       to="/login" 
@@ -21,24 +58,81 @@
       <span class="i-carbon-login mr-1"></span>
       Login
     </NuxtLink>
+    
+    <!-- Error Toast Message (auto dismiss) -->
+    <div v-if="errorMessage" 
+      class="fixed bottom-4 right-4 p-4 bg-red-100 dark:bg-red-900/80 text-red-700 dark:text-red-300 rounded-lg shadow-lg max-w-xs z-50 animate-fadeIn"
+    >
+      {{ errorMessage }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted, watchEffect } from 'vue'
 import { getAuth, signOut } from 'firebase/auth'
-import { useCurrentUser } from 'vuefire' // Vuefire composable to get the current user
+import { useCurrentUser } from 'vuefire'
+import { useRouter } from 'vue-router'
 
-const user = useCurrentUser() // Get the reactive user object
+const router = useRouter()
+const user = useCurrentUser()
+const showUserMenu = ref(false)
+const errorMessage = ref('')
+const errorTimeout = ref(null)
+
+// Close dropdown when clicking outside
+function handleClickOutside(event: MouseEvent) {
+  if (showUserMenu.value && !(event.target as Element).closest('.user-dropdown-container')) {
+    showUserMenu.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  if (errorTimeout.value) {
+    clearTimeout(errorTimeout.value)
+  }
+})
 
 async function signOutUser() {
   const auth = getAuth()
   try {
     await signOut(auth)
-    // Optional: Redirect to home or login page after sign out
-    // useRouter().push('/') 
+    showUserMenu.value = false
+    router.push('/login')
   } catch (error) {
     console.error('Sign Out Error:', error)
-    // Handle sign out error (e.g., show a notification)
+    showError('There was a problem signing out. Please try again.')
   }
 }
+
+function showError(message: string) {
+  errorMessage.value = message
+  
+  // Clear any existing timeout
+  if (errorTimeout.value) {
+    clearTimeout(errorTimeout.value)
+  }
+  
+  // Auto dismiss after 5 seconds
+  errorTimeout.value = setTimeout(() => {
+    errorMessage.value = ''
+    errorTimeout.value = null
+  }, 5000)
+}
 </script>
+
+<style scoped>
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

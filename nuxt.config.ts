@@ -99,6 +99,18 @@ export default defineNuxtConfig({
       'i-carbon-login', // Added for AuthStatus
       'i-carbon-logout', // Added for AuthStatus
       'i-carbon-circle-dash', // Added for login loading
+      'i-carbon-chevron-down', // Added for user dropdown
+      'i-carbon-settings', // Added for settings page
+      'i-carbon-upload', // Added for profile image upload
+      'i-carbon-arrow-right', // Added for login flow
+      'i-carbon-user-follow', // Added for registration
+      'i-carbon-home', // Added for magic link page
+      'i-carbon-checkmark', // Added for success state
+      'i-carbon-warning', // Added for error state
+      
+      // Animation classes
+      'animate-fadeIn',
+      'animate-spin',
     ]
   },
   css: [
