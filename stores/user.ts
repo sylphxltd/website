@@ -69,10 +69,16 @@ export const useUserStore = defineStore('user', () => {
     error.value = null
   }
 
-  const formatErrorMessage = (err: any): string => {
+  const formatErrorMessage = (err: unknown): string => {
     if (typeof err === 'string') return err
     
-    const errorCode = err.code || 'unknown'
+    let errorCode = 'unknown';
+    let message = 'An unknown error occurred.';
+
+    if (typeof err === 'object' && err !== null) {
+      errorCode = (err as { code?: string }).code || 'unknown';
+      message = (err as { message?: string }).message || message;
+    }
     
     // Format Firebase error messages to be more user-friendly
     switch (errorCode) {
@@ -101,7 +107,7 @@ export const useUserStore = defineStore('user', () => {
       case 'auth/requires-recent-login':
         return 'This operation requires a recent login. Please sign in again.'
       default:
-        return err.message || 'An unknown error occurred.'
+        return message
     }
   }
 
@@ -119,7 +125,7 @@ export const useUserStore = defineStore('user', () => {
       
       // Redirect to homepage after successful login
       await navigateTo('/')
-    } catch (err: any) {
+    } catch (err: unknown) {
       error.value = formatErrorMessage(err)
       showToast(error.value, 'error')
     } finally {
@@ -129,7 +135,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // Sign in with email and password
-  const signInWithEmailPassword = async (email: string, password: string, rememberMe: boolean = false) => {
+  const signInWithEmailPassword = async (email: string, password: string, rememberMe = false) => {
     loading.value = true
     activeProvider.value = 'password'
     error.value = null
@@ -144,7 +150,7 @@ export const useUserStore = defineStore('user', () => {
       
       // Redirect to homepage after successful login
       await navigateTo('/')
-    } catch (err: any) {
+    } catch (err: unknown) {
       error.value = formatErrorMessage(err)
       showToast(error.value, 'error')
     } finally {
@@ -154,7 +160,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // Register new user with email and password
-  const registerUser = async (email: string, password: string, rememberMe: boolean = false) => {
+  const registerUser = async (email: string, password: string, rememberMe = false) => {
     loading.value = true
     activeProvider.value = 'register'
     error.value = null
@@ -169,7 +175,7 @@ export const useUserStore = defineStore('user', () => {
       
       // Redirect to homepage after successful registration
       await navigateTo('/')
-    } catch (err: any) {
+    } catch (err: unknown) {
       error.value = formatErrorMessage(err)
       showToast(error.value, 'error')
     } finally {
@@ -189,7 +195,7 @@ export const useUserStore = defineStore('user', () => {
       await sendPasswordResetEmail(auth, email)
       
       // Success handled in UI
-    } catch (err: any) {
+    } catch (err: unknown) {
       error.value = formatErrorMessage(err)
       showToast(error.value, 'error')
     } finally {
@@ -218,7 +224,7 @@ export const useUserStore = defineStore('user', () => {
       
       // Redirect to magic link page handled in UI
       await navigateTo(`/magic-link?email=${encodeURIComponent(email)}`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       error.value = formatErrorMessage(err)
       showToast(error.value, 'error')
     } finally {
@@ -238,7 +244,7 @@ export const useUserStore = defineStore('user', () => {
       
       // Redirect to login page after sign out
       await navigateTo('/login')
-    } catch (err: any) {
+    } catch (err: unknown) {
       error.value = formatErrorMessage(err)
       showToast(error.value, 'error')
     } finally {
@@ -251,7 +257,7 @@ export const useUserStore = defineStore('user', () => {
     loading,
     error,
     activeProvider,
-    currentUser,
+    // currentUser, // Removed raw Firebase User object to prevent serialization errors
     
     // Computed
     isAuthenticated,
