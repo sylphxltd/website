@@ -4,7 +4,40 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: [
     '@unocss/nuxt',
+    'nuxt-vuefire', // Revert back to module name
   ],
+  vuefire: { // This should be the correct structure according to docs
+    auth: {
+      enabled: true,
+      sessionCookie: true,
+    },
+    config: {
+      // Explicitly read from runtimeConfig.public for client-side config
+      apiKey: process.env.FIREBASE_API_KEY || useRuntimeConfig().public.firebaseApiKey,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || useRuntimeConfig().public.firebaseAuthDomain,
+      projectId: process.env.FIREBASE_PROJECT_ID || useRuntimeConfig().public.firebaseProjectId,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || useRuntimeConfig().public.firebaseStorageBucket,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || useRuntimeConfig().public.firebaseMessagingSenderId,
+      appId: process.env.FIREBASE_APP_ID || useRuntimeConfig().public.firebaseAppId,
+      measurementId: process.env.FIREBASE_MEASUREMENT_ID || useRuntimeConfig().public.firebaseMeasurementId,
+    },
+  },
+  runtimeConfig: { // Use runtimeConfig to expose env variables
+    // nuxt-vuefire should automatically pick up GOOGLE_APPLICATION_CREDENTIALS from process.env
+    // We don't need to explicitly define it here unless we need it elsewhere server-side.
+    public: {
+      // Public runtime config (client-side accessible)
+      // nuxt-vuefire reads client config from here or process.env
+      // but we define them here explicitly for clarity and potential other uses
+      firebaseApiKey: process.env.FIREBASE_API_KEY,
+      firebaseAuthDomain: process.env.FIREBASE_AUTH_DOMAIN,
+      firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
+      firebaseStorageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+      firebaseMessagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+      firebaseAppId: process.env.FIREBASE_APP_ID,
+      firebaseMeasurementId: process.env.FIREBASE_MEASUREMENT_ID,
+    }
+  },
   unocss: {
     // presets
     uno: true,
@@ -60,6 +93,9 @@ export default defineNuxtConfig({
       'i-carbon-security',
       'i-carbon-chart-network',
       'i-carbon-data-vis-1',
+      'i-carbon-login', // Added for AuthStatus
+      'i-carbon-logout', // Added for AuthStatus
+      'i-carbon-circle-dash', // Added for login loading
     ]
   },
   css: [

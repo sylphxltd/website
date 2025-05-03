@@ -11,8 +11,9 @@
               <img src="/images/logo.png" alt="Sylphx Logo" class="h-6 w-auto" />
               <span class="text-indigo-600 dark:text-indigo-400 text-xl font-bold tracking-tight">Sylphx</span>
             </NuxtLink>
-            <div class="flex items-center gap-2 md:gap-8">
-              <nav class="hidden md:flex gap-6">
+            <div class="flex items-center gap-4 md:gap-6">
+              <!-- Navigation -->
+              <nav class="hidden md:flex gap-5">
                 <NuxtLink to="/" class="text-gray-800 dark:text-gray-200 font-medium text-sm relative py-1 decoration-none transition hover:text-blue-600 dark:hover:text-blue-400" 
                   active-class="text-blue-600 dark:text-blue-400 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-blue-600 dark:after:bg-blue-400">
                   About
@@ -33,6 +34,8 @@
                   Contact
                 </a>
               </nav>
+              <!-- Auth Status -->
+              <AuthStatus />
               <!-- Dark mode toggle -->
               <button @click="toggleDark()" class="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <div v-if="isDark" class="i-carbon-moon text-lg text-indigo-400"></div>
