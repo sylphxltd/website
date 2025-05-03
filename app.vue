@@ -1,5 +1,5 @@
 <template>
-  <div class="font-sans min-h-screen flex flex-col transition-colors duration-300" :class="{ 'dark': isDark }">
+  <div class="font-sans min-h-screen flex flex-col transition-colors duration-300"> {/* Removed :class binding */}
     <div class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 flex-grow flex flex-col">
       
       <!-- Use AppHeader Component -->
@@ -41,6 +41,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useDark, useToggle } from '@vueuse/core';
+// import { useHead } from '#imports'; // Removed useHead import
 import AppHeader from '~/components/AppHeader.vue';
 import AppMobileMenu from '~/components/AppMobileMenu.vue';
 import AppFooter from '~/components/AppFooter.vue';
@@ -54,6 +55,7 @@ const navLinks = [
   { name: 'About', path: '/' },
   { name: 'Products', path: '/products' },
   { name: 'Technologies', path: '/technologies' },
+  { name: 'Instructions', path: '/instructions' }, // Added Instructions link
   { name: 'Privacy Policy', path: '/privacy' },
   { name: 'Contact', path: 'mailto:support@sylphx.com', external: true },
 ];
@@ -93,6 +95,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', onResize);
 });
+
+// useDark() automatically handles the 'dark' class on the <html> element.
+// No need for manual useHead manipulation here.
+
 </script>
 
 <style>

@@ -6,16 +6,15 @@ export default defineNuxtConfig({
     '@unocss/nuxt',
     'nuxt-vuefire', // Revert back to module name
     '@pinia/nuxt', // Add Pinia module
+    '@vueuse/nuxt', // Add VueUse Nuxt module
   ],
-  vuefire: { // This should be the correct structure according to docs
+  vuefire: { // This is needed for nuxt-vuefire module initialization
     auth: {
       enabled: true,
       sessionCookie: true,
     },
     config: {
-      // Rely on nuxt-vuefire automatically reading from runtimeConfig.public
-      // or directly from process.env.FIREBASE_...
-      // Restoring direct process.env reads to potentially fix SSR initialization issues.
+      // These should be the original FIREBASE_ variables from .env for module init
       apiKey: process.env.FIREBASE_API_KEY,
       authDomain: process.env.FIREBASE_AUTH_DOMAIN,
       projectId: process.env.FIREBASE_PROJECT_ID,
@@ -25,20 +24,8 @@ export default defineNuxtConfig({
       measurementId: process.env.FIREBASE_MEASUREMENT_ID,
     },
   },
-  runtimeConfig: { // Use runtimeConfig to expose env variables
-    // nuxt-vuefire should automatically pick up GOOGLE_APPLICATION_CREDENTIALS from process.env
-    // We don't need to explicitly define it here unless we need it elsewhere server-side.
+  runtimeConfig: {
     public: {
-      // Public runtime config (client-side accessible)
-      // nuxt-vuefire reads client config from vuefire.config or process.env directly.
-      // Defining them here might be redundant if vuefire.config is sufficient.
-      // firebaseApiKey: process.env.FIREBASE_API_KEY, // Removed, relying on vuefire.config
-      // firebaseAuthDomain: process.env.FIREBASE_AUTH_DOMAIN, // Removed, relying on vuefire.config
-      // firebaseProjectId: process.env.FIREBASE_PROJECT_ID, // Removed, relying on vuefire.config
-      // firebaseStorageBucket: process.env.FIREBASE_STORAGE_BUCKET, // Removed, relying on vuefire.config
-      // firebaseMessagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID, // Removed, relying on vuefire.config
-      // firebaseAppId: process.env.FIREBASE_APP_ID, // Removed, relying on vuefire.config
-      // firebaseMeasurementId: process.env.FIREBASE_MEASUREMENT_ID, // Removed, relying on vuefire.config
     }
   },
   unocss: {
@@ -60,14 +47,14 @@ export default defineNuxtConfig({
         mono: 'JetBrains Mono:400', // Removed unused weights 500, 600
       },
     },
-    // safelist for dark mode classes
-    // safelist is generally not needed with UnoCSS as it scans the codebase.
-    // Removing the safelist to rely on build-time scanning.
-    safelist: []
   },
   css: [
     '@unocss/reset/tailwind.css',
-    // 'animate.css/animate.min.css', // Removed, using UnoCSS animations instead
+    '@milkdown/theme-nord/style.css', // Use Nord theme CSS for @milkdown/kit
+    // '@milkdown/crepe/theme/common/style.css', // Removed Crepe styles
+    // '@milkdown/crepe/theme/nord.css', // Removed Crepe styles
+    // '@milkdown/prose/style/prosemirror.css', // Removed
+    // 'animate.css/animate.min.css', // Removed
   ],
   app: {
     head: {
@@ -82,5 +69,17 @@ export default defineNuxtConfig({
       ]
     },
     pageTransition: { name: 'page', mode: 'out-in' }
+  },
+  vite: {
+    ssr: {
+      // Force Vite to bundle these packages for SSR, potentially resolving CSS import issues
+      noExternal: [
+        /@milkdown\/.*/, // Match all @milkdown packages
+        /prosemirror-.*/, // Match prosemirror related packages if needed
+      ],
+    },
+  },
+  vueuse: {
+    ssrHandlers: true, // Enable SSR handlers for VueUse
   }
 })

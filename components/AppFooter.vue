@@ -54,6 +54,8 @@
       <div class="border-t border-gray-800 pt-5 flex flex-wrap justify-between gap-4">
         <p class="text-gray-500 text-sm">&copy; {{ new Date().getFullYear() }} Sylphx Limited. All rights reserved.</p>
         <div class="flex gap-4">
+          <!-- Dark mode toggle -->
+          <!-- Removed ClientOnly wrapper -->
           <button @click="$emit('toggle-dark')" class="text-gray-500 hover:text-gray-300 transition text-sm flex items-center gap-1.5">
             <div v-if="isDark" class="i-carbon-moon text-base text-indigo-400"></div>
             <div v-else class="i-carbon-sun text-base text-blue-600"></div>

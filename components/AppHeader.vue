@@ -34,6 +34,7 @@
           <!-- Auth Status -->
           <AuthStatus />
           <!-- Dark mode toggle -->
+          <!-- Removed ClientOnly wrapper -->
           <button @click="$emit('toggle-dark')" class="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <div v-if="isDark" class="i-carbon-moon text-lg text-indigo-400"></div>
             <div v-else class="i-carbon-sun text-lg text-blue-600"></div>
