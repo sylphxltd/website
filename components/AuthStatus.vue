@@ -1,18 +1,18 @@
 <template>
   <div class="flex items-center gap-3">
-    <div v-if="user" class="relative user-dropdown-container">
+    <div v-if="userStore.isAuthenticated" class="relative user-dropdown-container">
       <button 
         @click="showUserMenu = !showUserMenu" 
         class="flex items-center gap-2 hover:opacity-80 transition"
       >
         <div class="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-          <span v-if="user.photoURL">
-            <img :src="user.photoURL" alt="User avatar" class="w-8 h-8 rounded-full" />
+          <span v-if="userStore.userPhotoURL">
+            <img :src="userStore.userPhotoURL" alt="User avatar" class="w-8 h-8 rounded-full" />
           </span>
-          <span v-else>{{ (user.displayName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase() }}</span>
+          <span v-else>{{ userStore.userInitial }}</span>
         </div>
         <span class="text-sm text-gray-700 dark:text-gray-300 hidden sm:inline">
-          {{ user.displayName || user.email?.split('@')[0] }}
+          {{ userStore.userDisplayName }}
         </span>
         <div class="i-carbon-chevron-down text-sm"></div>
       </button>
@@ -24,7 +24,7 @@
       >
         <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
           Signed in as<br/>
-          <span class="font-medium text-gray-900 dark:text-white">{{ user.email }}</span>
+          <span class="font-medium text-gray-900 dark:text-white">{{ userStore.userEmail }}</span>
         </p>
         
         <NuxtLink 
@@ -39,7 +39,7 @@
         </NuxtLink>
         
         <button 
-          @click="signOutUser" 
+          @click="handleSignOut" 
           class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700"
         >
           <div class="flex items-center">
@@ -70,12 +70,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watchEffect } from 'vue'
-import { getAuth, signOut } from 'firebase/auth'
-import { useCurrentUser } from 'vuefire'
+import { useUserStore } from '~/stores/user'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const user = useCurrentUser()
+const userStore = useUserStore()
 const showUserMenu = ref(false)
 const errorMessage = ref('')
 const errorTimeout = ref(null)
@@ -98,16 +97,10 @@ onUnmounted(() => {
   }
 })
 
-async function signOutUser() {
-  const auth = getAuth()
-  try {
-    await signOut(auth)
-    showUserMenu.value = false
-    router.push('/login')
-  } catch (error) {
-    console.error('Sign Out Error:', error)
-    showError('There was a problem signing out. Please try again.')
-  }
+// Handle sign out
+async function handleSignOut() {
+  showUserMenu.value = false
+  await userStore.signOutUser()
 }
 
 function showError(message: string) {

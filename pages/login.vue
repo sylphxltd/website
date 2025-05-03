@@ -191,379 +191,264 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  getAuth,
-  fetchSignInMethodsForEmail,
-  signInWithEmailLink,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  AuthErrorCodes
-} from 'firebase/auth'
+import { ref, computed } from 'vue'
+import { getAuth, fetchSignInMethodsForEmail } from 'firebase/auth'
 import { useRouter } from 'vue-router'
-import { useCurrentUser } from 'vuefire'
+import { useUserStore } from '~/stores/user'
+import { useToastStore } from '~/stores/toast'
 
-// Authentication state
+// Stores
+const userStore = useUserStore()
+const toastStore = useToastStore()
 const router = useRouter()
-const error = ref<Error | null>(null)
-const loading = ref(false)
-const activeProvider = ref<string>('')
 
-// User flow steps
-// 'email' -> 'password' (existing user) -> redirect to home
-// 'email' -> 'register' (new user) -> redirect to home
-// Or direct social login -> redirect to home  
-type FlowStep = 'email' | 'password' | 'register' | 'magic-link-sent';
-const currentStep = ref<FlowStep>('email')
-
-// Form fields
+// Form state
 const email = ref('')
 const password = ref('')
 const newPassword = ref('')
 const rememberMe = ref(false)
+const error = ref<Error | null>(null)
+const loading = ref(false)
+const activeProvider = ref('')
+const currentStep = ref('email')
 
-// Firebase auth
-const auth = getAuth()
-const user = useCurrentUser()
-
-// Action Settings - use computed to avoid SSR issues
+// Magic link settings
 const actionCodeSettings = computed(() => {
-  // Only access window when in browser environment
-  if (typeof window !== 'undefined') {
-    return {
-      url: window.location.origin + '/magic-link',
-      handleCodeInApp: true,
-    }
-  }
-  // Return placeholder during SSR
+  // Safe to access window here since it's wrapped in a computed
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
   return {
-    url: 'http://localhost:3000/magic-link', // Default fallback for SSR
-    handleCodeInApp: true,
+    url: `${baseUrl}/magic-link?email=${encodeURIComponent(email.value)}`,
+    handleCodeInApp: true
   }
 })
 
-// Redirect if already logged in
-watch(user, (newUser) => {
-  if (newUser) {
-    router.push('/')
-  }
-}, { immediate: true })
-
-// Only run client-side code in onMounted hook
-onMounted(() => {
-  // Check if the URL contains email link sign-in info
-  if (typeof window !== 'undefined' && isSignInWithEmailLink(auth, window.location.href)) {
-    // Get the email from localStorage if available
-    let email = localStorage.getItem('emailForSignIn')
-    
-    if (!email) {
-      // If no email in storage, ask the user
-      email = window.prompt('Please provide your email for confirmation')
-    }
-    
-    if (email) {
-      loading.value = true
-      activeProvider.value = 'magic'
-      
-      signInWithEmailLink(auth, email, window.location.href)
-        .then(() => {
-          // Clear the URL and email
-          localStorage.removeItem('emailForSignIn')
-          // Redirect
-          router.push('/')
-        })
-        .catch((err) => {
-          error.value = err
-          console.error('Magic Link Sign-In Error:', err)
-          // Reset to email step
-          currentStep.value = 'email'
-        })
-        .finally(() => {
-          loading.value = false
-          activeProvider.value = ''
-        })
-    }
-  }
-})
-
-function formatErrorMessage(err: Error): string {
-  if (!err) return '';
+// Format error message to be user-friendly
+function formatErrorMessage(err: any): string {
+  if (!err) return ''
   
-  // Extract Firebase error code
-  const errorMessage = err.message || '';
-  const isFirebaseError = errorMessage.includes('auth/');
+  if (typeof err === 'string') return err
   
-  if (isFirebaseError) {
-    // Handle common Firebase auth errors with user-friendly messages
-    if (errorMessage.includes('auth/email-already-in-use')) {
-      return 'This email address is already registered. Please sign in instead.';
-    }
-    if (errorMessage.includes('auth/invalid-email')) {
-      return 'Please enter a valid email address.';
-    }
-    if (errorMessage.includes('auth/weak-password')) {
-      return 'Password is too weak. Please use at least 6 characters.';
-    }
-    if (errorMessage.includes('auth/user-not-found') || errorMessage.includes('auth/wrong-password')) {
-      return 'Invalid email or password. Please check your credentials and try again.';
-    }
-    if (errorMessage.includes('auth/too-many-requests')) {
-      return 'Too many unsuccessful login attempts. Please try again later or reset your password.';
-    }
-    if (errorMessage.includes('auth/network-request-failed')) {
-      return 'Network error. Please check your internet connection and try again.';
-    }
-    if (errorMessage.includes('auth/popup-closed-by-user')) {
-      return 'Sign-in popup was closed before completing authentication.';
-    }
-    if (errorMessage.includes('auth/account-exists-with-different-credential')) {
-      return 'An account already exists with the same email address but different sign-in credentials. Try signing in using a different method.';
-    }
+  // Get Firebase error code or message
+  const errorCode = err.code || ''
+  const errorMessage = err.message || 'An unknown error occurred'
+  
+  // Format Firebase error messages to be more user-friendly
+  switch (errorCode) {
+    case 'auth/invalid-email':
+      return 'The email address is not valid.'
+    case 'auth/user-disabled':
+      return 'This account has been disabled.'
+    case 'auth/user-not-found':
+      return 'No account found with this email.'
+    case 'auth/wrong-password':
+      return 'Incorrect password.'
+    case 'auth/invalid-credential':
+      return 'Invalid login credentials.'
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists.'
+    case 'auth/weak-password':
+      return 'Password is too weak. Please use at least 6 characters.'
+    case 'auth/network-request-failed':
+      return 'Network error. Please check your connection.'
+    case 'auth/too-many-requests':
+      return 'Too many unsuccessful login attempts. Please try again later.'
+    case 'auth/popup-closed-by-user':
+      return 'Login popup was closed before completion.'
+    case 'auth/popup-blocked':
+      return 'Login popup was blocked by your browser.'
+    case 'auth/requires-recent-login':
+      return 'This operation requires a recent login. Please sign in again.'
+    default:
+      // Return the message but remove Firebase prefix
+      return errorMessage.replace('Firebase: ', '').replace(/\(auth\/.*\)\.?/, '')
   }
-  
-  // Fallback to the original error message or a generic message
-  return errorMessage || 'An error occurred. Please try again.';
 }
 
-// Add a new function to directly check if an email exists
-async function checkEmailExists(email: string): Promise<boolean> {
+async function checkEmailExists(emailAddress: string): Promise<boolean> {
+  // Skip check if email is empty
+  if (!emailAddress) return false
+  
   try {
-    // First try using fetchSignInMethodsForEmail
-    const methods = await fetchSignInMethodsForEmail(auth, email);
-    if (methods && methods.length > 0) {
-      return true;
-    }
-    
-    // If that doesn't give a clear answer, we can try a second approach
-    // Try to create a temporary user to see if the email exists
-    // Note: This will fail if the email exists, which is what we want to check
-    try {
-      // We won't actually create the user, just check if it would fail
-      await createUserWithEmailAndPassword(auth, email, 'TemporaryPassword123!');
-      // If we get here, the email doesn't exist
-      return false;
-    } catch (err) {
-      // If we get email-already-in-use error, then the email exists
-      if (err.code === 'auth/email-already-in-use') {
-        return true;
-      }
-      // For other errors, we can't determine if the email exists
-      return false;
-    }
+    const auth = getAuth()
+    const signInMethods = await fetchSignInMethodsForEmail(auth, emailAddress)
+    return signInMethods.length > 0
   } catch (err) {
-    console.error('Error checking if email exists:', err);
-    return false;
+    console.error('Error checking email existence:', err)
+    return false
   }
 }
 
 async function continueWithEmail() {
-  if (!email.value.trim()) {
-    error.value = new Error('Please enter your email address.');
-    return;
+  if (!email.value) {
+    error.value = new Error('Please enter your email address.')
+    return
   }
   
-  loading.value = true;
-  activeProvider.value = 'email';
-  error.value = null;
+  loading.value = true
+  activeProvider.value = 'email'
+  error.value = null
   
   try {
     // Check if the email exists using our more robust method
-    const emailExists = await checkEmailExists(email.value);
-    console.log("Email exists:", emailExists); // Debug log
+    const emailExists = await checkEmailExists(email.value)
     
     if (emailExists) {
       // User exists - go to password step
-      currentStep.value = 'password';
+      currentStep.value = 'password'
     } else {
       // New user - go to registration step
-      currentStep.value = 'register';
+      currentStep.value = 'register'
     }
   } catch (err) {
-    console.error('Email Check Error:', err);
-    error.value = err as Error;
+    console.error('Email Check Error:', err)
+    error.value = err as Error
+    toastStore.error(formatErrorMessage(err))
   } finally {
-    loading.value = false;
-    activeProvider.value = '';
+    loading.value = false
+    activeProvider.value = ''
   }
 }
 
 async function signInWithGoogle() {
-  loading.value = true;
-  activeProvider.value = 'google';
-  error.value = null;
+  loading.value = true
+  activeProvider.value = 'google'
+  error.value = null
   
-  const provider = new GoogleAuthProvider();
-
   try {
-    // Use browser persistence if remember me is checked
-    if (rememberMe.value) {
-      // Import browser persistence explicitly
-      const { browserLocalPersistence, browserSessionPersistence } = await import('firebase/auth');
-      await auth.setPersistence(browserLocalPersistence);
-    } else {
-      const { browserSessionPersistence } = await import('firebase/auth');
-      await auth.setPersistence(browserSessionPersistence);
-    }
-    await signInWithPopup(auth, provider);
-    router.push('/');
+    await userStore.signInWithGoogle()
+    // Navigation is handled in the store
   } catch (err) {
-    error.value = err as Error;
-    console.error('Google Sign-In Error:', err);
+    error.value = err as Error
+    toastStore.error(formatErrorMessage(err))
   } finally {
-    loading.value = false;
-    activeProvider.value = '';
+    loading.value = false
+    activeProvider.value = ''
   }
 }
 
 async function signInWithEmailPassword() {
   if (!password.value) {
-    error.value = new Error('Please enter your password.');
-    return;
+    error.value = new Error('Please enter your password.')
+    toastStore.error('Please enter your password.')
+    return
   }
   
-  loading.value = true;
-  activeProvider.value = 'password';
-  error.value = null;
+  loading.value = true
+  activeProvider.value = 'password'
+  error.value = null
   
   try {
-    // Use browser persistence if remember me is checked
-    if (rememberMe.value) {
-      // Import browser persistence explicitly
-      const { browserLocalPersistence } = await import('firebase/auth');
-      await auth.setPersistence(browserLocalPersistence);
-    } else {
-      const { browserSessionPersistence } = await import('firebase/auth');
-      await auth.setPersistence(browserSessionPersistence);
-    }
-    
-    await signInWithEmailAndPassword(auth, email.value, password.value);
-    router.push('/');
+    await userStore.signInWithEmailPassword(email.value, password.value, rememberMe.value)
+    // Navigation is handled in the store
   } catch (err) {
-    error.value = err as Error;
-    console.error('Email/Password Sign-In Error:', err);
+    error.value = err as Error
+    toastStore.error(formatErrorMessage(err))
   } finally {
-    loading.value = false;
-    activeProvider.value = '';
+    loading.value = false
+    activeProvider.value = ''
   }
 }
 
 async function registerUser() {
   if (!newPassword.value) {
-    error.value = new Error('Please create a password.');
-    return;
+    error.value = new Error('Please create a password.')
+    toastStore.error('Please create a password.')
+    return
   }
   
   if (newPassword.value.length < 6) {
-    error.value = new Error('Password must be at least 6 characters long.');
-    return;
+    error.value = new Error('Password must be at least 6 characters long.')
+    toastStore.error('Password must be at least 6 characters long.')
+    return
   }
   
-  loading.value = true;
-  activeProvider.value = 'register';
-  error.value = null;
+  loading.value = true
+  activeProvider.value = 'register'
+  error.value = null
   
   try {
     // Double-check that the email doesn't exist before trying to register
-    const emailExists = await checkEmailExists(email.value);
+    const emailExists = await checkEmailExists(email.value)
     
     if (emailExists) {
       // If the email exists, redirect to the password step instead
-      error.value = new Error('This email is already registered. Please sign in with your password instead.');
-      currentStep.value = 'password';
-      return;
+      error.value = new Error('This email is already registered. Please sign in with your password instead.')
+      toastStore.warning('This email is already registered. Please sign in with your password instead.')
+      currentStep.value = 'password'
+      return
     }
     
-    // Skip setting persistence for registration to avoid the internal assertion error
-    // We'll set it after successful registration if needed
-    const userCredential = await createUserWithEmailAndPassword(auth, email.value, newPassword.value);
-    
-    // Now set persistence if needed
-    if (rememberMe.value) {
-      // We can just leave it as the default persistence which is already 'local'
-      console.log('User will be remembered');
-    }
-    
-    router.push('/');
+    await userStore.registerUser(email.value, newPassword.value, rememberMe.value)
+    // Navigation is handled in the store
   } catch (err) {
-    error.value = err as Error;
-    console.error('Registration Error:', err);
+    error.value = err as Error
+    toastStore.error(formatErrorMessage(err))
     
     // If we get an email-already-in-use error, redirect to password login
     if (err.code === 'auth/email-already-in-use') {
-      error.value = new Error('This email is already registered. Please sign in with your password.');
-      currentStep.value = 'password';
+      error.value = new Error('This email is already registered. Please sign in with your password.')
+      toastStore.warning('This email is already registered. Please sign in with your password.')
+      currentStep.value = 'password'
     }
   } finally {
-    loading.value = false;
-    activeProvider.value = '';
+    loading.value = false
+    activeProvider.value = ''
   }
 }
 
 async function resetPassword() {
   if (!email.value) {
-    error.value = new Error('Please enter your email address first.');
-    return;
+    error.value = new Error('Please enter your email address first.')
+    toastStore.error('Please enter your email address first.')
+    return
   }
   
-  loading.value = true;
-  activeProvider.value = 'reset';
-  error.value = null;
+  loading.value = true
+  activeProvider.value = 'reset'
+  error.value = null
   
   try {
-    await sendPasswordResetEmail(auth, email.value);
-    alert('Password reset email has been sent. Please check your inbox.');
+    await userStore.resetPassword(email.value)
+    toastStore.success('Password reset email has been sent. Please check your inbox.')
   } catch (err) {
-    error.value = err as Error;
-    console.error('Password Reset Error:', err);
+    error.value = err as Error
+    toastStore.error(formatErrorMessage(err))
   } finally {
-    loading.value = false;
-    activeProvider.value = '';
+    loading.value = false
+    activeProvider.value = ''
   }
 }
 
 async function sendMagicLink() {
   if (!email.value) {
-    error.value = new Error('Please enter your email address first.');
-    return;
+    error.value = new Error('Please enter your email address first.')
+    toastStore.error('Please enter your email address first.')
+    return
   }
   
-  loading.value = true;
-  activeProvider.value = 'magic';
-  error.value = null;
+  loading.value = true
+  activeProvider.value = 'magic'
+  error.value = null
   
   try {
-    // Use the computed actionCodeSettings that's safe for SSR
-    await sendSignInLinkToEmail(auth, email.value, actionCodeSettings.value);
-    
-    // Only access localStorage in browser environment
-    if (typeof window !== 'undefined') {
-      // Save the email locally to complete sign-in on the same device
-      localStorage.setItem('emailForSignIn', email.value);
-    }
-    
-    alert('Sign-in link has been sent to your email. Please check your inbox and click the link to sign in.');
+    await userStore.sendMagicLink(email.value)
     
     // Clear current step and return to email input
-    resetFlow();
+    resetFlow()
   } catch (err) {
-    error.value = err as Error;
-    console.error('Magic Link Error:', err);
+    error.value = err as Error
+    toastStore.error(formatErrorMessage(err))
   } finally {
-    loading.value = false;
-    activeProvider.value = '';
+    loading.value = false
+    activeProvider.value = ''
   }
 }
 
 function resetFlow() {
-  currentStep.value = 'email';
-  error.value = null;
+  currentStep.value = 'email'
+  error.value = null
   // Don't clear email to make it easy to correct typos
-  password.value = '';
-  newPassword.value = '';
+  password.value = ''
+  newPassword.value = ''
 }
 </script>

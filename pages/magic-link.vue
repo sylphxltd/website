@@ -17,10 +17,6 @@
         </p>
       </div>
       
-      <div v-if="error" class="mb-6 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-sm">
-        {{ errorMessage }}
-      </div>
-      
       <div v-if="!loading" class="mt-6">
         <NuxtLink 
           to="/" 
@@ -38,13 +34,14 @@
 import { ref, onMounted } from 'vue'
 import { getAuth, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth'
 import { useRouter } from 'vue-router'
+import { useToastStore } from '~/stores/toast'
 
 const router = useRouter()
+const toastStore = useToastStore()
 const loading = ref(true)
 const success = ref(false)
 const error = ref(false)
 const statusMessage = ref('Please wait while we authenticate your account...')
-const errorMessage = ref('')
 
 onMounted(async () => {
   const auth = getAuth()
@@ -72,6 +69,9 @@ onMounted(async () => {
         success.value = true
         statusMessage.value = 'You are now signed in. Redirecting you to the home page shortly...'
         
+        // Show success toast
+        toastStore.success('Successfully signed in')
+        
         // Redirect after a short delay
         setTimeout(() => {
           router.push('/')
@@ -86,8 +86,12 @@ onMounted(async () => {
     }
   } catch (err) {
     error.value = true
-    errorMessage.value = err.message || 'Authentication failed. Please try signing in again.'
+    const errorMessage = err.message || 'Authentication failed. Please try signing in again.'
     statusMessage.value = 'Something went wrong while trying to sign you in.'
+    
+    // Show error toast
+    toastStore.error(errorMessage)
+    
     console.error('Magic Link Authentication Error:', err)
   } finally {
     loading.value = false

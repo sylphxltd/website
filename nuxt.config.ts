@@ -5,6 +5,7 @@ export default defineNuxtConfig({
   modules: [
     '@unocss/nuxt',
     'nuxt-vuefire', // Revert back to module name
+    '@pinia/nuxt', // Add Pinia module
   ],
   vuefire: { // This should be the correct structure according to docs
     auth: {
