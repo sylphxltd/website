@@ -1,5 +1,5 @@
 <template>
-  <div class="font-sans min-h-screen flex flex-col transition-colors duration-300"> {/* Removed :class binding */}
+  <div class="font-sans min-h-screen flex flex-col transition-colors duration-300">
     <div class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 flex-grow flex flex-col">
       
       <!-- Use AppHeader Component -->
