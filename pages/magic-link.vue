@@ -34,10 +34,8 @@
 import { ref, onMounted } from 'vue'
 import { getAuth, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth'
 import { useRouter } from 'vue-router'
-import { useToastStore } from '~/stores/toast'
 
 const router = useRouter()
-const toastStore = useToastStore()
 const loading = ref(true)
 const success = ref(false)
 const error = ref(false)
@@ -69,9 +67,6 @@ onMounted(async () => {
         success.value = true
         statusMessage.value = 'You are now signed in. Redirecting you to the home page shortly...'
         
-        // Show success toast
-        toastStore.success('Successfully signed in')
-        
         // Redirect after a short delay
         setTimeout(() => {
           router.push('/')
@@ -88,9 +83,6 @@ onMounted(async () => {
     error.value = true
     const errorMessage = err.message || 'Authentication failed. Please try signing in again.'
     statusMessage.value = 'Something went wrong while trying to sign you in.'
-    
-    // Show error toast
-    toastStore.error(errorMessage)
     
     console.error('Magic Link Authentication Error:', err)
   } finally {

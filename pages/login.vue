@@ -242,11 +242,9 @@ import { ref, computed } from 'vue'
 import { getAuth, fetchSignInMethodsForEmail } from 'firebase/auth'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '~/stores/user'
-import { useToastStore } from '~/stores/toast'
 
 // Stores
 const userStore = useUserStore()
-const toastStore = useToastStore()
 const router = useRouter()
 
 // Form state
@@ -336,7 +334,6 @@ function togglePasswordLogin() {
 function switchToEmailLink() {
   if (!email.value) {
     error.value = new Error('Please enter your email address first.')
-    toastStore.error('Please enter your email address first.')
     return
   }
   
@@ -346,7 +343,6 @@ function switchToEmailLink() {
 async function checkEmailAndContinue() {
   if (!email.value) {
     error.value = new Error('Please enter your email address.')
-    toastStore.error('Please enter your email address.')
     return
   }
   
@@ -371,7 +367,6 @@ async function checkEmailAndContinue() {
   } catch (err) {
     console.error('Email Check Error:', err)
     error.value = err as Error
-    toastStore.error(formatErrorMessage(err))
     return false
   } finally {
     loading.value = false
@@ -382,7 +377,6 @@ async function checkEmailAndContinue() {
 async function continueWithEmail() {
   if (!email.value) {
     error.value = new Error('Please enter your email address.')
-    toastStore.error('Please enter your email address.')
     return
   }
   
@@ -406,7 +400,6 @@ async function signInWithGoogle() {
     // Navigation is handled in the store
   } catch (err) {
     error.value = err as Error
-    toastStore.error(formatErrorMessage(err))
   } finally {
     loading.value = false
     activeProvider.value = ''
@@ -416,7 +409,6 @@ async function signInWithGoogle() {
 async function signInWithEmailPassword() {
   if (!password.value) {
     error.value = new Error('Please enter your password.')
-    toastStore.error('Please enter your password.')
     return
   }
   
@@ -429,7 +421,6 @@ async function signInWithEmailPassword() {
     // Navigation is handled in the store
   } catch (err) {
     error.value = err as Error
-    toastStore.error(formatErrorMessage(err))
   } finally {
     loading.value = false
     activeProvider.value = ''
@@ -439,13 +430,11 @@ async function signInWithEmailPassword() {
 async function registerUser() {
   if (!newPassword.value) {
     error.value = new Error('Please create a password.')
-    toastStore.error('Please create a password.')
     return
   }
   
   if (newPassword.value.length < 6) {
     error.value = new Error('Password must be at least 6 characters long.')
-    toastStore.error('Password must be at least 6 characters long.')
     return
   }
   
@@ -460,7 +449,6 @@ async function registerUser() {
     if (emailExists) {
       // If the email exists, redirect to the password step instead
       error.value = new Error('This email is already registered. Please sign in with your password instead.')
-      toastStore.warning('This email is already registered. Please sign in with your password instead.')
       currentStep.value = 'password'
       return
     }
@@ -469,12 +457,10 @@ async function registerUser() {
     // Navigation is handled in the store
   } catch (err) {
     error.value = err as Error
-    toastStore.error(formatErrorMessage(err))
     
     // If we get an email-already-in-use error, redirect to password login
     if (err.code === 'auth/email-already-in-use') {
       error.value = new Error('This email is already registered. Please sign in with your password.')
-      toastStore.warning('This email is already registered. Please sign in with your password.')
       currentStep.value = 'password'
     }
   } finally {
@@ -486,7 +472,6 @@ async function registerUser() {
 async function resetPassword() {
   if (!email.value) {
     error.value = new Error('Please enter your email address first.')
-    toastStore.error('Please enter your email address first.')
     return
   }
   
@@ -496,10 +481,8 @@ async function resetPassword() {
   
   try {
     await userStore.resetPassword(email.value)
-    toastStore.success('Password reset email has been sent. Please check your inbox.')
   } catch (err) {
     error.value = err as Error
-    toastStore.error(formatErrorMessage(err))
   } finally {
     loading.value = false
     activeProvider.value = ''
@@ -509,7 +492,6 @@ async function resetPassword() {
 async function sendMagicLink() {
   if (!email.value) {
     error.value = new Error('Please enter your email address first.')
-    toastStore.error('Please enter your email address first.')
     return
   }
   
@@ -522,10 +504,8 @@ async function sendMagicLink() {
     
     // Show success step
     currentStep.value = 'magic-link-sent'
-    toastStore.success('Secure link sent to your email')
   } catch (err) {
     error.value = err as Error
-    toastStore.error(formatErrorMessage(err))
   } finally {
     loading.value = false
     activeProvider.value = ''

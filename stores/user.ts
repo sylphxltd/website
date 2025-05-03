@@ -117,8 +117,6 @@ export const useUserStore = defineStore('user', () => {
       
       await signInWithPopup(auth, provider)
       
-      showToast('Successfully signed in with Google', 'success')
-      
       // Redirect to homepage after successful login
       await navigateTo('/')
     } catch (err: any) {
@@ -143,8 +141,6 @@ export const useUserStore = defineStore('user', () => {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       
       await signInWithEmailAndPassword(auth, email, password)
-      
-      showToast('Successfully signed in', 'success')
       
       // Redirect to homepage after successful login
       await navigateTo('/')
@@ -171,8 +167,6 @@ export const useUserStore = defineStore('user', () => {
       
       await createUserWithEmailAndPassword(auth, email, password)
       
-      showToast('Account created successfully', 'success')
-      
       // Redirect to homepage after successful registration
       await navigateTo('/')
     } catch (err: any) {
@@ -194,7 +188,7 @@ export const useUserStore = defineStore('user', () => {
       const auth = getAuth()
       await sendPasswordResetEmail(auth, email)
       
-      showToast('Password reset email sent', 'success')
+      // Success handled in UI
     } catch (err: any) {
       error.value = formatErrorMessage(err)
       showToast(error.value, 'error')
@@ -222,9 +216,7 @@ export const useUserStore = defineStore('user', () => {
       // Save the email locally to remember the user
       window.localStorage.setItem('emailForSignIn', email)
       
-      showToast('Magic link sent to your email', 'success')
-      
-      // Redirect to magic link page
+      // Redirect to magic link page handled in UI
       await navigateTo(`/magic-link?email=${encodeURIComponent(email)}`)
     } catch (err: any) {
       error.value = formatErrorMessage(err)
@@ -243,8 +235,6 @@ export const useUserStore = defineStore('user', () => {
     try {
       const auth = getAuth()
       await signOut(auth)
-      
-      showToast('Successfully signed out', 'success')
       
       // Redirect to login page after sign out
       await navigateTo('/login')
