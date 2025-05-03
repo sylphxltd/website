@@ -4,11 +4,11 @@
     <section class="py-20 md:py-24 bg-gradient-to-br from-gray-900 to-gray-800 text-white relative overflow-hidden">
       <div class="absolute inset-0 bg-pattern opacity-10"></div>
       <div class="relative z-10 w-full max-w-7xl mx-auto px-4 md:px-6">
-        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 animate__animated animate__fadeInUp">Privacy Policy</h1>
-        <p class="text-lg sm:text-xl text-gray-300 max-w-2xl mb-6 animate__animated animate__fadeInUp animate__delay-1s">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 animate-fade-in-up">Privacy Policy</h1>
+        <p class="text-lg sm:text-xl text-gray-300 max-w-2xl mb-6 animate-fade-in-up animate-delay-1s">
           Sylphx is committed to protecting your privacy and personal data
         </p>
-        <div class="text-sm text-gray-400 italic animate__animated animate__fadeInUp animate__delay-2s flex items-center">
+        <div class="text-sm text-gray-400 italic animate-fade-in-up animate-delay-2s flex items-center">
           <span class="i-carbon-calendar mr-2"></span>
           Last updated: May 1, 2025
         </div>
@@ -18,7 +18,7 @@
     <!-- Policy Content -->
     <section class="py-12 md:py-16 bg-gray-50 dark:bg-gray-800">
       <div class="w-full max-w-7xl mx-auto px-4 md:px-6">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-12 shadow-lg animate__animated animate__fadeInUp">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-12 shadow-lg animate-fade-in-up">
           
           <div class="prose max-w-none dark:prose-invert">
             <h2 class="text-2xl font-semibold mb-6 flex items-center">

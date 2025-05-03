@@ -64,6 +64,32 @@ export const useUserStore = defineStore('user', () => {
     toastStore[type](message)
   }
 
+  // Internal helper for auth actions
+  async function _performAuthAction(
+    providerName: string,
+    authLogic: () => Promise<void>, // Changed from Promise<any> to Promise<void>
+    successRedirectPath?: string
+  ) {
+    loading.value = true;
+    activeProvider.value = providerName;
+    error.value = null;
+    
+    try {
+      await authLogic();
+      if (successRedirectPath) {
+        await navigateTo(successRedirectPath);
+      }
+      // Optionally return success status or result if needed in the future
+    } catch (err: unknown) {
+      error.value = formatErrorMessage(err);
+      showToast(error.value, 'error');
+      // Optionally re-throw or return error status
+    } finally {
+      loading.value = false;
+      activeProvider.value = null;
+    }
+  }
+
   // Actions
   const clearError = () => {
     error.value = null
@@ -113,143 +139,61 @@ export const useUserStore = defineStore('user', () => {
 
   // Sign in with Google
   const signInWithGoogle = async () => {
-    loading.value = true
-    activeProvider.value = 'google'
-    error.value = null
-    
-    try {
-      const auth = getAuth()
-      const provider = new GoogleAuthProvider()
-      
-      await signInWithPopup(auth, provider)
-      
-      // Redirect to homepage after successful login
-      await navigateTo('/')
-    } catch (err: unknown) {
-      error.value = formatErrorMessage(err)
-      showToast(error.value, 'error')
-    } finally {
-      loading.value = false
-      activeProvider.value = null
-    }
+    await _performAuthAction('google', async () => {
+      const auth = getAuth();
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    }, '/'); // Redirect to home on success
   }
 
   // Sign in with email and password
   const signInWithEmailPassword = async (email: string, password: string, rememberMe = false) => {
-    loading.value = true
-    activeProvider.value = 'password'
-    error.value = null
-    
-    try {
-      const auth = getAuth()
-      
-      // Set persistence based on remember me choice
-      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
-      
-      await signInWithEmailAndPassword(auth, email, password)
-      
-      // Redirect to homepage after successful login
-      await navigateTo('/')
-    } catch (err: unknown) {
-      error.value = formatErrorMessage(err)
-      showToast(error.value, 'error')
-    } finally {
-      loading.value = false
-      activeProvider.value = null
-    }
+    await _performAuthAction('password', async () => {
+      const auth = getAuth();
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      await signInWithEmailAndPassword(auth, email, password);
+    }, '/'); // Redirect to home on success
   }
 
   // Register new user with email and password
   const registerUser = async (email: string, password: string, rememberMe = false) => {
-    loading.value = true
-    activeProvider.value = 'register'
-    error.value = null
-    
-    try {
-      const auth = getAuth()
-      
-      // Set persistence based on remember me choice
-      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
-      
-      await createUserWithEmailAndPassword(auth, email, password)
-      
-      // Redirect to homepage after successful registration
-      await navigateTo('/')
-    } catch (err: unknown) {
-      error.value = formatErrorMessage(err)
-      showToast(error.value, 'error')
-    } finally {
-      loading.value = false
-      activeProvider.value = null
-    }
+    await _performAuthAction('register', async () => {
+      const auth = getAuth();
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      await createUserWithEmailAndPassword(auth, email, password);
+    }, '/'); // Redirect to home on success
   }
 
   // Send password reset email
   const resetPassword = async (email: string) => {
-    loading.value = true
-    activeProvider.value = 'reset'
-    error.value = null
-    
-    try {
-      const auth = getAuth()
-      await sendPasswordResetEmail(auth, email)
-      
-      // Success handled in UI
-    } catch (err: unknown) {
-      error.value = formatErrorMessage(err)
-      showToast(error.value, 'error')
-    } finally {
-      loading.value = false
-      activeProvider.value = null
-    }
+    await _performAuthAction('reset', async () => {
+      const auth = getAuth();
+      await sendPasswordResetEmail(auth, email);
+      // Success handled in UI, no redirect needed
+    });
   }
 
   // Send magic link
   const sendMagicLink = async (email: string) => {
-    loading.value = true
-    activeProvider.value = 'magic'
-    error.value = null
-    
-    try {
-      const auth = getAuth()
+    await _performAuthAction('magic', async () => {
+      const auth = getAuth();
       const actionCodeSettings = {
-        url: `${window.location.origin}/magic-link?email=${email}`,
-        handleCodeInApp: true
-      }
-      
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings)
-      
+        url: `${window.location.origin}/magic-link?email=${email}`, // Keep email in URL for verification page
+        handleCodeInApp: true,
+      };
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
       // Save the email locally to remember the user
-      window.localStorage.setItem('emailForSignIn', email)
-      
-      // Redirect to magic link page handled in UI
-      await navigateTo(`/magic-link?email=${encodeURIComponent(email)}`)
-    } catch (err: unknown) {
-      error.value = formatErrorMessage(err)
-      showToast(error.value, 'error')
-    } finally {
-      loading.value = false
-      activeProvider.value = null
-    }
+      window.localStorage.setItem('emailForSignIn', email);
+    }, `/magic-link?email=${encodeURIComponent(email)}`); // Redirect to verification page
   }
 
   // Sign out
   const signOutUser = async () => {
-    loading.value = true
-    error.value = null
-    
-    try {
-      const auth = getAuth()
-      await signOut(auth)
-      
-      // Redirect to login page after sign out
-      await navigateTo('/login')
-    } catch (err: unknown) {
-      error.value = formatErrorMessage(err)
-      showToast(error.value, 'error')
-    } finally {
-      loading.value = false
-    }
+    // Note: activeProvider is not set for sign out as it's a general action
+    await _performAuthAction('signout', async () => {
+      const auth = getAuth();
+      await signOut(auth);
+    }, '/login'); // Redirect to login on success
   }
 
   return {

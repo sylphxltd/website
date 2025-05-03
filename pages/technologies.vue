@@ -4,10 +4,10 @@
     <section class="py-20 md:py-24 bg-gradient-to-br from-indigo-700 to-purple-700 text-white relative overflow-hidden">
       <div class="absolute inset-0 bg-tech-pattern opacity-10"></div>
       <div class="relative z-10 w-full max-w-7xl mx-auto px-4 md:px-6">
-        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 animate__animated animate__fadeInUp">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 animate-fade-in-up">
           Cutting-Edge Technologies
         </h1>
-        <p class="text-lg sm:text-xl text-indigo-100 max-w-2xl mb-8 animate__animated animate__fadeInUp animate__delay-1s">
+        <p class="text-lg sm:text-xl text-indigo-100 max-w-2xl mb-8 animate-fade-in-up animate-delay-1s">
           We're focused on the technologies of tomorrow, pushing boundaries to create experiences that feel like the future, today.
         </p>
       </div>

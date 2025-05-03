@@ -14,16 +14,15 @@ export default defineNuxtConfig({
     },
     config: {
       // Rely on nuxt-vuefire automatically reading from runtimeConfig.public
-      // or directly from process.env.FIREBASE_...
-      // We keep the keys here mainly for potential type inference benefits,
-      // but the values assigned here might be ignored if runtimeConfig is used.
-      apiKey: process.env.FIREBASE_API_KEY,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.FIREBASE_APP_ID,
-      measurementId: process.env.FIREBASE_MEASUREMENT_ID,
+      // The keys defined in runtimeConfig.public will be used.
+      // No need to duplicate process.env reads here.
+      // apiKey: process.env.FIREBASE_API_KEY, // Removed
+      // authDomain: process.env.FIREBASE_AUTH_DOMAIN, // Removed
+      // projectId: process.env.FIREBASE_PROJECT_ID, // Removed
+      // storageBucket: process.env.FIREBASE_STORAGE_BUCKET, // Removed
+      // messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID, // Removed
+      // appId: process.env.FIREBASE_APP_ID, // Removed
+      // measurementId: process.env.FIREBASE_MEASUREMENT_ID, // Removed
     },
   },
   runtimeConfig: { // Use runtimeConfig to expose env variables
@@ -57,66 +56,18 @@ export default defineNuxtConfig({
     webFonts: {
       provider: 'google',
       fonts: {
-        sans: 'Inter:200,300,400,500,600,700,800',
-        mono: 'JetBrains Mono:400,500,600',
+        sans: 'Inter:300,400,500,600,700', // Removed unused weights 200, 800
+        mono: 'JetBrains Mono:400', // Removed unused weights 500, 600
       },
     },
     // safelist for dark mode classes
-    safelist: [
-      ...Array.from({ length: 10 }, (_, i) => `dark:bg-dark-${i+1}`),
-      ...Array.from({ length: 10 }, (_, i) => `dark:text-light-${i+1}`),
-      'dark:border-gray-700',
-      'dark:bg-gray-900',
-      'dark:bg-gray-800',
-      'dark:from-gray-800',
-      'dark:to-gray-900',
-      // Icon classes that need to be preserved
-      'i-carbon-moon',
-      'i-carbon-sun',
-      'i-carbon-close',
-      'i-carbon-menu',
-      'i-carbon-email',
-      'i-carbon-globe',
-      'i-carbon-logo-github',
-      'i-carbon-logo-apple',
-      'i-carbon-logo-google',
-      'i-carbon-logo-twitter',
-      'i-carbon-game-console',
-      'i-carbon-application',
-      'i-carbon-software-resource',
-      'i-carbon-machine-learning',
-      'i-carbon-face-activated-add',
-      'i-carbon-idea',
-      'i-carbon-machine-learning-model',
-      'i-carbon-chat',
-      'i-carbon-image-search',
-      'i-carbon-view-360',
-      'i-carbon-touch-1',
-      'i-carbon-augmented-reality',
-      'i-carbon-cloud',
-      'i-carbon-security',
-      'i-carbon-chart-network',
-      'i-carbon-data-vis-1',
-      'i-carbon-login', // Added for AuthStatus
-      'i-carbon-logout', // Added for AuthStatus
-      'i-carbon-circle-dash', // Added for login loading
-      'i-carbon-chevron-down', // Added for user dropdown
-      'i-carbon-settings', // Added for settings page
-      'i-carbon-upload', // Added for profile image upload
-      'i-carbon-arrow-right', // Added for login flow
-      'i-carbon-user-follow', // Added for registration
-      'i-carbon-home', // Added for magic link page
-      'i-carbon-checkmark', // Added for success state
-      'i-carbon-warning', // Added for error state
-      
-      // Animation classes
-      'animate-fadeIn',
-      'animate-spin',
-    ]
+    // safelist is generally not needed with UnoCSS as it scans the codebase.
+    // Removing the safelist to rely on build-time scanning.
+    safelist: []
   },
   css: [
     '@unocss/reset/tailwind.css',
-    'animate.css/animate.min.css',
+    // 'animate.css/animate.min.css', // Removed, using UnoCSS animations instead
   ],
   app: {
     head: {

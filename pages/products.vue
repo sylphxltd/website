@@ -4,10 +4,10 @@
     <section class="py-20 md:py-24 bg-gradient-to-br from-blue-600 to-violet-600 text-white relative overflow-hidden">
       <div class="absolute inset-0 bg-pattern opacity-10"></div>
       <div class="relative z-10 w-full max-w-7xl mx-auto px-4 md:px-6">
-        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 animate__animated animate__fadeInUp">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 animate-fade-in-up">
           Digital Experiences That Matter
         </h1>
-        <p class="text-lg sm:text-xl text-blue-100 max-w-2xl mb-8 animate__animated animate__fadeInUp animate__delay-1s">
+        <p class="text-lg sm:text-xl text-blue-100 max-w-2xl mb-8 animate-fade-in-up animate-delay-1s">
           We craft immersive games, intuitive applications, and seamless cross-platform experiences that empower users and create lasting value.
         </p>
       </div>
