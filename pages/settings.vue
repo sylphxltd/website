@@ -790,9 +790,8 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const user = useCurrentUser()
-const auth = getAuth()
-
-const storage = getStorage()
+let auth: ReturnType<typeof getAuth>
+let storage: ReturnType<typeof getStorage>
 
 // UI state
 const activeTab = ref('profile')
@@ -867,6 +866,10 @@ const connectedDevices = ref([
 
 // Initialize form values from user data
 onMounted(() => {
+  // Initialize Firebase services here
+  auth = getAuth()
+  storage = getStorage()
+
   if (user.value) {
     displayName.value = user.value.displayName || ''
     profileImageUrl.value = user.value.photoURL // Keep null if no photoURL exists
