@@ -191,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
@@ -231,11 +231,21 @@ const rememberMe = ref(false)
 const auth = getAuth()
 const user = useCurrentUser()
 
-// Action Settings
-const actionCodeSettings = {
-  url: window.location.origin + '/magic-link',
-  handleCodeInApp: true,
-}
+// Action Settings - use computed to avoid SSR issues
+const actionCodeSettings = computed(() => {
+  // Only access window when in browser environment
+  if (typeof window !== 'undefined') {
+    return {
+      url: window.location.origin + '/magic-link',
+      handleCodeInApp: true,
+    }
+  }
+  // Return placeholder during SSR
+  return {
+    url: 'http://localhost:3000/magic-link', // Default fallback for SSR
+    handleCodeInApp: true,
+  }
+})
 
 // Redirect if already logged in
 watch(user, (newUser) => {
@@ -244,10 +254,10 @@ watch(user, (newUser) => {
   }
 }, { immediate: true })
 
-// Check for magic link sign-in
+// Only run client-side code in onMounted hook
 onMounted(() => {
   // Check if the URL contains email link sign-in info
-  if (isSignInWithEmailLink(auth, window.location.href)) {
+  if (typeof window !== 'undefined' && isSignInWithEmailLink(auth, window.location.href)) {
     // Get the email from localStorage if available
     let email = localStorage.getItem('emailForSignIn')
     
@@ -320,6 +330,37 @@ function formatErrorMessage(err: Error): string {
   return errorMessage || 'An error occurred. Please try again.';
 }
 
+// Add a new function to directly check if an email exists
+async function checkEmailExists(email: string): Promise<boolean> {
+  try {
+    // First try using fetchSignInMethodsForEmail
+    const methods = await fetchSignInMethodsForEmail(auth, email);
+    if (methods && methods.length > 0) {
+      return true;
+    }
+    
+    // If that doesn't give a clear answer, we can try a second approach
+    // Try to create a temporary user to see if the email exists
+    // Note: This will fail if the email exists, which is what we want to check
+    try {
+      // We won't actually create the user, just check if it would fail
+      await createUserWithEmailAndPassword(auth, email, 'TemporaryPassword123!');
+      // If we get here, the email doesn't exist
+      return false;
+    } catch (err) {
+      // If we get email-already-in-use error, then the email exists
+      if (err.code === 'auth/email-already-in-use') {
+        return true;
+      }
+      // For other errors, we can't determine if the email exists
+      return false;
+    }
+  } catch (err) {
+    console.error('Error checking if email exists:', err);
+    return false;
+  }
+}
+
 async function continueWithEmail() {
   if (!email.value.trim()) {
     error.value = new Error('Please enter your email address.');
@@ -331,10 +372,11 @@ async function continueWithEmail() {
   error.value = null;
   
   try {
-    // Check if the email exists and what sign-in methods are available
-    const methods = await fetchSignInMethodsForEmail(auth, email.value);
+    // Check if the email exists using our more robust method
+    const emailExists = await checkEmailExists(email.value);
+    console.log("Email exists:", emailExists); // Debug log
     
-    if (methods.length > 0) {
+    if (emailExists) {
       // User exists - go to password step
       currentStep.value = 'password';
     } else {
@@ -342,10 +384,8 @@ async function continueWithEmail() {
       currentStep.value = 'register';
     }
   } catch (err) {
-    error.value = err as Error;
     console.error('Email Check Error:', err);
-    // Default to registration if we can't check
-    currentStep.value = 'register';
+    error.value = err as Error;
   } finally {
     loading.value = false;
     activeProvider.value = '';
@@ -428,6 +468,16 @@ async function registerUser() {
   error.value = null;
   
   try {
+    // Double-check that the email doesn't exist before trying to register
+    const emailExists = await checkEmailExists(email.value);
+    
+    if (emailExists) {
+      // If the email exists, redirect to the password step instead
+      error.value = new Error('This email is already registered. Please sign in with your password instead.');
+      currentStep.value = 'password';
+      return;
+    }
+    
     // Skip setting persistence for registration to avoid the internal assertion error
     // We'll set it after successful registration if needed
     const userCredential = await createUserWithEmailAndPassword(auth, email.value, newPassword.value);
@@ -442,6 +492,12 @@ async function registerUser() {
   } catch (err) {
     error.value = err as Error;
     console.error('Registration Error:', err);
+    
+    // If we get an email-already-in-use error, redirect to password login
+    if (err.code === 'auth/email-already-in-use') {
+      error.value = new Error('This email is already registered. Please sign in with your password.');
+      currentStep.value = 'password';
+    }
   } finally {
     loading.value = false;
     activeProvider.value = '';
@@ -481,10 +537,14 @@ async function sendMagicLink() {
   error.value = null;
   
   try {
-    await sendSignInLinkToEmail(auth, email.value, actionCodeSettings);
+    // Use the computed actionCodeSettings that's safe for SSR
+    await sendSignInLinkToEmail(auth, email.value, actionCodeSettings.value);
     
-    // Save the email locally to complete sign-in on the same device
-    localStorage.setItem('emailForSignIn', email.value);
+    // Only access localStorage in browser environment
+    if (typeof window !== 'undefined') {
+      // Save the email locally to complete sign-in on the same device
+      localStorage.setItem('emailForSignIn', email.value);
+    }
     
     alert('Sign-in link has been sent to your email. Please check your inbox and click the link to sign in.');
     
