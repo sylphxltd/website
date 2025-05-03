@@ -1,67 +1,81 @@
 <template>
-  <Milkdown v-if="editor" :editor="editor" /> <!-- Pass editor instance via prop -->
-  <div v-else>Initializing Editor...</div> <!-- Placeholder while editor initializes -->
+  <Milkdown />
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'; // Import ref and onMounted
-import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core';
+import { ref, watch, nextTick } from 'vue';
+import { Editor, rootCtx } from '@milkdown/core';
 import { nord } from '@milkdown/theme-nord';
 import { Milkdown, useEditor } from '@milkdown/vue';
 import { commonmark } from '@milkdown/preset-commonmark';
 import { listener, listenerCtx } from '@milkdown/plugin-listener';
 import { clipboard } from '@milkdown/plugin-clipboard';
 import { history } from '@milkdown/plugin-history';
+import { replaceAll, getMarkdown } from '@milkdown/utils';
 
-// Define props and emits for v-model binding
-const props = defineProps({
-  modelValue: {
-    type: String,
-    default: '',
-  },
-});
-const emit = defineEmits(['update:modelValue']);
+const model = defineModel({
+  default: '',
+})
 
-const editor = ref(null); // Use ref to hold the editor instance
+// 使用單一的鎖來防止重入，更簡潔可靠
+const updateLock = ref(false);
 
-onMounted(() => {
-  // Ensure useEditor is only called on the client side within onMounted
-  const editorInstance = useEditor((root) => {
-    return Editor.make()
-      .config((ctx) => {
-        ctx.set(rootCtx, root);
-        // Set initial value from prop
-        ctx.set(defaultValueCtx, props.modelValue);
-        // Update modelValue when editor content changes
-        ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
-          // Avoid emitting update if the change came from the prop watcher
-          if (props.modelValue !== markdown) {
-             emit('update:modelValue', markdown);
-          }
+const { get, loading } = useEditor((root) => Editor.make()
+  .config((ctx) => {
+    ctx.set(rootCtx, root);
+    
+    // 監聽編輯器內容變化
+    ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
+      if (updateLock.value) return; // 如果更新鎖定中，不執行
+      
+      try {
+        updateLock.value = true; // 鎖定更新
+        model.value = markdown; // 更新模型
+      } finally {
+        // 使用 nextTick 確保在 Vue 的更新循環後解鎖
+        nextTick(() => {
+          updateLock.value = false;
         });
-      })
-      .use(nord) // Apply the Nord theme
-      .use(commonmark) // Use CommonMark preset (Markdown support)
-      .use(listener) // Enable listener plugin for content updates
-      .use(clipboard) // Enable clipboard plugin (paste support)
-      .use(history); // Enable history plugin (undo/redo)
-  }).value; // Get the actual editor instance from the ref returned by useEditor
+      }
+    });
+  })
+  .use(nord)
+  .use(commonmark)
+  .use(listener)
+  .use(clipboard)
+  .use(history));
 
-  editor.value = editorInstance; // Assign the instance to our ref
-});
-
-
-// Watch for external changes to modelValue and update the editor
-// Note: Directly updating editor content like this might need refinement
-// depending on Milkdown's API for programmatic updates.
-// Consider using editor commands if available for better control.
-// watch(() => props.modelValue, (newValue) => {
-//   const editorInstance = editor.value; // Access the editor instance
-//   if (editorInstance && editorInstance.ctx.get(defaultValueCtx) !== newValue) {
-//      // This might reset the editor state, investigate Milkdown's update methods
-//      editorInstance.ctx.set(defaultValueCtx, newValue);
-//      // editorInstance.action(replaceAll(newValue)); // Example using a hypothetical command
-//   }
-// });
-
+// 監聽模型變化並更新編輯器
+watch(
+  () => model.value,
+  async (newValue) => {
+    if (updateLock.value || loading.value) return; // 如果鎖定中或編輯器加載中，不執行
+    
+    const editor = get();
+    if (!editor) return;
+    
+    const currentContent = editor.action(getMarkdown());
+    if (currentContent === newValue) return; // 內容相同，不需更新
+    
+    try {
+      updateLock.value = true; // 鎖定更新
+      await editor.action(replaceAll(newValue || ''));
+    } finally {
+      // 確保在任何情況下都會解鎖
+      nextTick(() => {
+        updateLock.value = false;
+      });
+    }
+  }
+);
 </script>
+
+<style>
+.milkdown-editor {
+  min-height: 200px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+</style>

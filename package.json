@@ -16,6 +16,7 @@
     "@milkdown/plugin-listener": "^7.9.0",
     "@milkdown/preset-commonmark": "^7.9.0",
     "@milkdown/theme-nord": "^7.9.0",
+    "@milkdown/utils": "^7.9.0",
     "@milkdown/vue": "^7.9.0",
     "@pinia/nuxt": "^0.11.0",
     "firebase": "^11.6.1",

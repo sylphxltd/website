@@ -45,7 +45,7 @@
       <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instruction Content</label>
         <div class="milkdown-editor-container border border-gray-300 dark:border-gray-600 rounded-md shadow-sm overflow-hidden min-h-[200px]">
-          <!-- Removed ClientOnly wrapper -->
+          <!-- Nuxt automatically handles client-side rendering for .client.vue components -->
           <MilkdownEditorWrapper v-model="formData.content" />
         </div>
          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Supports Markdown formatting.</p>
@@ -110,9 +110,6 @@ import { useToastStore } from '~/stores/toast'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { useFirestore, useCurrentUser } from 'vuefire'
 
-// Import the wrapper and editor components
-import MilkdownEditorWrapper from '~/components/MilkdownEditorWrapper.vue';
-import MilkdownEditor from '~/components/MilkdownEditor.vue';
 
 // Note: Milkdown core/theme CSS needs to be imported globally in nuxt.config.ts
 
@@ -159,7 +156,11 @@ function handleTagInputKeydown(event) {
 }
 // --- End Tag Input Logic ---
 
-
+watch(() => formData.content, (newValue) => {
+  // Update the model value in the editor component
+  // This is handled in MilkdownEditor.vue now
+  console.log('Content updated:', newValue)
+})
 async function submitInstruction() {
   if (!userStore.isAuthenticated || !userStore.userEmail) {
     error.value = 'Authentication error. Please log in again.'
