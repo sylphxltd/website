@@ -1,77 +1,130 @@
 <template>
-  <footer class="bg-gray-900 dark:bg-gray-950 text-white py-12 md:py-16 mt-16">
-    <div class="w-full max-w-7xl mx-auto px-4 md:px-6">
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-10 mb-10">
-        <div class="col-span-1 md:col-span-2">
-          <div class="mb-6">
-            <span class="text-2xl font-bold">Sylphx</span>
+  <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-12">
+        <!-- Logo and company info -->
+        <div class="md:col-span-2">
+          <div class="flex items-center mb-4">
+            <img src="/images/logo.png" alt="SylphX" class="h-10 w-auto">
+            <span class="ml-2 text-xl font-bold text-gray-900 dark:text-white">SylphX</span>
           </div>
-          <p class="text-gray-300 max-w-xs mb-6">Creating simple, elegant, and deeply usable software across games, applications, and cutting-edge technologies.</p>
-          <div class="flex flex-wrap gap-4">
-            <a href="https://github.com/sylphxltd" target="_blank" class="w-10 h-10 rounded-full bg-blue-800/20 hover:bg-blue-800/30 flex items-center justify-center transition">
-              <div class="i-carbon-logo-github text-lg text-gray-300"></div>
+          <p class="text-gray-600 dark:text-gray-300 mb-4">
+            Powering the next generation of applications with innovative solutions for modern businesses.
+          </p>
+          <div class="flex space-x-4">
+            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <span class="i-carbon-logo-github text-xl"></span>
             </a>
-            <!-- Placeholder for future App Store link -->
-            <a href="#" class="w-10 h-10 rounded-full bg-blue-800/20 hover:bg-blue-800/30 flex items-center justify-center transition opacity-50 cursor-not-allowed">
-              <div class="i-carbon-logo-apple text-lg text-gray-300"></div>
+            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <span class="i-carbon-logo-twitter text-xl"></span>
             </a>
-            <!-- Placeholder for future Google Play link -->
-            <a href="#" class="w-10 h-10 rounded-full bg-blue-800/20 hover:bg-blue-800/30 flex items-center justify-center transition opacity-50 cursor-not-allowed">
-              <div class="i-carbon-logo-google text-lg text-gray-300"></div>
+            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <span class="i-carbon-logo-linkedin text-xl"></span>
             </a>
-            <!-- Placeholder for future social media -->
-            <a href="#" class="w-10 h-10 rounded-full bg-blue-800/20 hover:bg-blue-800/30 flex items-center justify-center transition opacity-50 cursor-not-allowed">
-              <div class="i-carbon-logo-twitter text-lg text-gray-300"></div>
+            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <span class="i-carbon-logo-facebook text-xl"></span>
             </a>
-          </div>
-        </div>
-        <div>
-          <h4 class="font-semibold mb-5 text-base">Pages</h4>
-          <div class="flex flex-col gap-3">
-            <template v-for="link in footerLinks" :key="link.path">
-              <NuxtLink :to="link.path" class="text-gray-300 hover:text-blue-400 transition decoration-none">{{ link.name }}</NuxtLink>
-            </template>
           </div>
         </div>
+        
+        <!-- Quick links -->
         <div>
-          <h4 class="font-semibold mb-5 text-base">Contact</h4>
-          <div class="flex flex-col gap-3">
-            <a href="mailto:support@sylphx.com" class="text-gray-300 hover:text-blue-400 transition decoration-none flex items-center gap-2">
-              <div class="i-carbon-email text-base"></div>
-              <span>support@sylphx.com</span>
-            </a>
-            <a href="https://sylphx.com" target="_blank" class="text-gray-300 hover:text-blue-400 transition decoration-none flex items-center gap-2">
-              <div class="i-carbon-globe text-base"></div>
-              <span>sylphx.com</span>
-            </a>
-            <a href="https://github.com/sylphxltd" target="_blank" class="text-gray-300 hover:text-blue-400 transition decoration-none flex items-center gap-2">
-              <div class="i-carbon-logo-github text-base"></div>
-              <span>github.com/sylphxltd</span>
-            </a>
-          </div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Links</h3>
+          <ul class="space-y-2">
+            <li>
+              <NuxtLink to="/" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                Home
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/apps" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                Applications
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/technologies" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                Technologies
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/privacy" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                Privacy Policy
+              </NuxtLink>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Resources -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Resources</h3>
+          <ul class="space-y-2">
+            <li>
+              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                Documentation
+              </a>
+            </li>
+            <li>
+              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                Tutorials
+              </a>
+            </li>
+            <li>
+              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                Blog
+              </a>
+            </li>
+            <li>
+              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                API Reference
+              </a>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Contact -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Contact</h3>
+          <ul class="space-y-2">
+            <li class="flex items-start">
+              <span class="i-carbon-email mt-1 mr-2 text-gray-400"></span>
+              <a href="mailto:info@sylphx.com" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                info@sylphx.com
+              </a>
+            </li>
+            <li class="flex items-start">
+              <span class="i-carbon-phone mt-1 mr-2 text-gray-400"></span>
+              <a href="tel:+15551234567" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                +1 (555) 123-4567
+              </a>
+            </li>
+            <li class="flex items-start">
+              <span class="i-carbon-location mt-1 mr-2 text-gray-400"></span>
+              <span class="text-gray-600 dark:text-gray-300">
+                123 Tech Avenue<br>
+                San Francisco, CA 94107
+              </span>
+            </li>
+          </ul>
         </div>
       </div>
-      <div class="border-t border-gray-800 pt-5 flex flex-wrap justify-between gap-4">
-        <p class="text-gray-500 text-sm">&copy; {{ new Date().getFullYear() }} Sylphx Limited. All rights reserved.</p>
-        <div class="flex gap-4">
-          <!-- Dark mode toggle -->
-          <!-- Removed ClientOnly wrapper -->
-          <button @click="$emit('toggle-dark')" class="text-gray-500 hover:text-gray-300 transition text-sm flex items-center gap-1.5">
-            <div v-if="isDark" class="i-carbon-moon text-base text-indigo-400"></div>
-            <div v-else class="i-carbon-sun text-base text-blue-600"></div>
-            <span>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</span>
-          </button>
+      
+      <!-- Copyright -->
+      <div class="border-t border-gray-200 dark:border-gray-700 mt-10 pt-8 flex flex-col md:flex-row justify-between items-center">
+        <p class="text-gray-500 dark:text-gray-400 text-sm">
+          &copy; {{ new Date().getFullYear() }} SylphX. All rights reserved.
+        </p>
+        <div class="mt-4 md:mt-0 flex space-x-6">
+          <NuxtLink to="/privacy" class="text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white">
+            Privacy Policy
+          </NuxtLink>
+          <NuxtLink to="/terms" class="text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white">
+            Terms of Service
+          </NuxtLink>
+          <NuxtLink to="/cookies" class="text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white">
+            Cookie Policy
+          </NuxtLink>
         </div>
       </div>
     </div>
   </footer>
 </template>
-
-<script setup>
-defineProps({
-  isDark: Boolean,
-  footerLinks: Array // Changed prop name
-});
-
-defineEmits(['toggle-dark']);
-</script>

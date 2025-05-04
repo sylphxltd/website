@@ -1,242 +1,201 @@
-<script setup lang="ts">
-definePageMeta({
-  public: true,
-})
-</script>
 <template>
   <div>
     <!-- Hero Section -->
-    <section class="relative py-16 overflow-hidden">
-      <div class="absolute inset-0 bg-gradient-to-tr from-blue-50/40 to-indigo-50/40 dark:from-blue-950/40 dark:to-indigo-950/40"></div>
-      <div class="relative z-10 w-full max-w-7xl mx-auto px-4 md:px-6 pt-4 md:pt-8">
-        <div class="md:grid md:grid-cols-2 gap-12 items-center">
-          <!-- Hero Content -->
-          <div class="max-w-xl mb-16 md:mb-0">
-            <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 dark:text-white">
-              <span class="text-blue-600 dark:text-blue-400 relative z-10 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[30%] after:bg-blue-100/60 dark:after:bg-blue-900/30 after:-z-10">Simple</span>,
-              <span class="text-indigo-600 dark:text-indigo-400 relative z-10 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[30%] after:bg-indigo-100/60 dark:after:bg-indigo-900/30 after:-z-10">Elegant</span> &
-              <span class="text-violet-600 dark:text-violet-400 relative z-10 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[30%] after:bg-violet-100/60 dark:after:bg-violet-900/30 after:-z-10">Usable</span> Software
-            </h1>
-            <p class="text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8">
-              Sylphx creates digital products that empower without overwhelming. We believe technology should serve life, not disrupt it.
-            </p>
-            <div class="flex flex-wrap gap-4 mb-12 md:mb-0">
-              <a href="/products" class="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 text-white font-medium rounded-lg shadow-lg shadow-blue-600/20 dark:shadow-blue-900/20 transition hover:-translate-y-1 hover:shadow-xl">
-                <span class="i-carbon-application mr-2"></span>
-                Explore Our Products
-              </a>
-              <a href="/technologies" class="inline-flex items-center justify-center px-6 py-3 bg-transparent border-2 border-indigo-600 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 font-medium rounded-lg transition hover:bg-indigo-50 dark:hover:bg-indigo-950">
-                <span class="i-carbon-machine-learning mr-2"></span>
-                Our Technologies
-              </a>
-            </div>
-          </div>
-          <!-- Hero Visual - Only shown on medium screens and up -->
-          <div class="relative h-[400px] hidden md:flex justify-center">
-            <!-- Device mockup -->
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] md:w-[300px] h-[580px] md:h-[620px] bg-white dark:bg-gray-800 rounded-[36px] shadow-2xl overflow-hidden border-[10px] border-gray-800 dark:border-gray-950 z-20">
-              <div class="w-full h-full bg-white dark:bg-gray-800 overflow-hidden">
-                <div class="w-full h-full flex flex-col">
-                  <div class="h-[60px] bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700"></div>
-                  <div class="flex-1 p-5 flex flex-col gap-5">
-                    <div class="h-[100px] bg-gray-100 dark:bg-gray-700 rounded-xl"></div>
-                    <div class="h-[140px] bg-gray-100 dark:bg-gray-700 rounded-xl"></div>
-                    <div class="h-[100px] bg-gray-100 dark:bg-gray-700 rounded-xl"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Decorative shapes -->
-            <div class="absolute w-[200px] h-[200px] bg-gradient-to-tr from-blue-600/20 to-indigo-400/20 dark:from-blue-700/20 dark:to-indigo-600/20 rounded-full top-[-40px] right-[20px] blur-[40px] z-10"></div>
-            <div class="absolute w-[300px] h-[300px] bg-gradient-to-tr from-indigo-400/20 to-blue-600/20 dark:from-indigo-600/20 dark:to-blue-700/20 rounded-full bottom-[-80px] right-[-100px] blur-[50px] z-10"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Core Principles Section -->
-    <section class="py-16 md:py-20 bg-white dark:bg-gray-900">
-      <div class="w-full max-w-7xl mx-auto px-4 md:px-6">
-        <div class="max-w-3xl mx-auto text-center mb-12 md:mb-16">
-          <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold mb-5 dark:text-white">Our Core Principles</h2>
-          <p class="text-base md:text-lg text-gray-600 dark:text-gray-300">
-            Every product we create embodies our commitment to design and technology excellence.
-          </p>
-        </div>
-        
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
-          <!-- Principle 1 -->
-          <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 shadow-lg transition hover:-translate-y-2 hover:shadow-xl">
-            <div class="w-[70px] h-[70px] bg-blue-100 dark:bg-blue-900/30 rounded-[18px] flex items-center justify-center mb-6 transition group-hover:rotate-10">
-              <div class="w-[30px] h-[30px] bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 rounded-lg"></div>
-            </div>
-            <h3 class="text-xl font-semibold mb-4 dark:text-white">Minimalism with Purpose</h3>
-            <p class="text-gray-600 dark:text-gray-300">We reduce clutter and friction, so you can focus on what matters. Streamlined but not stripped, focused but not limiting.</p>
-          </div>
-          
-          <!-- Principle 2 -->
-          <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 shadow-lg transition hover:-translate-y-2 hover:shadow-xl">
-            <div class="w-[70px] h-[70px] bg-indigo-100 dark:bg-indigo-900/30 rounded-[18px] flex items-center justify-center mb-6 relative transition group-hover:rotate-10">
-              <div class="w-[30px] h-[10px] bg-gradient-to-r from-indigo-500 to-violet-500 dark:from-indigo-400 dark:to-violet-400 relative">
-                <div class="absolute top-[-10px] left-0 w-[15px] h-[10px] bg-gradient-to-r from-indigo-500 to-violet-500 dark:from-indigo-400 dark:to-violet-400"></div>
-                <div class="absolute bottom-[-10px] right-0 w-[15px] h-[10px] bg-gradient-to-r from-indigo-500 to-violet-500 dark:from-indigo-400 dark:to-violet-400"></div>
-              </div>
-            </div>
-            <h3 class="text-xl font-semibold mb-4 dark:text-white">Performance without Compromise</h3>
-            <p class="text-gray-600 dark:text-gray-300">Smooth experiences on all devices. No ads, no bloat, just pure functionality. Speed is a feature we prioritize.</p>
-          </div>
-          
-          <!-- Principle 3 -->
-          <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 shadow-lg transition hover:-translate-y-2 hover:shadow-xl">
-            <div class="w-[70px] h-[70px] bg-violet-100 dark:bg-violet-900/30 rounded-[18px] flex items-center justify-center mb-6 transition group-hover:rotate-10">
-              <div class="w-[30px] h-[30px] border-[6px] border-violet-500 dark:border-violet-400 rounded-full"></div>
-            </div>
-            <h3 class="text-xl font-semibold mb-4 dark:text-white">Design with Integrity</h3>
-            <p class="text-gray-600 dark:text-gray-300">Natural interfaces, intentional visuals, and interactions that respect your time. Our design serves rather than demands attention.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Focus Areas Section -->
-    <section class="py-16 md:py-20 bg-gray-50 dark:bg-gray-800">
-      <div class="w-full max-w-7xl mx-auto px-4 md:px-6">
-        <div class="mb-12 md:mb-16 text-center">
-          <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold mb-5 dark:text-white">What We Focus On</h2>
-          <p class="text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Our expertise spans multiple domains, combining technical excellence with creative vision.
-          </p>
-        </div>
-        
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          <!-- Focus 1: Games -->
-          <a href="/products" class="block group">
-            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 h-64 rounded-2xl p-6 flex flex-col justify-end text-white shadow-lg transition hover:-translate-y-2 hover:shadow-xl overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8">
-                <div class="i-carbon-game-console text-8xl text-white/10"></div>
-              </div>
-              <h3 class="text-2xl font-bold mb-2 relative">Immersive Games</h3>
-              <p class="text-blue-100 relative">
-                Games that blend captivating narratives with innovative mechanics.
-              </p>
-            </div>
-          </a>
-          
-          <!-- Focus 2: Applications -->
-          <a href="/products" class="block group">
-            <div class="bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-indigo-600 dark:to-violet-700 h-64 rounded-2xl p-6 flex flex-col justify-end text-white shadow-lg transition hover:-translate-y-2 hover:shadow-xl overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8">
-                <div class="i-carbon-application text-8xl text-white/10"></div>
-              </div>
-              <h3 class="text-2xl font-bold mb-2 relative">Intuitive Applications</h3>
-              <p class="text-indigo-100 relative">
-                Apps that deliver exceptional experiences through clean design.
-              </p>
-            </div>
-          </a>
-          
-          <!-- Focus 3: Cross-Platform -->
-          <a href="/products" class="block group">
-            <div class="bg-gradient-to-br from-purple-500 to-violet-600 dark:from-purple-600 dark:to-violet-700 h-64 rounded-2xl p-6 flex flex-col justify-end text-white shadow-lg transition hover:-translate-y-2 hover:shadow-xl overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8">
-                <div class="i-carbon-software-resource text-8xl text-white/10"></div>
-              </div>
-              <h3 class="text-2xl font-bold mb-2 relative">Cross-Platform Solutions</h3>
-              <p class="text-purple-100 relative">
-                Seamless experiences that work flawlessly across platforms.
-              </p>
-            </div>
-          </a>
-          
-          <!-- Focus 4: AI -->
-          <a href="/technologies" class="block group">
-            <div class="bg-gradient-to-br from-blue-600 to-violet-600 dark:from-blue-700 dark:to-violet-700 h-64 rounded-2xl p-6 flex flex-col justify-end text-white shadow-lg transition hover:-translate-y-2 hover:shadow-xl overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8">
-                <div class="i-carbon-machine-learning text-8xl text-white/10"></div>
-              </div>
-              <h3 class="text-2xl font-bold mb-2 relative">Artificial Intelligence</h3>
-              <p class="text-blue-100 relative">
-                AI that creates more intuitive and personalized experiences.
-              </p>
-            </div>
-          </a>
-          
-          <!-- Focus 5: VR/AR -->
-          <a href="/technologies" class="block group">
-            <div class="bg-gradient-to-br from-indigo-600 to-purple-600 dark:from-indigo-700 dark:to-purple-700 h-64 rounded-2xl p-6 flex flex-col justify-end text-white shadow-lg transition hover:-translate-y-2 hover:shadow-xl overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8">
-                <div class="i-carbon-face-activated-add text-8xl text-white/10"></div>
-              </div>
-              <h3 class="text-2xl font-bold mb-2 relative">VR & AR Experiences</h3>
-              <p class="text-indigo-100 relative">
-                Immersive experiences that blur digital and physical worlds.
-              </p>
-            </div>
-          </a>
-          
-          <!-- Focus 6: Innovation -->
-          <a href="/technologies" class="block group">
-            <div class="bg-gradient-to-br from-violet-600 to-blue-600 dark:from-violet-700 dark:to-blue-700 h-64 rounded-2xl p-6 flex flex-col justify-end text-white shadow-lg transition hover:-translate-y-2 hover:shadow-xl overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8">
-                <div class="i-carbon-idea text-8xl text-white/10"></div>
-              </div>
-              <h3 class="text-2xl font-bold mb-2 relative">Future Technologies</h3>
-              <p class="text-violet-100 relative">
-                Exploring emerging tech to create tomorrow's experiences.
-              </p>
-            </div>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <!-- Vision Section -->
-    <section class="py-16 md:py-20 bg-white dark:bg-gray-900 relative overflow-hidden">
-      <div class="absolute inset-0 bg-gradient-to-br from-blue-50/40 to-indigo-50/40 dark:from-blue-950/20 dark:to-indigo-950/20"></div>
-      <div class="relative z-10 w-full max-w-7xl mx-auto px-4 md:px-6">
+    <section class="relative bg-gradient-to-br from-indigo-600 to-blue-800 text-white py-20 md:py-28">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold mb-8 dark:text-white">Our Vision</h2>
-            <blockquote class="border-l-4 border-indigo-600 dark:border-indigo-500 pl-5 py-2 mb-8 text-lg md:text-xl font-light text-gray-800 dark:text-gray-200 bg-white/50 dark:bg-white/5 rounded-r-lg shadow-sm">
-              We envision a world filled with calm, focused, high-quality digital experiences. Sylphx exists to bring that world closer—one thoughtfully crafted app at a time.
-            </blockquote>
-            <p class="text-gray-600 dark:text-gray-300 text-lg italic">
-              We don't aim to be the biggest studio. We aim to be the most trusted. For us, good software isn't just about functionality—it's about how it makes you feel.
+            <h1 class="text-4xl md:text-5xl font-bold mb-4">Powering the Next Generation of Applications</h1>
+            <p class="text-lg mb-8 text-indigo-100">
+              SylphX delivers innovative solutions for modern businesses. Our suite of applications helps you streamline operations, increase productivity, and achieve your goals.
             </p>
+            <div class="flex flex-wrap gap-4">
+              <NuxtLink to="/apps" class="px-6 py-3 bg-white text-indigo-700 rounded-md font-semibold hover:bg-indigo-50 transition-colors">
+                Explore Our Apps
+              </NuxtLink>
+              <a href="#contact" class="px-6 py-3 bg-transparent border border-white text-white rounded-md font-semibold hover:bg-white/10 transition-colors">
+                Contact Us
+              </a>
+            </div>
           </div>
-          <div class="h-[300px] relative hidden sm:block">
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[90%] bg-gradient-to-tr from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 rounded-[30%_70%_70%_30%/30%_30%_70%_70%] animate-morph"></div>
+          <div class="hidden md:flex justify-center">
+            <div class="max-w-md rounded-lg shadow-xl bg-indigo-500/20 h-80 flex items-center justify-center">
+              <img src="/images/logo.png" alt="SylphX Applications" class="h-32 w-32">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Wave separator -->
+      <div class="absolute bottom-0 left-0 right-0 h-16 overflow-hidden">
+        <svg class="w-full h-full" viewBox="0 0 1200 120" preserveAspectRatio="none">
+          <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" fill="#ffffff" class="fill-white dark:fill-gray-900" opacity=".25"></path>
+          <path d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" fill="#ffffff" class="fill-white dark:fill-gray-900" opacity=".5"></path>
+          <path d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z" fill="#ffffff" class="fill-white dark:fill-gray-900"></path>
+        </svg>
+      </div>
+    </section>
+
+    <!-- Featured Apps Section -->
+    <section class="py-16 bg-white dark:bg-gray-900">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">Our Featured Applications</h2>
+          <p class="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            Discover our suite of powerful applications designed to enhance productivity and streamline your workflow.
+          </p>
+        </div>
+
+        <!-- App cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div v-for="app in featuredApps" :key="app.id" class="bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
+            <div class="p-6">
+              <div class="flex items-center mb-4">
+                <div class="h-12 w-12 rounded-lg overflow-hidden bg-white dark:bg-gray-700 flex items-center justify-center">
+                  <img v-if="app.logoUrl" :src="app.logoUrl" :alt="app.name" class="h-10 w-10 object-contain">
+                  <span v-else class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{{ app.name.charAt(0) }}</span>
+                </div>
+                <h3 class="ml-4 text-xl font-semibold text-gray-900 dark:text-white">{{ app.name }}</h3>
+              </div>
+              <p class="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">{{ app.description }}</p>
+              <div class="flex flex-wrap gap-2 mb-4">
+                <span v-for="(tag, index) in app.tags" :key="index" class="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded-full">
+                  {{ tag }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between mt-4">
+                <div class="flex space-x-2">
+                  <a v-if="app.links?.googlePlay" :href="app.links.googlePlay" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+                    <span class="i-carbon-logo-google"></span>
+                  </a>
+                  <a v-if="app.links?.appStore" :href="app.links.appStore" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+                    <span class="i-carbon-logo-apple"></span>
+                  </a>
+                  <a v-if="app.links?.website" :href="app.links.website" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+                    <span class="i-carbon-globe"></span>
+                  </a>
+                </div>
+                <NuxtLink :to="`/apps/${app.id}`" class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+                  View Details <span class="i-carbon-arrow-right"></span>
+                </NuxtLink>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center mt-12">
+          <NuxtLink to="/apps" class="px-6 py-3 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 transition-colors inline-flex items-center">
+            View All Applications <span class="i-carbon-arrow-right ml-2"></span>
+          </NuxtLink>
+        </div>
+      </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="py-16 bg-gray-50 dark:bg-gray-800">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div>
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">About SylphX</h2>
+            <p class="text-gray-600 dark:text-gray-300 mb-4">
+              SylphX is a leading technology company specializing in developing innovative applications for businesses across various industries. Our mission is to empower organizations with powerful tools that enhance efficiency and drive growth.
+            </p>
+            <p class="text-gray-600 dark:text-gray-300 mb-4">
+              With a team of experienced developers and designers, we create intuitive, user-friendly applications that solve complex problems and deliver measurable results.
+            </p>
+            <div class="mt-6">
+              <NuxtLink to="/technologies" class="text-indigo-600 dark:text-indigo-400 font-medium hover:underline inline-flex items-center">
+                Learn More About Our Technologies <span class="i-carbon-arrow-right ml-1"></span>
+              </NuxtLink>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow-md">
+              <div class="text-3xl text-indigo-600 dark:text-indigo-400 mb-2">
+                <span class="i-carbon-application"></span>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Custom Applications</h3>
+              <p class="text-gray-600 dark:text-gray-300">Tailored solutions designed specifically for your business needs.</p>
+            </div>
+            <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow-md">
+              <div class="text-3xl text-indigo-600 dark:text-indigo-400 mb-2">
+                <span class="i-carbon-ai-status"></span>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">AI Integration</h3>
+              <p class="text-gray-600 dark:text-gray-300">Cutting-edge artificial intelligence to automate and optimize workflows.</p>
+            </div>
+            <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow-md">
+              <div class="text-3xl text-indigo-600 dark:text-indigo-400 mb-2">
+                <span class="i-carbon-cloud"></span>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Cloud Solutions</h3>
+              <p class="text-gray-600 dark:text-gray-300">Secure, scalable cloud infrastructure for your applications.</p>
+            </div>
+            <div class="bg-white dark:bg-gray-700 p-6 rounded-lg shadow-md">
+              <div class="text-3xl text-indigo-600 dark:text-indigo-400 mb-2">
+                <span class="i-carbon-chat-support"></span>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">24/7 Support</h3>
+              <p class="text-gray-600 dark:text-gray-300">Dedicated support team ready to assist whenever you need help.</p>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Contact CTA Section -->
-    <section class="py-16 md:py-20">
-      <div class="w-full max-w-7xl mx-auto px-4 md:px-6">
-        <div class="bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-800 rounded-2xl overflow-hidden shadow-xl">
-          <div class="grid grid-cols-1 md:grid-cols-2">
-            <div class="p-8 md:p-12 flex flex-col justify-center">
-              <h3 class="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-4">Let's Build Something Amazing</h3>
-              <p class="text-blue-100 mb-6">
-                Whether you have a project in mind or just want to learn more about our capabilities, we'd love to hear from you.
-              </p>
-              <div class="flex flex-wrap gap-4">
-                <a href="mailto:support@sylphx.com" class="inline-flex items-center px-6 py-3 bg-white text-indigo-600 rounded-lg font-medium hover:bg-blue-50 transition">
-                  <span class="i-carbon-email mr-2"></span>
-                  Get in Touch
-                </a>
-                <a href="https://github.com/sylphxltd" target="_blank" class="inline-flex items-center px-6 py-3 bg-indigo-500/20 text-white rounded-lg font-medium border border-white/20 hover:bg-indigo-500/30 transition">
-                  <span class="i-carbon-logo-github mr-2"></span>
-                  GitHub
-                </a>
+    <!-- Contact Section -->
+    <section id="contact" class="py-16 bg-white dark:bg-gray-900">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">Get In Touch</h2>
+          <p class="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            Have questions about our applications or services? Reach out to our team and we'll get back to you as soon as possible.
+          </p>
+        </div>
+
+        <div class="max-w-3xl mx-auto">
+          <div class="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                <input 
+                  type="text" 
+                  id="name" 
+                  class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white" 
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                <input 
+                  type="email" 
+                  id="email" 
+                  class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white" 
+                  placeholder="your.email@example.com"
+                />
               </div>
             </div>
-            <div class="hidden md:block relative">
-              <div class="absolute inset-0 bg-pattern opacity-10 mix-blend-overlay"></div>
-              <div class="h-full w-full bg-gradient-to-br from-indigo-600/30 to-violet-600/30"></div>
+            <div class="mb-6">
+              <label for="subject" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
+              <input 
+                type="text" 
+                id="subject" 
+                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white" 
+                placeholder="How can we help?"
+              />
             </div>
+            <div class="mb-6">
+              <label for="message" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Message</label>
+              <textarea 
+                id="message" 
+                rows="4" 
+                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white" 
+                placeholder="Enter your message..."
+              ></textarea>
+            </div>
+            <button class="w-full bg-indigo-600 text-white py-3 px-4 rounded-md font-medium hover:bg-indigo-700 transition-colors">
+              Send Message
+            </button>
           </div>
         </div>
       </div>
@@ -244,20 +203,58 @@ definePageMeta({
   </div>
 </template>
 
-<style>
-@keyframes morph {
-  0% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
-  25% { border-radius: 58% 42% 75% 25% / 76% 46% 54% 24%; }
-  50% { border-radius: 50% 50% 33% 67% / 55% 27% 73% 45%; }
-  75% { border-radius: 33% 67% 58% 42% / 63% 68% 32% 37%; }
-  100% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
-}
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useAppsStore } from '~/stores/apps';
 
-.animate-morph {
-  animation: morph 15s ease-in-out infinite alternate;
-}
+// Define page meta
+definePageMeta({
+  layout: 'default'
+});
 
-.bg-pattern {
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-}
-</style>
+// Get apps store
+const appsStore = useAppsStore();
+const featuredApps = ref([]);
+
+// Add sample tags for featured apps display
+const addTagsToApps = (apps) => {
+  return apps.map(app => {
+    // Generate some sample tags based on app description if available
+    const tags = [];
+    const description = app.description?.toLowerCase() || '';
+    
+    if (description.includes('ai') || description.includes('intelligence')) {
+      tags.push('AI-Powered');
+    }
+    
+    if (description.includes('cloud') || description.includes('online')) {
+      tags.push('Cloud');
+    }
+    
+    if (description.includes('mobile') || app.links?.appStore || app.links?.googlePlay) {
+      tags.push('Mobile');
+    }
+    
+    // Add at least one tag if none were added
+    if (tags.length === 0) {
+      tags.push('Application');
+    }
+    
+    return {
+      ...app,
+      tags
+    };
+  });
+};
+
+// Load apps for the featured section
+onMounted(async () => {
+  if (appsStore.apps.length === 0) {
+    await appsStore.fetchApps();
+  }
+  
+  // Get the top 3 apps (or whatever is available) for featured display
+  const appsWithTags = addTagsToApps([...appsStore.apps]);
+  featuredApps.value = appsWithTags.slice(0, 3);
+});
+</script>
