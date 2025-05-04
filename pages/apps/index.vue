@@ -55,38 +55,41 @@
       </div>
       
       <!-- Product Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-        <div 
-          v-for="product in filteredProducts" 
-          :key="product.id" 
-          class="group bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-100 dark:border-gray-700"
+      <div v-if="!loading && filteredApps.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+        <!-- App Card - This div repeats -->
+        <div
+          v-for="app in filteredApps"
+          :key="app.id"
+          class="group bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col"
         >
           <!-- Product Header with Gradient -->
           <div 
             :class="[
               'h-48 relative overflow-hidden',
-              product.gradientClass || 'bg-gradient-to-br from-indigo-500 to-purple-600' 
+              'bg-gradient-to-br from-indigo-500 to-purple-600' // Default gradient, remove app.gradientClass
             ]"
           >
             <!-- Logo/Icon -->
             <div class="absolute top-6 left-6">
               <div class="h-16 w-16 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center shadow-lg">
-                <img v-if="product.logoUrl" :src="product.logoUrl" :alt="product.name" class="h-10 w-10 object-contain">
-                <span v-else class="text-2xl font-bold" :class="product.iconTextColor || 'text-indigo-600'">
-                  {{ product.name.charAt(0) }}
+                <img v-if="app.logoUrl" :src="app.logoUrl" :alt="app.name" class="h-10 w-10 object-contain">
+                <span v-else class="text-2xl font-bold text-indigo-600">
+                  {{ app.name?.charAt(0)?.toUpperCase() || '?' }}
                 </span>
               </div>
             </div>
             
             <!-- Category tags -->
             <div class="absolute top-6 right-6 flex flex-wrap justify-end gap-2">
-              <span 
-                v-for="tag in product.tags" 
-                :key="tag"
-                class="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium"
-              >
-                {{ tag }}
-              </span>
+                <!--
+                <span
+                  v-for="tag in app.tags || []"
+                  :key="tag"
+                  class="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium"
+                >
+                  {{ tag }}
+                </span>
+                 -->
             </div>
             
             <!-- Screenshot Preview (decorative) -->
@@ -94,34 +97,34 @@
           </div>
           
           <!-- Product Content -->
-          <div class="p-6">
+          <div class="p-6 flex flex-col flex-grow">
             <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-              {{ product.name }}
+              {{ app.name }}
             </h3>
             
-            <p class="text-gray-600 dark:text-gray-300 mb-6 line-clamp-2">
-              {{ product.description }}
+            <p class="text-gray-600 dark:text-gray-300 mb-6 line-clamp-3 flex-grow"> <!-- Increased line-clamp -->
+              {{ app.description }}
             </p>
             
-            <div class="flex items-center justify-between">
+            <div class="mt-auto flex items-center justify-between">
               <!-- Platform Labels -->
               <div class="flex flex-wrap gap-2">
-                <span 
-                  v-for="platform in product.platforms" 
-                  :key="platform.name"
-                  :class="[
-                    'px-2 py-1 rounded-full text-xs font-medium',
-                    platform.class || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                  ]"
-                >
-                  {{ platform.name }}
-                </span>
+                  <span
+                    v-for="platform in app.platforms"
+                    :key="platform"
+                    :class="[
+                      'px-2 py-1 rounded-full text-xs font-medium',
+                      platformBadgeClass(platform) // Use helper function
+                    ]"
+                  >
+                    {{ platform }}
+                  </span>
               </div>
               
               <!-- View Details Link -->
               <NuxtLink 
-                :to="`/apps/${product.id}`"
-                class="inline-flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+                :to="`/apps/${app.id}`"
+                class="inline-flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors flex-shrink-0 ml-2"
               >
                 Details
                 <span class="i-carbon-arrow-right ml-1"></span>
@@ -131,9 +134,27 @@
         </div>
       </div>
       
+       <div v-else-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+         <div v-for="i in 6" :key="`skel-${i}`" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700 animate-pulse">
+           <div class="h-48 bg-gray-200 dark:bg-gray-700"></div>
+           <div class="p-6">
+             <div class="h-6 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-3"></div>
+             <div class="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+             <div class="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded mb-6"></div>
+             <div class="flex justify-between items-center">
+               <div class="flex gap-2">
+                 <div class="h-5 w-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                 <div class="h-5 w-12 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+               </div>
+               <div class="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+             </div>
+           </div>
+         </div>
+       </div>
+
       <!-- Empty State -->
-      <div 
-        v-if="filteredProducts.length === 0" 
+      <div
+        v-else
         class="py-20 text-center max-w-md mx-auto"
       >
         <div class="h-20 w-20 mx-auto bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
@@ -151,7 +172,7 @@
         </button>
       </div>
       
-      <!-- Featured Product Section -->
+      <!-- Featured Product Section (Keep as is for now) -->
       <div class="mt-32 max-w-6xl mx-auto">
         <div class="lg:flex lg:items-center lg:gap-12">
           <div class="lg:w-1/2 mb-10 lg:mb-0">
@@ -200,7 +221,7 @@
         </div>
       </div>
       
-      <!-- Coming Soon Section -->
+      <!-- Coming Soon Section (Keep as is for now) -->
       <div class="mt-32 max-w-4xl mx-auto text-center">
         <div class="inline-flex items-center px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded-full text-sm font-medium mb-6">
           <span class="i-carbon-timer mr-2"></span>
@@ -256,9 +277,9 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
-import { useAppsStore } from '~/stores/apps';
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { useAppsStore, type Application as App } from '~/stores/apps'; // Import App type
 
 // Define page meta
 definePageMeta({
@@ -275,11 +296,11 @@ const categories = [
   { id: 'creative', name: 'Creative Tools' }
 ];
 
-const selectedCategories = ref([]);
-const search = ref('');
+const selectedCategories = ref<string[]>([]); // Typed array
+const search = ref<string>('');
 
 // Toggle category selection
-const toggleCategory = (categoryId) => {
+const toggleCategory = (categoryId: string) => { // Added type
   if (selectedCategories.value.includes(categoryId)) {
     selectedCategories.value = selectedCategories.value.filter(id => id !== categoryId);
   } else {
@@ -287,112 +308,63 @@ const toggleCategory = (categoryId) => {
   }
 };
 
-// Clear all filters
 const clearFilters = () => {
   selectedCategories.value = [];
   search.value = '';
 };
 
-// Mock products data (in a real app, this would come from the apps store)
-const products = ref([
-  {
-    id: 'sylph-note',
-    name: 'SylphNote',
-    description: 'AI-powered note-taking application with smart organization and cross-platform sync.',
-    tags: ['Productivity', 'AI'],
-    platforms: [
-      { name: 'iOS', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
-      { name: 'Android', class: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' },
-      { name: 'Web', class: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' }
-    ],
-    categories: ['mobile', 'productivity'],
-    gradientClass: 'bg-gradient-to-br from-blue-500 to-indigo-600'
-  },
-  {
-    id: 'vortex-vr',
-    name: 'VortexVR',
-    description: 'Immersive virtual reality experience with stunning visuals and interactive environments.',
-    tags: ['VR', 'Gaming'],
-    platforms: [
-      { name: 'Oculus', class: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
-      { name: 'SteamVR', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' }
-    ],
-    categories: ['vr', 'games'],
-    gradientClass: 'bg-gradient-to-br from-purple-500 to-pink-600'
-  },
-  {
-    id: 'sylph-chat',
-    name: 'SylphChat',
-    description: 'AI-powered messaging app with smart replies and real-time translation.',
-    tags: ['Communication', 'AI'],
-    platforms: [
-      { name: 'iOS', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
-      { name: 'Android', class: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' }
-    ],
-    categories: ['mobile'],
-    gradientClass: 'bg-gradient-to-br from-green-500 to-teal-600'
-  },
-  {
-    id: 'cosmic-explorer',
-    name: 'Cosmic Explorer',
-    description: 'Space exploration game with procedurally generated galaxies and immersive gameplay.',
-    tags: ['Gaming', 'Adventure'],
-    platforms: [
-      { name: 'PC', class: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
-      { name: 'Console', class: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' }
-    ],
-    categories: ['games'],
-    gradientClass: 'bg-gradient-to-br from-indigo-500 to-blue-600'
-  },
-  {
-    id: 'pocket-ar',
-    name: 'PocketAR',
-    description: 'Augmented reality tool for visualizing 3D models in real-world environments.',
-    tags: ['AR', 'Design'],
-    platforms: [
-      { name: 'iOS', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
-      { name: 'Android', class: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' }
-    ],
-    categories: ['mobile', 'ar', 'creative'],
-    gradientClass: 'bg-gradient-to-br from-amber-500 to-orange-600'
-  },
-  {
-    id: 'code-flow',
-    name: 'CodeFlow',
-    description: 'Programming editor with AI code completion and intelligent refactoring suggestions.',
-    tags: ['Developer', 'AI'],
-    platforms: [
-      { name: 'macOS', class: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
-      { name: 'Windows', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
-      { name: 'Linux', class: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300' }
-    ],
-    categories: ['productivity', 'creative'],
-    gradientClass: 'bg-gradient-to-br from-gray-700 to-gray-900'
-  }
-]);
+// --- Use Apps Store ---
+const appsStore = useAppsStore();
+const loading = computed(() => appsStore.loading);
+const allApps = computed(() => appsStore.apps); // Get apps from store
 
-// Filtered products based on search and category selections
-const filteredProducts = computed(() => {
-  let result = products.value;
-  
-  // Apply search filter
+// --- Client-side Filtering ---
+// Note: Assumes fetchApps retrieves all 'active' apps suitable for public display.
+const filteredApps = computed(() => {
+  let result = allApps.value
+    // Ensure only active apps are shown on the public page
+    .filter(app => app.status === 'active');
+
+  // Apply search filter (name, description)
   if (search.value) {
     const searchQuery = search.value.toLowerCase();
-    result = result.filter(product => 
-      product.name.toLowerCase().includes(searchQuery) || 
-      product.description.toLowerCase().includes(searchQuery) ||
-      product.tags.some(tag => tag.toLowerCase().includes(searchQuery)) ||
-      product.platforms.some(platform => platform.name.toLowerCase().includes(searchQuery))
+    result = result.filter(app =>
+      app.name.toLowerCase().includes(searchQuery) ||
+      (app.description?.toLowerCase().includes(searchQuery) || false)
+      // Add tag filtering if tags are added to App data
+      // || (app.tags?.some(tag => tag.toLowerCase().includes(searchQuery)) || false)
     );
   }
-  
-  // Apply category filters
-  if (selectedCategories.value.length > 0) {
-    result = result.filter(product => {
-      return selectedCategories.value.some(category => product.categories.includes(category));
-    });
-  }
-  
+
+  // Apply category filters (requires 'categories' field in App data)
+  // if (selectedCategories.value.length > 0) {
+  //   result = result.filter(app =>
+  //     selectedCategories.value.some(category => app.categories?.includes(category))
+  //   );
+  // }
+
   return result;
+});
+
+// --- Helper Functions ---
+const platformBadgeClass = (platform: string): string => {
+  const platformMap: Record<string, string> = {
+    'ios': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+    'android': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    'web': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    'windows': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+    'macos': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+    'linux': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+    'github': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+    'npm': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+  };
+  return platformMap[platform.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+};
+
+// --- Fetch initial data ---
+onMounted(() => {
+  // Fetch all apps (or implement public-specific fetching if needed)
+  // Assuming fetchApps without args gets all relevant public apps
+  appsStore.fetchApps();
 });
 </script>

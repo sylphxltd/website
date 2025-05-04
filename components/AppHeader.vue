@@ -27,80 +27,25 @@
 
         <!-- Desktop navigation -->
         <nav class="hidden md:flex space-x-1">
-          <NuxtLink 
-            v-for="link in navigationLinks" 
-            :key="link.path" 
-            :to="link.path"
-            :class="[
-              'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-              isActiveRoute(link.path)
-                ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/30'
-                : (isScrolled || isDark)
-                  ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
-                  : 'text-gray-800 hover:text-gray-900 hover:bg-white/20 dark:text-white dark:hover:text-white dark:hover:bg-white/10'
-            ]"
-          >
-            {{ link.name }}
-          </NuxtLink>
-          
-          <!-- Auth buttons -->
-          <template v-if="userStore.isAuthenticated">
-            <NuxtLink 
-              to="/settings" 
+            <!-- Iterate over headerLinks from useNavigation -->
+            <NuxtLink
+              v-for="link in headerLinks"
+              :key="link.path"
+              :to="link.path"
               :class="[
-                'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                isActiveRoute('/settings')
+                'px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center', // Added flex items-center
+                isActiveRoute(link.path)
                   ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/30'
                   : (isScrolled || isDark)
                     ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
                     : 'text-gray-800 hover:text-gray-900 hover:bg-white/20 dark:text-white dark:hover:text-white dark:hover:bg-white/10'
-              ]"
-            >
-              Settings
+              ]">
+              <span v-if="link.icon" :class="[link.icon, 'mr-2 text-base']"></span> <!-- Optional icon -->
+              {{ link.name }}
             </NuxtLink>
-            <div v-if="userStore.isAdmin" class="relative group">
-              <NuxtLink 
-                to="/admin" 
-                :class="[
-                  'px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center',
-                  isActiveRoute('/admin')
-                    ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/30'
-                    : (isScrolled || isDark)
-                      ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
-                      : 'text-gray-800 hover:text-gray-900 hover:bg-white/20 dark:text-white dark:hover:text-white dark:hover:bg-white/10'
-                ]"
-              >
-                Admin
-                <span class="i-carbon-chevron-down ml-1 text-xs"></span>
-              </NuxtLink>
-              
-              <!-- Admin dropdown -->
-              <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg overflow-hidden z-10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2">
-                <div class="py-1">
-                  <NuxtLink 
-                    v-for="item in adminMenuItems" 
-                    :key="item.path"
-                    :to="item.path" 
-                    class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    {{ item.name }}
-                  </NuxtLink>
-                </div>
-              </div>
-            </div>
-            <button 
-              @click="logout"
-              :class="[
-                'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                (isScrolled || isDark)
-                  ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
-                  : 'text-gray-800 hover:text-gray-900 hover:bg-white/20 dark:text-white dark:hover:text-white dark:hover:bg-white/10'
-              ]"
-            >
-              Sign Out
-            </button>
-          </template>
-          <template v-else>
+          
+          <!-- Auth buttons (Sign In/Sign Up/Sign Out) -->
+          <template v-if="!userStore.isAuthenticated">
             <NuxtLink 
               to="/login" 
               :class="[
@@ -123,6 +68,21 @@
             >
               Sign Up
             </NuxtLink>
+          </template>
+          <!-- Re-add Sign Out button for authenticated users -->
+          <template v-if="userStore.isAuthenticated">
+             <!-- Corrected: Call store action -->
+             <button
+               @click="userStore.signOutUser"
+               :class="[
+                 'px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                 (isScrolled || isDark)
+                   ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
+                   : 'text-gray-800 hover:text-gray-900 hover:bg-white/20 dark:text-white dark:hover:text-white dark:hover:bg-white/10'
+               ]"
+             >
+               Sign Out
+             </button>
           </template>
         </nav>
 
@@ -163,10 +123,11 @@
   </header>
 </template>
 
-<script setup>
-import { computed, ref, onMounted, watch } from 'vue';
-import { useRoute } from '#app';
+<script setup lang="ts"> // Added lang="ts"
+import { computed } from 'vue';
+import { useRoute, navigateTo } from '#app'; // Import navigateTo
 import { useUserStore } from '~/stores/user';
+import { useNavigation } from '~/composables/useNavigation'; // Import useNavigation
 
 // Props
 defineProps({
@@ -181,50 +142,29 @@ defineProps({
   mobileMenuOpen: {
     type: Boolean,
     default: false
-  },
-  navLinks: {
-    type: Array,
-    default: () => []
   }
+  // Removed navLinks prop
 });
 
 // Emits
 defineEmits(['toggle-dark', 'toggle-mobile-menu']);
 
-// Store
+// Store & Composables
 const userStore = useUserStore();
 const route = useRoute();
-
-// Navigation links
-const navigationLinks = [
-  { name: 'Home', path: '/' },
-  { name: 'Applications', path: '/apps' },
-  { name: 'Technologies', path: '/technologies' },
-  { name: 'About', path: '/about' }
-];
-
-// Admin menu items
-const adminMenuItems = [
-  { name: 'Dashboard', path: '/admin' },
-  { name: 'Applications', path: '/admin/apps' },
-  { name: 'Users', path: '/admin/users' },
-  { name: 'Reviews', path: '/admin/reviews' },
-  { name: 'Resources', path: '/admin/resources' },
-  { name: 'Email Support', path: '/admin/emails' },
-  { name: 'Media Publishing', path: '/admin/media' }
-];
+const { headerLinks } = useNavigation(); // Use headerLinks from composable
 
 // Check if route is active
-const isActiveRoute = (path) => {
+const isActiveRoute = (path: string) => {
   if (path === '/') {
     return route.path === '/';
   }
-  return route.path.startsWith(path);
+  // Ensure trailing slashes don't break matching for parent routes like /admin
+  // Use template literals
+  const currentPath = route.path.endsWith('/') ? route.path : `${route.path}/`;
+  const targetPath = path.endsWith('/') ? path : `${path}/`;
+  return currentPath.startsWith(targetPath);
 };
 
-// Logout
-const logout = async () => {
-  await userStore.logout();
-  navigateTo('/login');
-};
+// Removed local logout function, using userStore.signOutUser directly in template
 </script>

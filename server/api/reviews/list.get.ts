@@ -1,87 +1,112 @@
 import type { H3Event } from 'h3';
+import { getQuery } from 'h3';
 import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+import type { Review } from '~/stores/reviews'; // Import type
 
-// Mock Review Data Interface
-interface MockReview {
-  id: string;
-  userName: string;
-  rating: number; // 1-5
-  title?: string;
-  text: string;
-  timestamp: string; // ISO string
-  store: 'googlePlay' | 'appStore';
-  appId: string; // Package name or App Store ID
-}
-
-// Mock Data Generator
-const generateMockReviews = (appId: string, store: 'googlePlay' | 'appStore', count: number): MockReview[] => {
-  const reviews: MockReview[] = [];
-  const users = ['Alice', 'Bob', 'Charlie', 'David', 'Eve'];
-  const titles = ['Great App!', 'Needs Improvement', 'Love it!', 'Buggy', 'Okay'];
-  const texts = [
-    'This app is fantastic, does exactly what I need.',
-    'Constantly crashing on my device, please fix.',
-    'Simple and easy to use, highly recommend.',
-    'The latest update introduced some annoying bugs.',
-    'It works, but the UI could be better.',
-    'Best app in its category!',
+// Mock Data Generation
+const generateMockReviews = (appId: string, store: string, count: number, page: number): Review[] => {
+  const reviews: Review[] = [];
+  const baseId = `${appId}-${store}-p${page}-`;
+  const authors = ['User A', 'Reviewer B', 'Customer C', 'Tester D', 'Gamer E'];
+  // Use undefined instead of null for optional title
+  const titles = [undefined, 'Great App!', 'Needs Improvement', 'Bug Found', 'Feature Request'];
+  const bodies = [
+    'This app is fantastic, works perfectly!',
+    'Crashes frequently on my device.',
+    'Could you add a dark mode feature?',
+    'Easy to use and very helpful.',
+    'The latest update broke the login.',
+    'Love the new features, keep it up!',
+    'Interface is a bit confusing.',
   ];
 
   for (let i = 0; i < count; i++) {
-    const date = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000); // Random date in last 30 days
+    const rating = Math.floor(Math.random() * 5) + 1;
+    const hasReply = Math.random() > 0.6;
+    const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(); // Random date in last 30 days
+
     reviews.push({
-      id: `${store}-${appId}-${i}-${Date.now()}`,
-      userName: users[Math.floor(Math.random() * users.length)],
-      rating: Math.floor(Math.random() * 5) + 1,
-      title: titles[Math.floor(Math.random() * titles.length)],
-      text: texts[Math.floor(Math.random() * texts.length)],
-      timestamp: date.toISOString(),
-      store: store,
+      id: baseId + i,
       appId: appId,
+      store: store,
+      author: authors[Math.floor(Math.random() * authors.length)],
+      rating: rating,
+      title: titles[Math.floor(Math.random() * titles.length)],
+      body: bodies[Math.floor(Math.random() * bodies.length)],
+      createdAt: createdAt,
+      reply: hasReply ? {
+        body: 'Thank you for your feedback!',
+        createdAt: new Date(new Date(createdAt).getTime() + Math.random() * 1000 * 60 * 60 * 24).toISOString() // Reply within a day
+      } : null,
     });
   }
-  return reviews.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort newest first
+  return reviews;
 };
 
 
 export default defineEventHandler(async (event: H3Event) => {
-  const adminAuth = getAdminAuth();
-
-  // 1. Authentication and Authorization Check
+  // 1. Authorization Check (Admin Only)
   const authorization = getHeader(event, 'Authorization');
-   if (!authorization || !authorization.startsWith('Bearer ')) {
+  if (!authorization || !authorization.startsWith('Bearer ')) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Missing Bearer token' });
   }
   const idToken = authorization.split('Bearer ')[1];
 
   try {
+    const adminAuth = getAdminAuth();
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     if (!decodedToken.admin) {
       throw createError({ statusCode: 403, statusMessage: 'Forbidden: User is not an admin' });
     }
   } catch (error) {
-    console.error("Error verifying admin token:", error);
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
+     console.error("Error verifying admin token:", error);
+     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
   }
 
-  // 2. Get Query Parameters (App ID and Store)
+  // 2. Get Query Parameters
   const query = getQuery(event);
-  const appId = query.appId as string;
-  const store = query.store as ('googlePlay' | 'appStore' | undefined);
+  const appId = query.appId?.toString();
+  const store = query.store?.toString() || 'all'; // 'googlePlay', 'appStore', 'all'
+  const page = Number.parseInt(query.page?.toString() || '1', 10);
+  const limit = Number.parseInt(query.limit?.toString() || '10', 10);
+  // Add other filters like rating, dateFrom, dateTo, hasReply if needed
 
-  if (!appId || !store) {
-      throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing appId or store query parameter.' });
+  if (!appId) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing appId query parameter' });
   }
-   if (store !== 'googlePlay' && store !== 'appStore') {
-       throw createError({ statusCode: 400, statusMessage: 'Bad Request: Invalid store parameter. Use "googlePlay" or "appStore".' });
-   }
 
+  console.log(`Fetching reviews for appId: ${appId}, store: ${store}, page: ${page}, limit: ${limit}`);
 
-  // 3. Simulate API Call / Return Mock Data
-  console.log(`Simulating fetching reviews for ${store} app: ${appId}`);
-  // In a real scenario, you would call the respective store API here.
+  // 3. **Placeholder:** Fetch reviews from actual store APIs or aggregation service
+  // This part needs real implementation based on chosen APIs/services.
   // For now, return mock data.
-  const mockReviews = generateMockReviews(appId, store, 15); // Generate 15 mock reviews
 
-  return { reviews: mockReviews };
+  try {
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    let mockReviews: Review[] = [];
+    const totalMockReviews = 55; // Simulate a total count
+
+    if (store === 'all' || store === 'googlePlay') {
+        mockReviews = mockReviews.concat(generateMockReviews(appId, 'googlePlay', Math.ceil(limit / (store === 'all' ? 2 : 1)), page));
+    }
+     if (store === 'all' || store === 'appStore') {
+        mockReviews = mockReviews.concat(generateMockReviews(appId, 'appStore', Math.floor(limit / (store === 'all' ? 2 : 1)), page));
+    }
+
+    // Simulate pagination slicing (crude version)
+    const startIndex = (page - 1) * limit;
+    const paginatedReviews = mockReviews.slice(startIndex, startIndex + limit);
+
+
+    return {
+      reviews: paginatedReviews,
+      total: totalMockReviews // Return simulated total
+    };
+
+  } catch (error) {
+    console.error(`Error fetching/simulating reviews for appId ${appId}:`, error);
+    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error fetching reviews' });
+  }
 });

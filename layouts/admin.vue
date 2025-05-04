@@ -90,9 +90,11 @@
         </button>
         
         <!-- Page title (mobile) -->
-        <h1 class="text-lg font-medium text-gray-900 dark:text-white lg:hidden">
-          {{ pageTitle }}
-        </h1>
+        <!-- Page title is now handled by individual pages using useHead -->
+        <!-- Placeholder for breadcrumbs or dynamic title if needed later -->
+        <div class="text-lg font-medium text-gray-900 dark:text-white lg:hidden">
+          <!-- Dynamic title/breadcrumbs can go here -->
+        </div>
         
         <!-- Search bar (desktop) -->
         <div class="hidden lg:flex lg:flex-1 px-2 max-w-md">
@@ -153,10 +155,12 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '~/stores/user';
+import { useAdminNavigation } from '~/composables/useAdminNavigation'; // Import useAdminNavigation
 
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+const { adminSubNavigation } = useAdminNavigation(); // Get admin navigation from the correct composable
 
 // User data
 const user = computed(() => userStore.user);
@@ -170,20 +174,7 @@ const closeSidebar = () => {
   sidebarOpen.value = false;
 };
 
-// Page title based on current route
-const pageTitle = computed(() => {
-  const path = route.path;
-  if (path === '/admin') return 'Dashboard';
-  if (path.startsWith('/admin/apps')) return 'Applications';
-  if (path.startsWith('/admin/users')) return 'Users';
-  if (path.startsWith('/admin/reviews')) return 'Reviews';
-  if (path.startsWith('/admin/emails')) return 'Email Support';
-  if (path.startsWith('/admin/resources')) return 'Resources';
-  if (path.startsWith('/admin/media')) return 'Media Publishing';
-  if (path.startsWith('/admin/analytics')) return 'Analytics';
-  if (path.startsWith('/admin/settings')) return 'Settings';
-  return 'Admin';
-});
+// Page title is now handled by individual pages using useHead
 
 // Dark mode toggle
 const isDark = ref(false);
@@ -198,21 +189,17 @@ const toggleTheme = () => {
   }
 };
 
-// Navigation items
-const navItems = [
-  { name: 'Dashboard', to: '/admin', icon: 'i-carbon-dashboard' },
-  { name: 'Applications', to: '/admin/apps', icon: 'i-carbon-application', badge: '24', badgeColor: 'text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 py-0.5 px-2 rounded-full' },
-  { name: 'Users', to: '/admin/users', icon: 'i-carbon-user-multiple' },
-  { name: 'Reviews', to: '/admin/reviews', icon: 'i-carbon-star-review', badge: '12', badgeColor: 'text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 py-0.5 px-2 rounded-full' },
-  { name: 'Email Support', to: '/admin/emails', icon: 'i-carbon-email', badge: '8', badgeColor: 'text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 py-0.5 px-2 rounded-full' },
-  { name: 'Resources', to: '/admin/resources', icon: 'i-carbon-content-delivery-network' },
-  { name: 'Media', to: '/admin/media', icon: 'i-carbon-share-knowledge' },
-  { name: 'Analytics', to: '/admin/analytics', icon: 'i-carbon-analytics' },
-  { name: 'Settings', to: '/admin/settings', icon: 'i-carbon-settings' }
-];
+// Use adminSubNavigation from the composable
+const navItems = computed(() => adminSubNavigation.value.map(item => ({
+  ...item,
+  to: item.path // Map path to 'to' for NuxtLink
+  // Add badge logic here later if needed, fetching data dynamically
+})));
+
 
 // Logout function
 const logout = async () => {
+  // Consider moving this logic entirely into the userStore or an auth composable
   await userStore.logout();
   router.push('/login');
 };
@@ -220,7 +207,7 @@ const logout = async () => {
 // Initialize theme on mount
 onMounted(() => {
   // Check local storage theme preference
-  isDark.value = localStorage.getItem('color-theme') === 'dark' || 
+  isDark.value = localStorage.getItem('color-theme') === 'dark' ||
     (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
   
   // Apply theme

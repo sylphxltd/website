@@ -1,60 +1,68 @@
 import type { H3Event } from 'h3';
-import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+import { readBody } from 'h3';
 import { getStorage } from 'firebase-admin/storage';
+import { getAdminAuth } from '~/server/utils/firebaseAdmin';
 
-interface DeleteBody {
-    filePath: string; // Full path to the file in storage, e.g., appResources/appId123/image.png
+interface DeleteRequestBody {
+  path: string; // Expecting the full path to the file in storage
 }
 
 export default defineEventHandler(async (event: H3Event) => {
+  // 1. Authorization Check
+  const authorization = getHeader(event, 'Authorization');
+  if (!authorization || !authorization.startsWith('Bearer ')) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Missing Bearer token' });
+  }
+  const idToken = authorization.split('Bearer ')[1];
+
+  try {
     const adminAuth = getAdminAuth();
-    const storage = getStorage();
-    const bucket = storage.bucket();
-
-    // 1. Authentication and Authorization Check
-    const authorization = getHeader(event, 'Authorization');
-    if (!authorization || !authorization.startsWith('Bearer ')) {
-        throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Missing Bearer token' });
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    if (!decodedToken.admin) {
+      throw createError({ statusCode: 403, statusMessage: 'Forbidden: User is not an admin' });
     }
-    const idToken = authorization.split('Bearer ')[1];
+  } catch (error) {
+     console.error("Error verifying admin token:", error);
+     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
+  }
 
-    try {
-        const decodedToken = await adminAuth.verifyIdToken(idToken);
-        if (!decodedToken.admin) {
-            throw createError({ statusCode: 403, statusMessage: 'Forbidden: User is not an admin' });
-        }
-    } catch (error) {
-        console.error("Error verifying admin token:", error);
-        throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
+  // 2. Read Request Body
+  const body = await readBody<DeleteRequestBody>(event);
+  if (!body || typeof body.path !== 'string' || !body.path.trim()) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing or invalid file path in request body' });
+  }
+
+  const filePath = body.path.trim();
+
+  // Basic validation: Ensure path looks somewhat valid (e.g., starts with 'apps/')
+  if (!filePath.startsWith('apps/')) {
+      throw createError({ statusCode: 400, statusMessage: 'Bad Request: Invalid file path format' });
+  }
+
+  // 3. Delete File from Firebase Storage
+  try {
+    const bucket = getStorage().bucket();
+    const file = bucket.file(filePath);
+
+    // Check if file exists before attempting delete
+    const [exists] = await file.exists();
+    if (!exists) {
+        console.warn(`Attempted to delete non-existent file: ${filePath}`);
+        // Decide whether to return success or error if file doesn't exist
+        // Returning success might be better UX if the goal is just to ensure it's gone
+        return { success: true, message: `File ${filePath} does not exist or already deleted.` };
+        // throw createError({ statusCode: 404, statusMessage: 'Not Found: File does not exist' });
     }
 
-    // 2. Read and Validate Request Body
-    const body = await readBody<DeleteBody>(event);
-    if (!body || !body.filePath) {
-        throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing filePath in request body.' });
-    }
+    await file.delete();
+    console.log(`Successfully deleted ${filePath}`);
 
-    // Basic validation to ensure it's likely within the allowed path
-    if (!body.filePath.startsWith('appResources/')) {
-         throw createError({ statusCode: 400, statusMessage: 'Bad Request: Invalid file path.' });
-    }
+    // Optionally: Delete corresponding Firestore metadata document here if needed
 
-    // 3. Delete File from Firebase Storage
-    try {
-        const file = bucket.file(body.filePath);
-        await file.delete();
+    return { success: true, message: `File ${filePath} deleted successfully.` };
 
-        console.log(`Successfully deleted ${body.filePath}`);
-        return { success: true, message: 'File deleted successfully.' };
-
-    } catch (error: unknown) { // Use unknown type
-        console.error(`Error deleting file ${body.filePath}:`, error);
-        // Check for specific errors like 'object not found' after type checking
-        if (typeof error === 'object' && error !== null && 'code' in error && error.code === 404) {
-             throw createError({ statusCode: 404, statusMessage: 'File not found.' });
-        }
-        // You might want to log the actual error message for debugging
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        throw createError({ statusCode: 500, statusMessage: `Failed to delete file: ${errorMessage}` });
-    }
+  } catch (error) {
+    console.error(`Error deleting file ${filePath}:`, error);
+    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error during file deletion' });
+  }
 });

@@ -7,10 +7,12 @@ export interface ApiUser {
   uid: string
   email?: string
   displayName?: string
-  photoURL?: string
-  disabled: boolean
-  emailVerified: boolean
-  customClaims?: { [key: string]: unknown }
+  photoURL?: string;
+  phoneNumber?: string; // Add phoneNumber
+  disabled: boolean;
+  emailVerified: boolean;
+  customClaims?: { [key: string]: unknown };
+  tenantId?: string; // Add tenantId
   metadata: {
     creationTime?: string
     lastSignInTime?: string
@@ -24,12 +26,26 @@ export interface ApiUser {
   }[]
 }
 
+// Define structure for pagination state
+interface PaginationState {
+  currentPage: number;
+  pageSize: number;
+  nextPageToken?: string | null; // Token for Firebase pagination
+  totalUsers: number | null; // Note: Firebase listUsers doesn't easily provide total
+}
+
 export const useAdminUsersStore = defineStore('adminUsers', () => {
   // State
-  const users = ref<ApiUser[]>([])
+  const users = ref<ApiUser[]>([]) // Holds the users for the CURRENT page
   const loading = ref(false)
   const error = ref<string | null>(null)
   const settingRoleUid = ref<string | null>(null)
+  const pagination = ref<PaginationState>({ // Add pagination state
+      currentPage: 1,
+      pageSize: 10, // Default page size
+      nextPageToken: null,
+      totalUsers: null,
+  })
   
   // Get dependencies
   const userStore = useUserStore()
@@ -49,8 +65,16 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
     return 'An unexpected error occurred'
   }
 
-  // Fetch users from the API endpoint
-  const fetchUsers = async () => {
+  // Fetch users from the API endpoint with pagination and filtering
+  const fetchUsers = async (options: {
+      page?: number;
+      pageSize?: number;
+      pageToken?: string | null; // Use pageToken for Firebase
+      search?: string;
+      role?: 'admin' | 'user' | '';
+      status?: 'active' | 'inactive' | ''; // Maps to 'disabled' flag
+    } = {}) => {
+        
     // Skip if not admin
     if (!userStore.isAdmin) {
       console.warn("AdminUsersStore: User is not an admin")
@@ -60,6 +84,11 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
     loading.value = true
     error.value = null
     
+    // Determine page size and token for the request
+    const requestedPageSize = options.pageSize ?? pagination.value.pageSize;
+    // Use provided pageToken if available (for next/prev page), otherwise start fresh
+    const requestedPageToken = options.pageToken;
+
     try {
       const auth = getAuth()
       const idToken = await auth.currentUser?.getIdToken()
@@ -68,14 +97,42 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
         throw new Error("Could not retrieve user token")
       }
 
-      const response = await $fetch<{ users: ApiUser[] }>('/api/users/list', {
+      // Construct query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append('limit', requestedPageSize.toString());
+      if (requestedPageToken) {
+          queryParams.append('pageToken', requestedPageToken);
+      }
+      if (options.search) {
+          queryParams.append('search', options.search);
+      }
+      if (options.role) {
+          queryParams.append('role', options.role);
+      }
+      if (options.status) {
+          // Map UI status ('active'/'inactive') to API parameter (e.g., 'disabled=false'/'disabled=true')
+          queryParams.append('disabled', options.status === 'inactive' ? 'true' : 'false');
+      }
+
+      // Make the API call
+      const response = await $fetch<{ users: ApiUser[]; nextPageToken?: string; total?: number }>('/api/users/list', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${idToken}`
-        }
+        },
+        query: queryParams // Pass constructed query params
       })
       
-      users.value = response.users
+      // Update state
+      users.value = response.users;
+      pagination.value.nextPageToken = response.nextPageToken || null;
+      pagination.value.pageSize = requestedPageSize;
+      // Update total if provided by API, otherwise keep null
+      pagination.value.totalUsers = response.total ?? pagination.value.totalUsers;
+      // Update current page number based on whether we used a token
+      // This is a simplification; true page number tracking needs more logic if jumping pages
+      pagination.value.currentPage = options.page ?? (requestedPageToken ? pagination.value.currentPage + 1 : 1);
+
     } catch (err: unknown) {
       console.error("Error fetching users:", err)
       error.value = getErrorMessage(err)
@@ -122,8 +179,18 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
         'success'
       )
       
-      // Refresh user list to show updated status
-      await fetchUsers()
+      // Refresh the CURRENT page after role change
+      await fetchUsers({
+          // Use current pagination state, but reset pageToken to fetch the current view again
+          pageSize: pagination.value.pageSize,
+          // We need a way to get the token for the *current* page, not just next.
+          // Simplification: Refetch page 1 for now, or implement more complex page token storage.
+          // Let's refetch the current view based on filters/search without page token for simplicity now.
+           search: /* Need current search query */ '',
+           role: /* Need current role filter */ '',
+           status: /* Need current status filter */ '',
+           // pageToken: pagination.value.currentPageToken // Need to store current page token
+      });
     } catch (err: unknown) {
       console.error("Error setting user role:", err)
       userStore.showToast(getErrorMessage(err), 'error')
@@ -134,11 +201,13 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
 
   // Return state and methods
   return {
-    users,
+    users, // Current page of users
     loading,
     error,
     settingRoleUid,
+    pagination, // Expose pagination state
     fetchUsers,
-    toggleAdminRole
+    toggleAdminRole,
+    // Consider adding actions for changing page size, going to next/prev page
   }
 })

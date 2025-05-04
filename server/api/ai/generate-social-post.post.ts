@@ -1,86 +1,79 @@
 import type { H3Event } from 'h3';
-import { openai } from '@ai-sdk/openai';
-import { generateText } from 'ai'; // Use generateText for non-streaming
+import { readBody } from 'h3';
 import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+// TODO: Import necessary AI SDK components
 
-// Define the expected request body structure
-interface GenerateSocialPostBody {
-  originalContent: string;
-  targetPlatform: 'x' | 'facebook'; // Add more platforms as needed
-  title?: string; // Optional title for context
+interface GeneratePostRequestBody {
+  baseContent: string; // The original content (e.g., blog post body)
+  platform: 'x' | 'facebook' | 'medium' | 'linkedin' | string; // Target platform
+  // Add other optional context: desired tone, length constraints, etc.
 }
 
 export default defineEventHandler(async (event: H3Event) => {
-  const adminAuth = getAdminAuth();
-  const config = useRuntimeConfig();
-
-  // 1. Authentication and Authorization Check
+  // 1. Authorization Check (Admin Only)
   const authorization = getHeader(event, 'Authorization');
-   if (!authorization || !authorization.startsWith('Bearer ')) {
+  if (!authorization || !authorization.startsWith('Bearer ')) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Missing Bearer token' });
   }
   const idToken = authorization.split('Bearer ')[1];
 
   try {
+    const adminAuth = getAdminAuth();
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     if (!decodedToken.admin) {
       throw createError({ statusCode: 403, statusMessage: 'Forbidden: User is not an admin' });
     }
   } catch (error) {
-    console.error("Error verifying admin token:", error);
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
+     console.error("Error verifying admin token:", error);
+     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
   }
 
-  // 2. Get API Key
-  const openaiApiKey = config.openaiApiKey;
-  if (!openaiApiKey) {
-    throw createError({ statusCode: 500, statusMessage: 'Server configuration error: OpenAI API key not set.' });
+  // 2. Read Request Body
+  const body = await readBody<GeneratePostRequestBody>(event);
+  if (!body || !body.baseContent || !body.platform) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing baseContent or platform' });
   }
 
-  // 3. Read and Validate Request Body
-  const body = await readBody<GenerateSocialPostBody>(event);
-  if (!body || !body.originalContent || !body.targetPlatform) {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing originalContent or targetPlatform.' });
-  }
+  const { baseContent, platform } = body;
 
-  // 4. Construct Prompt based on platform
-  let prompt = `Adapt the following content${body.title ? ` (titled "${body.title}")` : ''} into a suitable post for the social media platform: ${body.targetPlatform}.\n\nOriginal Content:\n---\n${body.originalContent}\n---\n\n`;
-
-  let maxTokens = 500; // Default for Facebook-like
-
-  switch (body.targetPlatform) {
-      case 'x':
-          prompt += `Adapt the content into a concise tweet (or a short thread if necessary, clearly indicating thread breaks with "[THREAD BREAK]"). Focus on the key message. Maximum length around 280 characters per tweet. Include relevant hashtags.`;
-          maxTokens = 150; // Shorter for X
-          break;
-      case 'facebook':
-          prompt += 'Adapt the content into an engaging Facebook post. You can be slightly more detailed than X. Include relevant hashtags and maybe a call to action if appropriate.'; // Use plain string
-          maxTokens = 400; // Longer for Facebook
-          break;
-      // Add cases for other platforms
-      default:
-          throw createError({ statusCode: 400, statusMessage: `Unsupported target platform: ${body.targetPlatform}` });
-  }
-
-  prompt += `\n\nGenerated ${body.targetPlatform} Post:`;
-
-
-  // 5. Call AI SDK (using generateText for a single output)
+  // 3. **Placeholder:** Call AI Service (e.g., Vercel AI SDK / OpenAI)
   try {
-    const { text } = await generateText({
-      model: openai('gpt-4o'),
-      prompt: prompt,
-      maxTokens: maxTokens,
-    });
+    console.log(`Generating AI post variation for platform: ${platform}`);
+    
+    // Simulate AI processing delay
+    await new Promise(resolve => setTimeout(resolve, 1200));
 
-    return { generatedContent: text };
+    // --- Example using OpenAI (requires setup) ---
+    // const config = useRuntimeConfig();
+    // const openai = new OpenAI({ apiKey: config.openaiApiKey });
+    // let prompt = `Adapt the following content for a ${platform} post. `;
+    // if (platform === 'x') {
+    //     prompt += `Keep it concise (under 280 characters) and include relevant hashtags.\n\nContent: "${baseContent}"\n\n${platform} Post:`;
+    // } else if (platform === 'facebook' || platform === 'linkedin') {
+    //     prompt += `Make it engaging and slightly more detailed.\n\nContent: "${baseContent}"\n\n${platform} Post:`;
+    // } else { // e.g., Medium
+    //      prompt += `Format it appropriately for a blog post.\n\nContent: "${baseContent}"\n\n${platform} Post:`;
+    // }
+    // const response = await openai.completions.create({
+    //   model: 'text-davinci-003', // Or another suitable model
+    //   prompt: prompt,
+    //   max_tokens: 300, // Adjust as needed
+    //   temperature: 0.7,
+    // });
+    // const suggestion = response.choices[0]?.text.trim() || 'Could not generate suggestion.';
 
-  } catch (error: unknown) {
-    console.error(`Error calling OpenAI for ${body.targetPlatform} post:`, error);
-    const message = error instanceof Error ? error.message : `Failed to generate content for ${body.targetPlatform}.`;
-     if (message.includes('invalid api key')) {
-         throw createError({ statusCode: 500, statusMessage: 'Server configuration error: Invalid OpenAI API key.' });
+    // --- Mock Suggestion ---
+    let suggestion = `Check out our latest update: ${baseContent.substring(0, 80)}... #news #${platform}`;
+    if (platform === 'x') {
+        suggestion = `Update! ${baseContent.substring(0, 100)}... #dev #update`;
+    } else if (platform === 'medium') {
+        suggestion = `## Our Latest Update\n\n${baseContent}\n\nRead more on our blog!`;
     }
-    throw createError({ statusCode: 500, statusMessage: `AI content generation failed: ${message}` });
+
+    return { suggestion };
+
+  } catch (error) {
+    console.error("Error generating AI social post:", error);
+    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error generating AI post' });
   }
 });

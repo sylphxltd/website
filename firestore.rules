@@ -21,7 +21,15 @@ service cloud.firestore {
       // Only admins can create, update, delete apps
       allow write: if request.auth != null && request.auth.token.admin == true;
     }
+    
+    // User settings and data
+    match /users/{userId} {
+      // Allow users to read and write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admins can potentially read/write any user document (use with caution)
+      // allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+    }
 
-    // Add rules for other collections if needed
+    // Add rules for other collections (e.g., resources metadata) if needed
   }
 }

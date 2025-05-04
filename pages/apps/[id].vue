@@ -1,7 +1,7 @@
 <template>
-  <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24"> <!-- Increased vertical padding -->
     <!-- Loading state -->
-    <div v-if="loading" class="flex justify-center items-center py-20">
+    <div v-if="loading" class="flex justify-center items-center py-24"> <!-- Increased padding -->
       <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
     </div>
 
@@ -17,9 +17,9 @@
     </div>
 
     <!-- App details -->
-    <div v-else-if="app" class="space-y-12">
+    <div v-else-if="app" class="space-y-16 md:space-y-20"> <!-- Increased spacing -->
       <!-- Back button and app title section -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div class="flex flex-col md:flex-row md:items-start justify-between gap-8"> <!-- Increased gap, align start -->
         <div>
           <NuxtLink to="/apps" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 inline-flex items-center mb-4">
             <span class="i-carbon-arrow-left mr-1"></span>
@@ -34,20 +34,21 @@
             :href="url" 
             target="_blank" 
             rel="noopener noreferrer"
-            class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+            class="px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            <span :class="getPlatformIcon(platform)"></span>
-            <span>{{ getPlatformName(platform) }}</span>
+            <!-- Explicitly cast platform key to string -->
+            <span :class="getPlatformIcon(String(platform))" class="text-lg"></span>
+            <span>{{ getPlatformName(String(platform)) }}</span>
           </a>
         </div>
       </div>
 
-      <!-- App overview -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+      <!-- App overview - Increased gap -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-12 items-start">
         <!-- App info -->
-        <div class="md:col-span-2 space-y-8">
-          <!-- Description -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="md:col-span-2 space-y-10"> <!-- Increased spacing -->
+          <!-- Description - Use rounded-xl, increased padding -->
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">About {{ app.name }}</h2>
             <div class="prose prose-indigo dark:prose-invert max-w-none">
               <p class="text-gray-700 dark:text-gray-300">{{ app.description || 'No description available' }}</p>
@@ -55,38 +56,41 @@
           </div>
 
           <!-- Features -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Key Features</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div v-for="(feature, index) in getAppFeatures()" :key="index" class="flex items-start gap-3">
-                <div class="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center flex-shrink-0">
-                  <span class="i-carbon-checkmark text-indigo-600 dark:text-indigo-400"></span>
-                </div>
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Key Features</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5"> <!-- Adjusted gap -->
+              <!-- Display actual features -->
+              <div v-if="app.features && app.features.length > 0">
+                  <div v-for="(feature, index) in app.features" :key="index" class="flex items-start gap-4"> <!-- Consistent gap -->
+                     <div class="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0 mt-1"> <!-- Adjusted size/margin -->
+                       <span class="i-carbon-checkmark-outline text-indigo-600 dark:text-indigo-400 text-lg"></span> <!-- Adjusted size -->
+                     </div>
                 <div>
                   <h3 class="font-medium text-gray-900 dark:text-white">{{ feature.title }}</h3>
                   <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{ feature.description }}</p>
-                </div>
+                    </div>
+                  </div>
+              </div>
+              <p v-else class="text-sm text-gray-500 dark:text-gray-400">No specific features listed.</p>
+            </div>
+          </div>
+ 
+          <!-- Screenshots -->
+          <div v-if="app.screenshotUrls && app.screenshotUrls.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Screenshots</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+              <div v-for="(url, index) in app.screenshotUrls" :key="index" class="aspect-[16/9] bg-gray-100 dark:bg-gray-700 rounded-xl overflow-hidden shadow-sm">
+                <img :src="url" :alt="`${app.name} Screenshot ${index + 1}`" class="h-full w-full object-cover">
               </div>
             </div>
           </div>
-
-          <!-- Screenshots (mock) -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Screenshots</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <div v-for="i in 3" :key="i" class="aspect-[3/2] bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                <div class="h-full w-full flex items-center justify-center text-gray-400 dark:text-gray-500">
-                  <span class="i-carbon-image text-4xl"></span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- Ensure correct closing tag for md:col-span-2 -->
         </div>
 
         <!-- Sidebar -->
-        <div class="space-y-6">
+        <div class="space-y-8">
           <!-- App info card -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
             <div class="p-6">
               <div class="flex items-center mb-6">
                 <div class="h-16 w-16 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center">
@@ -96,15 +100,18 @@
                 <div class="ml-4">
                   <h3 class="font-medium text-gray-900 dark:text-white">{{ app.name }}</h3>
                   <div class="flex flex-wrap gap-2 mt-1">
-                    <span v-for="(tag, index) in getAppTags()" :key="index" class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded-full">
+                    <!-- Display actual tags -->
+                    <span v-if="app.tags && app.tags.length > 0" v-for="(tag, index) in app.tags" :key="index" class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded-full">
                       {{ tag }}
                     </span>
+                    <span v-else class="text-xs text-gray-500 italic">No tags</span>
                   </div>
                 </div>
               </div>
 
-              <div class="border-t border-gray-200 dark:border-gray-700 -mx-6 px-6 py-4">
-                <h4 class="font-medium text-gray-900 dark:text-white mb-3">App Information</h4>
+              <!-- App Info Details -->
+              <div class="pt-6 border-t border-gray-200 dark:border-gray-700 -mx-6 px-6"> <!-- Keep border for visual separation -->
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">App Information</h4>
                 <dl class="space-y-3">
                   <div class="flex justify-between">
                     <dt class="text-sm text-gray-500 dark:text-gray-400">Released</dt>
@@ -116,7 +123,8 @@
                   </div>
                   <div class="flex justify-between">
                     <dt class="text-sm text-gray-500 dark:text-gray-400">Category</dt>
-                    <dd class="text-sm text-gray-900 dark:text-white">{{ getAppCategory() }}</dd>
+                    <!-- Display category based on first tag or default -->
+                    <dd class="text-sm text-gray-900 dark:text-white">{{ app.tags?.[0] || 'General' }}</dd>
                   </div>
                 </dl>
               </div>
@@ -124,8 +132,8 @@
           </div>
 
           <!-- Support card -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 class="font-medium text-gray-900 dark:text-white mb-3">Support</h3>
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Support</h3>
             <div class="space-y-4">
               <a href="mailto:support@sylphx.com" class="flex items-center text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
                 <span class="i-carbon-email mr-2"></span>
@@ -146,9 +154,9 @@
 
       <!-- Related apps section -->
       <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Related Applications</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div v-for="relatedApp in relatedApps" :key="relatedApp.id" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex items-start gap-4">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">Related Applications</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div v-for="relatedApp in relatedApps" :key="relatedApp.id" class="bg-white dark:bg-gray-800 rounded-xl shadow p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
             <div class="h-12 w-12 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
               <img v-if="relatedApp.logoUrl" :src="relatedApp.logoUrl" :alt="relatedApp.name" class="h-10 w-10 object-contain">
               <span v-else class="text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ relatedApp.name.charAt(0) }}</span>
@@ -168,18 +176,18 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts"> // Added lang="ts"
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { useAppsStore } from '~/stores/apps';
+import { useAppsStore, type Application } from '~/stores/apps'; // Import Application type
 
 // States
 const route = useRoute();
 const appsStore = useAppsStore();
 const loading = ref(true);
-const error = ref(null);
-const app = ref(null);
-const relatedApps = ref([]);
+const error = ref<string | null>(null); // Typed error
+const app = ref<Application | null>(null); // Typed app
+const relatedApps = ref<Application[]>([]); // Typed related apps
 
 // Get app details
 const fetchAppDetails = async () => {
@@ -204,160 +212,25 @@ const fetchAppDetails = async () => {
     
     app.value = foundApp;
     
-    // Get related apps (other apps from the same category)
-    const category = getAppCategoryRaw();
+    // TODO: Implement proper related apps logic based on tags/categories
+    // For now, just show some other apps excluding the current one
     relatedApps.value = appsStore.apps
-      .filter(a => a.id !== appId && getAppCategoryRaw(a) === category)
-      .slice(0, 3); // Only get 3 related apps
+      .filter(a => a.id !== appId && a.status === 'active') // Filter active and different ID
+      .slice(0, 3);
     
-    // If we don't have enough related apps, add some random ones
-    if (relatedApps.value.length < 3) {
-      const additionalApps = appsStore.apps
-        .filter(a => a.id !== appId && !relatedApps.value.some(related => related.id === a.id))
-        .slice(0, 3 - relatedApps.value.length);
-      
-      relatedApps.value = [...relatedApps.value, ...additionalApps];
-    }
-    
-  } catch (err) {
+  } catch (err: unknown) { // Typed catch
     console.error('Error fetching app details:', err);
-    error.value = 'Failed to load application details';
+    error.value = err instanceof Error ? err.message : 'Failed to load application details';
   } finally {
     loading.value = false;
   }
 };
 
-// Get app category
-const getAppCategoryRaw = (currentApp = app.value) => {
-  if (!currentApp) return 'other';
-  
-  const description = (currentApp.description || '').toLowerCase();
-  const hasGooglePlay = !!currentApp.links?.googlePlay;
-  const hasAppStore = !!currentApp.links?.appStore;
-  const hasWebsite = !!currentApp.links?.website;
-  const hasGithub = !!currentApp.links?.github;
-  const hasNpm = !!currentApp.links?.npm;
-  
-  if (hasAppStore || hasGooglePlay || description.includes('mobile') || description.includes('ios') || description.includes('android')) {
-    return 'mobile';
-  }
-  
-  if (hasNpm || hasGithub || description.includes('library') || description.includes('package') || description.includes('framework')) {
-    return 'tools';
-  }
-  
-  if (hasWebsite || description.includes('web') || description.includes('browser')) {
-    return 'web';
-  }
-  
-  if (description.includes('desktop') || description.includes('windows') || description.includes('mac') || description.includes('linux')) {
-    return 'desktop';
-  }
-  
-  return 'other';
-};
-
-// Get formatted app category
-const getAppCategory = () => {
-  const categoryNames = {
-    'mobile': 'Mobile Apps',
-    'web': 'Web Applications',
-    'desktop': 'Desktop Software',
-    'tools': 'Developer Tools',
-    'other': 'General Applications'
-  };
-  
-  return categoryNames[getAppCategoryRaw()] || 'Applications';
-};
-
-// Get app tags
-const getAppTags = () => {
-  if (!app.value) return [];
-  
-  const tags = [];
-  const category = getAppCategoryRaw();
-  
-  // Add category as tag
-  switch (category) {
-    case 'mobile':
-      tags.push('Mobile');
-      break;
-    case 'web':
-      tags.push('Web');
-      break;
-    case 'desktop':
-      tags.push('Desktop');
-      break;
-    case 'tools':
-      tags.push('Dev Tools');
-      break;
-  }
-  
-  // Add platform tags
-  if (app.value.links?.googlePlay) tags.push('Android');
-  if (app.value.links?.appStore) tags.push('iOS');
-  if (app.value.links?.github) tags.push('Open Source');
-  if (app.value.links?.npm) tags.push('NPM');
-  
-  return tags;
-};
-
-// Generate mock features based on app description and category
-const getAppFeatures = () => {
-  if (!app.value) return [];
-  
-  const features = [];
-  const category = getAppCategoryRaw();
-  
-  // Base features by category
-  switch (category) {
-    case 'mobile':
-      features.push(
-        { title: 'Cross-Platform Support', description: 'Available on iOS and Android devices' },
-        { title: 'Intuitive UI/UX', description: 'User-friendly interface designed for mobile' }
-      );
-      break;
-    case 'web':
-      features.push(
-        { title: 'Responsive Design', description: 'Optimized for all screen sizes and devices' },
-        { title: 'Fast Loading', description: 'Efficient code for quick page loads' }
-      );
-      break;
-    case 'desktop':
-      features.push(
-        { title: 'Multi-Platform', description: 'Available for Windows, Mac, and Linux' },
-        { title: 'Offline Support', description: 'Full functionality without internet connection' }
-      );
-      break;
-    case 'tools':
-      features.push(
-        { title: 'Developer-Friendly', description: 'Designed with developers in mind' },
-        { title: 'Extensive Documentation', description: 'Comprehensive guides and examples' }
-      );
-      break;
-  }
-  
-  // Add AI feature if description mentions AI
-  if (app.value.description?.toLowerCase().includes('ai') || app.value.description?.toLowerCase().includes('intelligence')) {
-    features.push({ title: 'AI Integration', description: 'Powered by advanced artificial intelligence' });
-  }
-  
-  // Add cloud feature if description mentions cloud
-  if (app.value.description?.toLowerCase().includes('cloud') || app.value.description?.toLowerCase().includes('online')) {
-    features.push({ title: 'Cloud Sync', description: 'Automatic synchronization across all your devices' });
-  }
-  
-  // Always add these general features
-  features.push(
-    { title: 'Regular Updates', description: 'Continual improvements and new features' },
-    { title: 'Customer Support', description: '24/7 support available for all users' }
-  );
-  
-  return features;
-};
+// Removed mock data generation functions:
+// getAppCategoryRaw, getAppCategory, getAppTags, getAppFeatures
 
 // Format date
-const formatDate = (dateString) => {
+const formatDate = (dateString: string | undefined | null): string => { // Typed input
   if (!dateString) return 'Unknown';
   
   const date = new Date(dateString);
@@ -369,8 +242,8 @@ const formatDate = (dateString) => {
 };
 
 // Get platform icon
-const getPlatformIcon = (platform) => {
-  const iconMap = {
+const getPlatformIcon = (platform: string): string => { // Typed input
+  const iconMap: Record<string, string> = { // Typed map
     'googlePlay': 'i-carbon-logo-google',
     'appStore': 'i-carbon-logo-apple',
     'github': 'i-carbon-logo-github',
@@ -382,8 +255,8 @@ const getPlatformIcon = (platform) => {
 };
 
 // Get platform name
-const getPlatformName = (platform) => {
-  const nameMap = {
+const getPlatformName = (platform: string): string => { // Typed input
+  const nameMap: Record<string, string> = { // Typed map
     'googlePlay': 'Google Play',
     'appStore': 'App Store',
     'github': 'GitHub',

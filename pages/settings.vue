@@ -1,93 +1,93 @@
 <template>
-  <div class="w-full max-w-4xl mx-auto px-4 py-12">
+  <div class="w-full max-w-4xl mx-auto px-4 py-16 md:py-24"> <!-- Increased vertical padding -->
     <div v-if="!user" class="flex flex-col items-center justify-center min-h-[50vh]">
       <h1 class="text-xl font-semibold mb-4">You need to be logged in to access settings</h1>
-      <NuxtLink 
-        to="/login" 
-        class="inline-flex items-center justify-center px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 text-white font-medium rounded-md shadow-md shadow-blue-600/20 dark:shadow-blue-900/20 transition hover:-translate-y-0.5 hover:shadow-lg"
+      <NuxtLink
+        to="/login"
+        class="inline-flex items-center justify-center px-5 py-2.5 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 text-white font-medium rounded-lg shadow-md shadow-blue-600/20 dark:shadow-blue-900/20 transition hover:-translate-y-0.5 hover:shadow-lg"
       >
-        <span class="i-carbon-login mr-1"></span>
+        <span class="i-carbon-login mr-1.5"></span>
         Login to your account
       </NuxtLink>
     </div>
 
-    <div v-else>
-      <h1 class="text-2xl font-bold mb-8">Account Settings</h1>
-      
-      <!-- Settings Tabs -->
-      <div class="flex border-b border-gray-200 dark:border-gray-700 mb-8">
-        <button 
-          @click="activeTab = 'profile'" 
+    <div v-else class="space-y-10"> <!-- Add overall spacing -->
+      <h1 class="text-3xl font-bold mb-0">Account Settings</h1> <!-- Increased size, reduced mb -->
+
+      <!-- Settings Tabs - Increased bottom margin -->
+      <div class="flex border-b border-gray-200 dark:border-gray-700 mb-10">
+        <button
+          @click="activeTab = 'profile'"
           class="px-4 py-2 font-medium transition-colors relative"
           :class="activeTab === 'profile' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 -mb-px' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
         >
           Profile
         </button>
-        <button 
-          @click="activeTab = 'connections'" 
+        <button
+          @click="activeTab = 'connections'"
           class="px-4 py-2 font-medium transition-colors relative"
           :class="activeTab === 'connections' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 -mb-px' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
         >
           Connected Accounts
         </button>
-        <button 
-          @click="activeTab = 'security'" 
+        <button
+          @click="activeTab = 'security'"
           class="px-4 py-2 font-medium transition-colors relative"
           :class="activeTab === 'security' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 -mb-px' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
         >
           Security
         </button>
-        <button 
-          @click="activeTab = 'privacy'" 
+        <button
+          @click="activeTab = 'privacy'"
           class="px-4 py-2 font-medium transition-colors relative"
           :class="activeTab === 'privacy' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 -mb-px' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
         >
           Privacy & Data
         </button>
       </div>
-      
+
       <!-- In-page Notification System -->
       <Transition name="notification">
-        <div v-if="successMessage" class="mb-6 p-4 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md flex items-start">
-          <div class="i-carbon-checkmark-outline text-lg mr-2 mt-0.5"></div>
-          <div class="flex-1">{{ successMessage }}</div>
-          <button @click="successMessage = ''" class="text-green-700/80 dark:text-green-300/80 hover:text-green-700 dark:hover:text-green-300">
+        <div v-if="successMessage" class="mb-8 p-4 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg flex items-start shadow">
+          <div class="i-carbon-checkmark-outline text-xl mr-3 mt-0.5 flex-shrink-0"></div>
+          <div class="flex-1 text-sm">{{ successMessage }}</div>
+          <button @click="successMessage = ''" class="ml-3 text-green-700/80 dark:text-green-300/80 hover:text-green-700 dark:hover:text-green-300">
             <div class="i-carbon-close text-lg"></div>
           </button>
         </div>
       </Transition>
-      
+
       <Transition name="notification">
-        <div v-if="error" class="mb-6 p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md flex items-start">
-          <div class="i-carbon-warning text-lg mr-2 mt-0.5"></div>
-          <div class="flex-1">{{ formatErrorMessage(error) }}</div>
-          <button @click="error = null" class="text-red-700/80 dark:text-red-300/80 hover:text-red-700 dark:hover:text-red-300">
+        <div v-if="error" class="mb-8 p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg flex items-start shadow">
+          <div class="i-carbon-warning text-xl mr-3 mt-0.5 flex-shrink-0"></div>
+          <div class="flex-1 text-sm">{{ formatErrorMessage(error) }}</div>
+          <button @click="error = null" class="ml-3 text-red-700/80 dark:text-red-300/80 hover:text-red-700 dark:hover:text-red-300">
             <div class="i-carbon-close text-lg"></div>
           </button>
         </div>
       </Transition>
-      
+
       <!-- Profile Tab -->
-      <div v-if="activeTab === 'profile'" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
-        <h2 class="text-lg font-semibold mb-4">Profile Information</h2>
-        
-        <div class="flex items-center mb-6">
+      <div v-if="activeTab === 'profile'" class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8 space-y-8">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Profile Information</h2>
+
+        <div class="flex items-center">
           <div v-if="profileImageUrl" class="relative">
-            <img :src="profileImageUrl" alt="Profile picture" class="w-20 h-20 rounded-full object-cover mr-6" />
+            <img :src="profileImageUrl" alt="Profile picture" class="w-24 h-24 rounded-full object-cover mr-8" />
             <button
               @click="removeProfileImage"
               :disabled="imageLoading || profileLoading"
-              class="absolute top-0 right-5 bg-red-500 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              class="absolute top-0 right-7 bg-red-500 text-white rounded-full p-1 w-7 h-7 flex items-center justify-center text-sm hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Remove image"
             >
               <span v-if="imageLoading" class="i-carbon-circle-dash animate-spin text-xs"></span>
               <span v-else>×</span>
             </button>
           </div>
-          <div v-else class="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-6">
-            <span class="text-3xl text-gray-400 dark:text-gray-500">{{ (displayName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase() }}</span>
+          <div v-else class="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-8">
+            <span class="text-4xl text-gray-400 dark:text-gray-500">{{ (displayName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase() }}</span>
           </div>
-          
+
           <!-- Hidden file input -->
           <input
             type="file"
@@ -99,67 +99,67 @@
           <button
             @click="triggerFileInput"
             :disabled="imageLoading || profileLoading"
-            class="inline-flex items-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            class="inline-flex items-center px-5 py-2.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span v-if="imageLoading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+            <span v-if="imageLoading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
             <span v-else class="i-carbon-upload mr-2"></span>
             Change Picture
           </button>
         </div>
-        
-        <form @submit.prevent="updateProfile" class="space-y-4">
+
+        <form @submit.prevent="updateProfile" class="space-y-6">
           <div>
-            <label for="displayName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Display Name</label>
-            <input 
-              id="displayName" 
-              v-model="displayName" 
-              type="text" 
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            <label for="displayName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Display Name</label>
+            <input
+              id="displayName"
+              v-model="displayName"
+              type="text"
+              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               placeholder="Your name"
             />
           </div>
-          
+
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email address</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email address</label>
             <div class="flex items-center">
-              <input 
-                type="email" 
-                :value="user.email" 
+              <input
+                type="email"
+                :value="user.email"
                 readonly
-                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+                class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
               />
               <div class="ml-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs py-1 px-2 rounded">
                 Verified
               </div>
             </div>
           </div>
-          
-          <div class="flex justify-end pt-4">
-            <button 
+
+          <div class="flex justify-end pt-6">
+            <button
               type="submit"
               :disabled="profileLoading || imageLoading"
-              class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              class="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span v-if="profileLoading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+              <span v-if="profileLoading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
               Save Changes
             </button>
           </div>
         </form>
       </div>
-      
+
       <!-- Connected Accounts Tab -->
-      <div v-if="activeTab === 'connections'" class="space-y-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 class="text-lg font-semibold mb-6">Connected Social Accounts</h2>
-          
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+      <div v-if="activeTab === 'connections'" class="space-y-8">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <h2 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Connected Social Accounts</h2>
+
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
             Link your accounts to enable seamless sign-in across different platforms.
           </p>
-          
+
           <!-- Connected Account Item -->
-          <div class="space-y-4">
+          <div class="space-y-6">
             <!-- Google -->
-            <div class="flex justify-between items-center p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <div class="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-xl">
               <div class="flex items-center">
                 <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center mr-3 shadow-sm">
                   <span class="i-carbon-logo-google text-xl text-red-500"></span>
@@ -174,7 +174,7 @@
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 v-if="googleConnected"
                 @click="unlinkProvider('google')"
                 :disabled="loading"
@@ -182,18 +182,18 @@
               >
                 Disconnect
               </button>
-              <button 
+              <button
                 v-else
                 @click="linkProvider('google')"
                 :disabled="loading"
-                class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                class="inline-flex items-center justify-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
               >
                 Connect
               </button>
             </div>
-            
+
             <!-- GitHub (placeholder) -->
-            <div class="flex justify-between items-center p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <div class="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-xl">
               <div class="flex items-center">
                 <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center mr-3 shadow-sm">
                   <span class="i-carbon-logo-github text-xl"></span>
@@ -203,16 +203,16 @@
                   <p class="text-xs text-gray-500 dark:text-gray-400">Not connected</p>
                 </div>
               </div>
-              <button 
-                class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded-md opacity-50 cursor-not-allowed"
+              <button
+                class="inline-flex items-center justify-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded-lg opacity-50 cursor-not-allowed"
                 disabled
               >
                 Coming Soon
               </button>
             </div>
-            
+
             <!-- Apple (placeholder) -->
-            <div class="flex justify-between items-center p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <div class="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-xl">
               <div class="flex items-center">
                 <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center mr-3 shadow-sm">
                   <span class="i-carbon-logo-apple text-xl"></span>
@@ -222,8 +222,8 @@
                   <p class="text-xs text-gray-500 dark:text-gray-400">Not connected</p>
                 </div>
               </div>
-              <button 
-                class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded-md opacity-50 cursor-not-allowed"
+              <button
+                class="inline-flex items-center justify-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded-lg opacity-50 cursor-not-allowed"
                 disabled
               >
                 Coming Soon
@@ -231,11 +231,12 @@
             </div>
           </div>
         </div>
-        
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 class="text-lg font-semibold mb-4">Sign-in Preferences</h2>
-          
-          <div class="flex items-start">
+
+        <!-- Sign-in Preferences -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <h2 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Sign-in Preferences</h2>
+
+          <div class="flex items-start space-y-4">
             <div class="flex items-center h-5">
               <input
                 id="social-preferred"
@@ -251,26 +252,26 @@
               </p>
             </div>
           </div>
-          
-          <div class="flex justify-end mt-4">
-            <button 
+
+          <div class="flex justify-end mt-6">
+            <button
               @click="savePreferences"
               :disabled="loading"
-              class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              class="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save Preferences
             </button>
           </div>
         </div>
       </div>
-      
+
       <!-- Security Tab -->
-      <div v-if="activeTab === 'security'" class="space-y-6">
+      <div v-if="activeTab === 'security'" class="space-y-8">
         <!-- Two-Factor Authentication -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
-          <div class="flex justify-between items-start mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8 border-l-4 border-blue-500">
+          <div class="flex justify-between items-start mb-6">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Two-Factor Authentication</h2>
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Two-Factor Authentication</h2>
               <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Add an extra layer of security to your account
               </p>
@@ -279,10 +280,10 @@
               Recommended
             </div>
           </div>
-          
-          <div class="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-4 mb-4">
-            <div class="flex items-start space-x-3">
-              <div class="mt-1 text-xl text-blue-600 dark:text-blue-400">
+
+          <div class="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-5 mb-6">
+            <div class="flex items-start space-x-4">
+              <div class="mt-1 text-2xl text-blue-600 dark:text-blue-400">
                 <span class="i-carbon-two-factor-authentication"></span>
               </div>
               <div>
@@ -290,21 +291,21 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">
                   Use Google Authenticator, Microsoft Authenticator or any other TOTP app
                 </p>
-                <button 
+                <button
                   @click="setupTwoFactor"
                   :disabled="loading"
-                  class="mt-3 inline-flex items-center justify-center px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50"
+                  class="mt-4 inline-flex items-center justify-center px-4 py-2 text-sm bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50"
                 >
-                  <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+                  <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
                   Set Up
                 </button>
               </div>
             </div>
           </div>
-          
-          <div class="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-4">
-            <div class="flex items-start space-x-3">
-              <div class="mt-1 text-xl text-blue-600 dark:text-blue-400">
+
+          <div class="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-5">
+            <div class="flex items-start space-x-4">
+              <div class="mt-1 text-2xl text-blue-600 dark:text-blue-400">
                 <span class="i-carbon-phone"></span>
               </div>
               <div>
@@ -312,8 +313,8 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">
                   Receive verification codes via SMS when signing in
                 </p>
-                <button 
-                  class="mt-3 inline-flex items-center justify-center px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition"
+                <button
+                  class="mt-4 inline-flex items-center justify-center px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition"
                 >
                   Coming Soon
                 </button>
@@ -321,15 +322,15 @@
             </div>
           </div>
         </div>
-      
+
         <!-- Recent Login Activity -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 class="text-lg font-semibold mb-4">Login Activity</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <h2 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Login Activity</h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
             Review your recent login activity. If you notice any suspicious activity, change your password immediately.
           </p>
-          
-          <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+
+          <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
             <div class="relative overflow-x-auto">
               <table class="w-full text-sm">
                 <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300">
@@ -402,7 +403,7 @@
               </table>
             </div>
           </div>
-          
+
           <div class="mt-4 flex justify-end">
             <button class="inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:underline">
               <span class="i-carbon-view mr-1"></span>
@@ -410,38 +411,38 @@
             </button>
           </div>
         </div>
-        
+
         <!-- Connected Devices Management -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div class="flex justify-between items-center mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <div class="flex justify-between items-center mb-6">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Connected Devices</h2>
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Connected Devices</h2>
               <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Manage all devices where you're currently logged in
               </p>
             </div>
             <div>
-              <button 
+              <button
                 @click="logoutAllDevices"
                 :disabled="loading"
-                class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center justify-center px-4 py-2 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+                <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
                 <span class="i-carbon-logout mr-1"></span>
                 Log Out All Devices
               </button>
             </div>
           </div>
-          
-          <div class="space-y-4">
+
+          <div class="space-y-6">
             <!-- Current Device -->
-            <div class="relative p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/20">
+            <div class="relative p-5 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
               <div class="absolute top-3 right-3 bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 text-xs py-0.5 px-2 rounded-full">
                 Current Device
               </div>
-              
-              <div class="flex items-start space-x-3 mt-4">
-                <div class="p-3 bg-white dark:bg-gray-800 rounded-md">
+
+              <div class="flex items-start space-x-4 mt-4">
+                <div class="p-3 bg-white dark:bg-gray-800 rounded-lg">
                   <span class="i-carbon-laptop text-2xl text-blue-600 dark:text-blue-400"></span>
                 </div>
                 <div>
@@ -458,12 +459,12 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- Other Devices -->
-            <div v-for="(device, index) in connectedDevices" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <div v-for="(device, index) in connectedDevices" :key="index" class="p-5 border border-gray-200 dark:border-gray-700 rounded-xl">
               <div class="flex justify-between">
-                <div class="flex items-start space-x-3">
-                  <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
+                <div class="flex items-start space-x-4">
+                  <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
                     <span :class="device.icon + ' text-2xl text-gray-600 dark:text-gray-400'"></span>
                   </div>
                   <div>
@@ -479,7 +480,7 @@
                     </p>
                   </div>
                 </div>
-                <button 
+                <button
                   @click="logoutDevice(device.id)"
                   class="mt-3 h-8 inline-flex items-center justify-center px-3 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
                 >
@@ -489,7 +490,7 @@
               </div>
             </div>
           </div>
-          
+
           <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
             <div class="flex items-start">
               <div class="i-carbon-information text-lg text-blue-600 dark:text-blue-400 mr-2 mt-0.5"></div>
@@ -499,101 +500,101 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Change Password -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 class="text-lg font-semibold mb-4">Change Password</h2>
-          
-          <form @submit.prevent="changePassword" class="space-y-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <h2 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Change Password</h2>
+
+          <form @submit.prevent="changePassword" class="space-y-6">
             <div>
-              <label for="currentPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
-              <input 
-                id="currentPassword" 
-                v-model="currentPassword" 
-                type="password" 
-                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              <label for="currentPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Current Password</label>
+              <input
+                id="currentPassword"
+                v-model="currentPassword"
+                type="password"
+                class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="••••••••"
                 :disabled="!emailPasswordProvider"
               />
             </div>
-            
+
             <div>
-              <label for="newPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
-              <input 
-                id="newPassword" 
-                v-model="newPassword" 
-                type="password" 
-                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              <label for="newPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">New Password</label>
+              <input
+                id="newPassword"
+                v-model="newPassword"
+                type="password"
+                class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="Minimum 6 characters"
                 :disabled="!emailPasswordProvider"
               />
             </div>
-            
+
             <div>
-              <label for="confirmNewPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
-              <input 
-                id="confirmNewPassword" 
-                v-model="confirmNewPassword" 
-                type="password" 
-                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              <label for="confirmNewPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Confirm New Password</label>
+              <input
+                id="confirmNewPassword"
+                v-model="confirmNewPassword"
+                type="password"
+                class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="Re-enter new password"
                 :disabled="!emailPasswordProvider"
               />
             </div>
-            
+
             <div v-if="!emailPasswordProvider" class="mt-2 text-sm text-amber-600 dark:text-amber-400">
               <p>Password change is only available for accounts using email/password authentication.</p>
               <p class="mt-1">You are currently using social login.</p>
             </div>
-            
-            <div class="flex justify-end pt-4">
-              <button 
+
+            <div class="flex justify-end pt-6">
+              <button
                 type="submit"
                 :disabled="loading || !emailPasswordProvider"
-                class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+                <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
                 Update Password
               </button>
             </div>
           </form>
         </div>
-        
+
         <!-- Account Deletion -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-red-500">
-          <h2 class="text-lg font-semibold mb-2 text-red-600 dark:text-red-400">Delete Account</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8 border-l-4 border-red-500">
+          <h2 class="text-xl font-semibold mb-4 text-red-600 dark:text-red-400">Delete Account</h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
             Permanently delete your account and all associated data. This action cannot be undone.
           </p>
-          
-          <button 
+
+          <button
             @click="showDeleteConfirm = true"
-            class="inline-flex items-center justify-center px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition"
+            class="inline-flex items-center justify-center px-5 py-2.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition"
           >
             Delete my account
           </button>
-          
+
           <!-- Delete Account Confirmation Modal -->
-          <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div class="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl">
-              <h3 class="text-xl font-bold mb-4 text-red-600 dark:text-red-400">Confirm Account Deletion</h3>
-              <p class="mb-6 text-gray-700 dark:text-gray-300">
+          <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div class="w-full max-w-md p-6 sm:p-8 bg-white dark:bg-gray-800 rounded-xl shadow-xl">
+              <h3 class="text-xl font-semibold mb-5 text-red-600 dark:text-red-400">Confirm Account Deletion</h3>
+              <p class="mb-8 text-gray-700 dark:text-gray-300">
                 This will permanently delete your account and all associated data. This action cannot be undone.
               </p>
-              
-              <div class="flex justify-end space-x-3">
-                <button 
+
+              <div class="flex justify-end space-x-4">
+                <button
                   @click="showDeleteConfirm = false"
-                  class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                  class="px-5 py-2.5 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   @click="deleteAccount"
                   :disabled="loading"
-                  class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  class="inline-flex items-center justify-center px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                 >
-                  <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+                  <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
                   Delete Account
                 </button>
               </div>
@@ -601,17 +602,17 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Privacy and Data Tab -->
-      <div v-if="activeTab === 'privacy'" class="space-y-6">
+      <div v-if="activeTab === 'privacy'" class="space-y-8">
         <!-- Data Authorizations -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 class="text-lg font-semibold mb-4">Data Usage Authorization</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <h2 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Data Usage Authorization</h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-8">
             Control how your personal data is collected and used
           </p>
-          
-          <div class="space-y-4">
+
+          <div class="space-y-6">
             <div class="flex items-start">
               <div class="flex items-center h-5 mt-1">
                 <input
@@ -630,7 +631,7 @@
                 </p>
               </div>
             </div>
-            
+
             <div class="flex items-start">
               <div class="flex items-center h-5 mt-1">
                 <input
@@ -649,7 +650,7 @@
                 </p>
               </div>
             </div>
-            
+
             <div class="flex items-start">
               <div class="flex items-center h-5 mt-1">
                 <input
@@ -669,33 +670,33 @@
               </div>
             </div>
           </div>
-          
-          <div class="flex justify-end mt-6">
-            <button 
+
+          <div class="flex justify-end mt-8">
+            <button
               @click="saveDataConsent"
               :disabled="loading"
-              class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              class="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+              <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
               Save Settings
             </button>
           </div>
         </div>
-        
+
         <!-- Connected Third-party Apps -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 class="text-lg font-semibold mb-4">Authorized Third-party Applications</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <h2 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Authorized Third-party Applications</h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-8">
             These applications have been authorized to access your account data
           </p>
-          
+
           <div v-if="connectedApps.length === 0" class="text-center py-8 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
             <div class="i-carbon-application-web mx-auto mb-3 text-3xl text-gray-400 dark:text-gray-500"></div>
             <p class="text-gray-500 dark:text-gray-400">You haven't authorized any third-party applications yet</p>
           </div>
-          
-          <div v-else class="space-y-4">
-            <div v-for="(app, index) in connectedApps" :key="index" class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+
+          <div v-else class="space-y-6">
+            <div v-for="(app, index) in connectedApps" :key="index" class="p-5 border border-gray-200 dark:border-gray-700 rounded-xl">
               <div class="flex justify-between">
                 <div class="flex items-center">
                   <img :src="app.icon" alt="App icon" class="w-10 h-10 rounded-md mr-3" />
@@ -706,14 +707,14 @@
                     </p>
                   </div>
                 </div>
-                <button 
+                <button
                   @click="revokeAppAccess(app.id)"
                   class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
                 >
                   Revoke Access
                 </button>
               </div>
-              
+
               <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                 <h4 class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Access permissions:</h4>
                 <div class="space-y-1">
@@ -726,41 +727,41 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Data Export / Delete -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 class="text-lg font-semibold mb-4">Data Download & Deletion</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 sm:p-8">
+          <h2 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Data Download & Deletion</h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-8">
             Download a copy of your data or request deletion of your account data
           </p>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-              <div class="i-carbon-document-export text-2xl text-blue-600 dark:text-blue-400 mb-2"></div>
-              <h3 class="font-medium text-gray-900 dark:text-white mb-1">Data Download</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="p-6 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
+              <div class="i-carbon-document-export text-3xl text-blue-600 dark:text-blue-400 mb-3"></div>
+              <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-2">Data Download</h3>
               <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
                 Download all your personal data, content, and activity records from the platform
               </p>
-              <button 
+              <button
                 @click="requestDataExport"
                 :disabled="loading"
-                class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center justify-center px-4 py-2 text-sm bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-2"></span>
+                <span v-if="loading" class="i-carbon-circle-dash animate-spin mr-1.5"></span>
                 Export Data
               </button>
             </div>
-            
-            <div class="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-900/20">
-              <div class="i-carbon-trash-can text-2xl text-red-600 dark:text-red-400 mb-2"></div>
-              <h3 class="font-medium text-red-700 dark:text-red-400 mb-1">Delete All Data</h3>
+
+            <div class="p-6 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-200 dark:border-red-900/20">
+              <div class="i-carbon-trash-can text-3xl text-red-600 dark:text-red-400 mb-3"></div>
+              <h3 class="font-medium text-lg text-red-700 dark:text-red-400 mb-2">Delete All Data</h3>
               <p class="text-xs text-red-600/80 dark:text-red-400/80 mb-3">
                 Request permanent deletion of all data associated with your account. This action cannot be undone.
               </p>
-              <button 
+              <button
                 @click="requestDataDeletion"
                 :disabled="loading"
-                class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-red-600 dark:bg-red-700 text-white font-medium rounded-md hover:bg-red-700 dark:hover:bg-red-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center justify-center px-4 py-2 text-sm bg-red-600 dark:bg-red-700 text-white font-medium rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Request Data Deletion
               </button>
@@ -773,7 +774,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getAuth,
   updateProfile as firebaseUpdateProfile,
   updatePassword,
@@ -785,13 +786,15 @@ import { getAuth,
   deleteUser
 } from 'firebase/auth'
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
-import { useCurrentUser } from 'vuefire'
+import { doc, getDoc, setDoc } from 'firebase/firestore' // Import Firestore functions
+import { useCurrentUser, useFirestore } from 'vuefire' // Import useFirestore
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const user = useCurrentUser()
 let auth: ReturnType<typeof getAuth>
 let storage: ReturnType<typeof getStorage>
+let db: ReturnType<typeof useFirestore> // Firestore instance
 
 // UI state
 const activeTab = ref('profile')
@@ -864,15 +867,16 @@ const connectedDevices = ref([
   }
 ])
 
-// Initialize form values from user data
-onMounted(() => {
+// Initialize form values from user data and load settings
+onMounted(async () => { // Make onMounted async
   // Initialize Firebase services here
   auth = getAuth()
   storage = getStorage()
-
+  db = useFirestore() // Initialize Firestore
+  
   if (user.value) {
     displayName.value = user.value.displayName || ''
-    profileImageUrl.value = user.value.photoURL // Keep null if no photoURL exists
+    profileImageUrl.value = user.value.photoURL
     
     // Check providers
     const providerData = user.value.providerData || []
@@ -881,6 +885,30 @@ onMounted(() => {
         googleConnected.value = true
         googleEmail.value = provider.email || ''
       }
+    }
+    
+    // Load data consent settings
+    loading.value = true; // Use general loading state
+    try {
+        const userSettingsRef = doc(db, 'users', user.value.uid);
+        const docSnap = await getDoc(userSettingsRef);
+        if (docSnap.exists()) {
+            const settingsData = docSnap.data();
+            if (settingsData.dataConsent) {
+                dataConsent.value = { ...dataConsent.value, ...settingsData.dataConsent };
+            }
+            // Load other settings like socialPreferred if stored
+            if (typeof settingsData.socialPreferred === 'boolean') {
+                 socialPreferred.value = settingsData.socialPreferred;
+            }
+        } else {
+            console.log("No user settings document found, using defaults.");
+        }
+    } catch (err) {
+        console.error("Error loading user settings:", err);
+        error.value = err as Error; // Show error loading settings
+    } finally {
+        loading.value = false;
     }
   }
 })
@@ -891,7 +919,7 @@ const emailPasswordProvider = computed(() => {
   return user.value.providerData.some(provider => provider.providerId === 'password')
 })
 
-function formatErrorMessage(err: Error): string {
+function formatErrorMessage(err: Error | null): string { // Allow null input
   if (!err) return '';
   
   // Extract Firebase error code
@@ -1171,10 +1199,21 @@ async function unlinkProvider(providerName: string) {
     loading.value = false
   }
 }
-
-function savePreferences() {
-  // Placeholder - would typically save to a database
-  successMessage.value = 'Preferences saved successfully'
+async function savePreferences() {
+  if (!user.value) return;
+  loading.value = true;
+  error.value = null;
+  successMessage.value = '';
+  try {
+      const userSettingsRef = doc(db, 'users', user.value.uid);
+      await setDoc(userSettingsRef, { socialPreferred: socialPreferred.value }, { merge: true });
+      successMessage.value = 'Preferences saved successfully';
+  } catch (err) {
+      console.error("Error saving preferences:", err);
+      error.value = err as Error;
+  } finally {
+      loading.value = false;
+  }
 }
 
 async function deleteAccount() {
@@ -1196,14 +1235,22 @@ async function deleteAccount() {
 }
 
 // Data privacy functions
-function saveDataConsent() {
-  loading.value = true
-  
-  // Simulate API call
-  setTimeout(() => {
-    loading.value = false
-    successMessage.value = 'Privacy settings updated successfully'
-  }, 800)
+async function saveDataConsent() { // Make async
+  if (!user.value) return;
+  loading.value = true;
+  error.value = null;
+  successMessage.value = '';
+  try {
+      const userSettingsRef = doc(db, 'users', user.value.uid);
+      // Save the entire dataConsent object, merging with existing data
+      await setDoc(userSettingsRef, { dataConsent: dataConsent.value }, { merge: true }); 
+      successMessage.value = 'Privacy settings updated successfully';
+  } catch (err) {
+      console.error("Error saving data consent:", err);
+      error.value = err as Error;
+  } finally {
+      loading.value = false;
+  }
 }
 
 function revokeAppAccess(appId: string) {
@@ -1301,4 +1348,4 @@ watch(activeTab, () => {
   opacity: 0;
   transform: translateY(-20px);
 }
-</style> 
+</style>

@@ -1,89 +1,70 @@
 import type { H3Event } from 'h3';
+import { readBody } from 'h3';
 import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+// TODO: Import necessary email sending library (e.g., nodemailer, SendGrid client)
 
-// Define the expected request body structure
-interface SendEmailBody {
+interface SendEmailRequestBody {
   to: string;
-  from?: string; // Optional: MailChannels might override this
   subject: string;
-  text?: string;
-  html?: string;
+  body: string; // HTML or plain text
+  threadId?: string; // Optional: ID of the thread being replied to
+  // Add cc, bcc, attachments etc. if needed
 }
 
-// MailChannels API Endpoint
-const MAILCHANNELS_API = "https://api.mailchannels.net/tx/v1/send";
-
 export default defineEventHandler(async (event: H3Event) => {
-  const adminAuth = getAdminAuth();
-
-  // 1. Authentication and Authorization Check
+  // 1. Authorization Check (Admin Only)
   const authorization = getHeader(event, 'Authorization');
-   if (!authorization || !authorization.startsWith('Bearer ')) {
+  if (!authorization || !authorization.startsWith('Bearer ')) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Missing Bearer token' });
   }
   const idToken = authorization.split('Bearer ')[1];
 
   try {
+    const adminAuth = getAdminAuth();
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     if (!decodedToken.admin) {
       throw createError({ statusCode: 403, statusMessage: 'Forbidden: User is not an admin' });
     }
   } catch (error) {
-    console.error("Error verifying admin token:", error);
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
+     console.error("Error verifying admin token:", error);
+     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
   }
 
-  // 2. Read and Validate Request Body
-  const body = await readBody<SendEmailBody>(event);
-  if (!body || !body.to || !body.subject || (!body.text && !body.html)) {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing required fields (to, subject, text or html).' });
+  // 2. Read Request Body
+  const requestBody = await readBody<SendEmailRequestBody>(event); // Renamed variable
+  if (!requestBody || !requestBody.to || !requestBody.subject || !requestBody.body) { // Use renamed variable
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing required fields (to, subject, body)' });
   }
 
-  // 3. Construct MailChannels Payload
-  const emailPayload = {
-    personalizations: [
-      { to: [{ email: body.to }] }
-    ],
-    from: {
-      // IMPORTANT: Replace with your verified sending email address configured in Cloudflare/MailChannels
-      email: body.from || "support@yourverifieddomain.com",
-      name: "Sylphx Support" // Optional: Sender name
-    },
-    subject: body.subject,
-    content: [
-      body.text ? { type: "text/plain", value: body.text } : undefined,
-      body.html ? { type: "text/html", value: body.html } : undefined
-    ].filter(Boolean) // Remove undefined entries
-  };
+  // Destructure, renaming 'body' to avoid conflict
+  const { to, subject, body: emailContent, threadId } = requestBody;
 
-   if (emailPayload.content.length === 0) {
-       throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing email content (text or html).' });
-   }
+  console.log(`Received request to send email to: ${to}, Subject: ${subject}`);
+  if (threadId) {
+      console.log(`Replying to thread: ${threadId}`);
+  }
 
-
-  // 4. Call MailChannels API
+  // 3. **Placeholder:** Send email using chosen service (SMTP, SendGrid, etc.)
   try {
-    const response = await fetch(MAILCHANNELS_API, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(emailPayload),
-    });
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 600));
 
-    // MailChannels returns 202 Accepted on success
-    if (response.status !== 202) {
-      const errorText = await response.text();
-      console.error("MailChannels API Error:", response.status, errorText);
-      throw new Error(`Failed to send email via MailChannels: ${response.status} ${errorText}`);
-    }
+    // --- Example using a generic mailer ---
+    // const mailer = getMailerInstance(); // Get configured mailer instance
+    // await mailer.send({
+    //   from: 'support@sylphx.com', // Your support address
+    //   to: to,
+    //   subject: subject,
+    //   html: emailContent, // Use renamed variable
+    //   // Add In-Reply-To and References headers if replying
+    //   // headers: threadId ? { 'In-Reply-To': threadId, 'References': threadId } : {}
+    // });
 
-    console.log(`Email successfully sent to ${body.to} via MailChannels.`);
-    return { success: true, message: 'Email sent successfully.' };
+    console.log(`Mock email sent to ${to}`);
+    return { success: true, message: 'Email sent successfully (mocked).' };
 
-  } catch (error: unknown) {
-    console.error("Error sending email via MailChannels:", error);
-    const message = error instanceof Error ? error.message : 'Failed to send email.';
-    throw createError({ statusCode: 500, statusMessage: `Email sending failed: ${message}` });
+  } catch (error) {
+    console.error(`Error sending email to ${to}:`, error);
+    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error sending email' });
   }
 });

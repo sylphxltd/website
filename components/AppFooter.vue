@@ -68,26 +68,18 @@
             Company
           </h3>
           <ul class="space-y-3">
-            <li>
-              <NuxtLink to="/about" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                About Us
+            <!-- Dynamically generate Company links -->
+            <li v-for="link in companyLinks" :key="link.path">
+              <NuxtLink :to="link.path" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                {{ link.name }}
               </NuxtLink>
             </li>
-            <li>
-              <NuxtLink to="/technologies" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                Technologies
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/contact" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                Contact
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/careers" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                Careers
-              </NuxtLink>
-            </li>
+             <!-- Keep Technologies link for now, or move to footerLinks if preferred -->
+             <li>
+               <NuxtLink to="/technologies" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                 Technologies
+               </NuxtLink>
+             </li>
           </ul>
         </div>
         
@@ -97,21 +89,12 @@
             Legal
           </h3>
           <ul class="space-y-3">
-            <li>
-              <NuxtLink to="/privacy" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                Privacy Policy
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/terms" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                Terms of Service
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/cookies" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                Cookie Policy
-              </NuxtLink>
-            </li>
+             <!-- Dynamically generate Legal links -->
+             <li v-for="link in legalLinks" :key="link.path">
+               <NuxtLink :to="link.path" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                 {{ link.name }}
+               </NuxtLink>
+             </li>
           </ul>
         </div>
       </div>
@@ -140,8 +123,19 @@
   </footer>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue';
+<script setup lang="ts"> // Added lang="ts"
+import { ref, onMounted, computed } from 'vue'; // Added computed
+import { useNavigation } from '~/composables/useNavigation'; // Import useNavigation
+
+const { footerLinks } = useNavigation(); // Get footer links
+
+// Filter links for specific sections
+const companyLinks = computed(() =>
+  footerLinks.value.filter(link => ['/about', '/contact', '/careers'].includes(link.path))
+);
+const legalLinks = computed(() =>
+  footerLinks.value.filter(link => ['/privacy', '/terms', '/cookies'].includes(link.path))
+);
 
 // Check dark mode preference
 const isDark = ref(false);
@@ -163,7 +157,7 @@ const toggleTheme = () => {
 // Initialize theme on mount
 onMounted(() => {
   // Check local storage theme preference
-  isDark.value = localStorage.getItem('color-theme') === 'dark' || 
+  isDark.value = localStorage.getItem('color-theme') === 'dark' ||
     (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
   
   // Apply theme
