@@ -102,6 +102,9 @@ importers:
       animate.css:
         specifier: ^4.1.1
         version: 4.1.1
+      dotenv:
+        specifier: ^16.5.0
+        version: 16.5.0
       gsap:
         specifier: ^3.13.0
         version: 3.13.0

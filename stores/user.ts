@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
-import { 
-  getAuth, 
-  signInWithPopup, 
+import {
+  getAuth,
+  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -11,8 +11,9 @@ import {
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
+  onIdTokenChanged // Import onIdTokenChanged
 } from 'firebase/auth'
-import type { User } from 'firebase/auth'
+import type { User, IdTokenResult } from 'firebase/auth' // Import IdTokenResult
 import { useCurrentUser } from 'vuefire'
 import { useRouter } from 'vue-router'
 import { useToastStore } from '~/stores/toast'
@@ -38,24 +39,79 @@ export const useUserStore = defineStore('user', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const activeProvider = ref<string | null>(null)
-  const currentUser = useCurrentUser()
+  // Remove top-level useCurrentUser() call
+  // const currentUser = useCurrentUser()
   const router = useRouter()
-  
+  const idTokenResult = ref<IdTokenResult | null>(null) // State to store token result
+
   // Get toast store for notifications
   const toastStore = useToastStore()
-  
+
+  // Flag to prevent multiple listener initializations
+  let authListenerInitialized = false;
+
+  // Action to initialize the auth state change listener
+  const initAuthListener = () => {
+    // Ensure listener is initialized only once and on the client side
+    if (authListenerInitialized || typeof window === 'undefined') {
+        return;
+    }
+    authListenerInitialized = true;
+    console.log("Initializing Firebase Auth listener...");
+
+    const auth = getAuth(); // Get auth instance here
+    onIdTokenChanged(auth, async (user) => {
+      if (user) {
+        try {
+        // Force refresh true to get latest claims
+        idTokenResult.value = await user.getIdTokenResult(true);
+      } catch (err) {
+        console.error("Error getting ID token result:", err);
+        idTokenResult.value = null; // Reset on error
+        error.value = formatErrorMessage(err);
+        showToast(error.value, 'error');
+      }
+    } else {
+      idTokenResult.value = null; // Clear on sign out
+    }
+  }, (err) => { // Add error handler for onIdTokenChanged
+      console.error("Error in onIdTokenChanged listener:", err);
+      idTokenResult.value = null;
+      error.value = formatErrorMessage(err);
+        showToast(error.value, 'error');
+    });
+     console.log("Firebase Auth listener initialized.");
+  }
+
+
   // Computed
-  const isAuthenticated = computed(() => !!currentUser.value)
-  const userDisplayName = computed(() => {
-    if (!currentUser.value) return null
-    return currentUser.value.displayName || currentUser.value.email?.split('@')[0] || 'User'
+  // Call useCurrentUser() inside computed properties
+  const isAuthenticated = computed(() => {
+      const user = useCurrentUser();
+      return !!user.value;
   })
-  const userEmail = computed(() => currentUser.value?.email || null)
-  const userPhotoURL = computed(() => currentUser.value?.photoURL || null)
+  const isAdmin = computed(() => {
+    // Check if claims exist and admin claim is true
+    return !!idTokenResult.value?.claims.admin
+  })
+  const userDisplayName = computed(() => {
+    const user = useCurrentUser(); // Call inside computed
+    if (!user.value) return null
+    return user.value.displayName || user.value.email?.split('@')[0] || 'User'
+  })
+  const userEmail = computed(() => {
+      const user = useCurrentUser(); // Call inside computed
+      return user.value?.email || null;
+  })
+  const userPhotoURL = computed(() => {
+      const user = useCurrentUser(); // Call inside computed
+      return user.value?.photoURL || null;
+  })
   const userInitial = computed(() => {
-    if (!currentUser.value) return 'U'
-    return (currentUser.value.displayName?.charAt(0) || 
-            currentUser.value.email?.charAt(0) || 
+    const user = useCurrentUser(); // Call inside computed
+    if (!user.value) return 'U'
+    return (user.value.displayName?.charAt(0) ||
+            user.value.email?.charAt(0) ||
             'U').toUpperCase()
   })
 
@@ -67,23 +123,23 @@ export const useUserStore = defineStore('user', () => {
   // Internal helper for auth actions
   async function _performAuthAction(
     providerName: string,
-    authLogic: () => Promise<void>, // Changed from Promise<any> to Promise<void>
+    authLogic: () => Promise<void>,
     successRedirectPath?: string
   ) {
     loading.value = true;
     activeProvider.value = providerName;
     error.value = null;
-    
+
     try {
       await authLogic();
+      // ID token result will be updated by onIdTokenChanged listener
       if (successRedirectPath) {
         await navigateTo(successRedirectPath);
       }
-      // Optionally return success status or result if needed in the future
     } catch (err: unknown) {
       error.value = formatErrorMessage(err);
       showToast(error.value, 'error');
-      // Optionally re-throw or return error status
+      idTokenResult.value = null; // Clear token result on auth error
     } finally {
       loading.value = false;
       activeProvider.value = null;
@@ -97,7 +153,7 @@ export const useUserStore = defineStore('user', () => {
 
   const formatErrorMessage = (err: unknown): string => {
     if (typeof err === 'string') return err
-    
+
     let errorCode = 'unknown';
     let message = 'An unknown error occurred.';
 
@@ -105,7 +161,7 @@ export const useUserStore = defineStore('user', () => {
       errorCode = (err as { code?: string }).code || 'unknown';
       message = (err as { message?: string }).message || message;
     }
-    
+
     // Format Firebase error messages to be more user-friendly
     switch (errorCode) {
       case 'auth/invalid-email':
@@ -132,7 +188,14 @@ export const useUserStore = defineStore('user', () => {
         return 'Login popup was blocked by your browser.'
       case 'auth/requires-recent-login':
         return 'This operation requires a recent login. Please sign in again.'
+      // Add specific error for claims if needed, e.g., permission denied
+      case 'functions/permission-denied': // Example if using Functions to set claims
+         return 'You do not have permission to perform this action.';
       default:
+        // Check for generic permission errors if not using Functions
+        if (message.toLowerCase().includes('permission denied') || message.toLowerCase().includes('insufficient permissions')) {
+            return 'You do not have permission to perform this action.';
+        }
         return message
     }
   }
@@ -140,7 +203,7 @@ export const useUserStore = defineStore('user', () => {
   // Sign in with Google
   const signInWithGoogle = async () => {
     await _performAuthAction('google', async () => {
-      const auth = getAuth();
+      const auth = getAuth(); // Call getAuth() inside the action
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
     }, '/'); // Redirect to home on success
@@ -149,7 +212,7 @@ export const useUserStore = defineStore('user', () => {
   // Sign in with email and password
   const signInWithEmailPassword = async (email: string, password: string, rememberMe = false) => {
     await _performAuthAction('password', async () => {
-      const auth = getAuth();
+      const auth = getAuth(); // Call getAuth() inside the action
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       await signInWithEmailAndPassword(auth, email, password);
     }, '/'); // Redirect to home on success
@@ -158,41 +221,44 @@ export const useUserStore = defineStore('user', () => {
   // Register new user with email and password
   const registerUser = async (email: string, password: string, rememberMe = false) => {
     await _performAuthAction('register', async () => {
-      const auth = getAuth();
+      const auth = getAuth(); // Call getAuth() inside the action
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       await createUserWithEmailAndPassword(auth, email, password);
+      // Note: New users won't have admin claims initially.
+      // Claims need to be set separately by an existing admin.
     }, '/'); // Redirect to home on success
   }
 
   // Send password reset email
   const resetPassword = async (email: string) => {
     await _performAuthAction('reset', async () => {
-      const auth = getAuth();
+      const auth = getAuth(); // Call getAuth() inside the action
       await sendPasswordResetEmail(auth, email);
-      // Success handled in UI, no redirect needed
+      showToast('Password reset email sent. Check your inbox.', 'success'); // Add success toast
     });
   }
 
   // Send magic link
   const sendMagicLink = async (email: string) => {
     await _performAuthAction('magic', async () => {
-      const auth = getAuth();
+      const auth = getAuth(); // Call getAuth() inside the action
       const actionCodeSettings = {
-        url: `${window.location.origin}/magic-link?email=${email}`, // Keep email in URL for verification page
+        url: `${window.location.origin}/magic-link?email=${email}`,
         handleCodeInApp: true,
       };
       await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-      // Save the email locally to remember the user
       window.localStorage.setItem('emailForSignIn', email);
-    }, `/magic-link?email=${encodeURIComponent(email)}`); // Redirect to verification page
+      showToast('Magic link sent. Check your email to sign in.', 'success'); // Add success toast
+    // }, `/magic-link?email=${encodeURIComponent(email)}`); // Redirect handled by user clicking link
+    }); // No automatic redirect needed here
   }
 
   // Sign out
   const signOutUser = async () => {
-    // Note: activeProvider is not set for sign out as it's a general action
     await _performAuthAction('signout', async () => {
-      const auth = getAuth();
+      const auth = getAuth(); // Call getAuth() inside the action
       await signOut(auth);
+      idTokenResult.value = null; // Explicitly clear token result on sign out
     }, '/login'); // Redirect to login on success
   }
 
@@ -201,15 +267,17 @@ export const useUserStore = defineStore('user', () => {
     loading,
     error,
     activeProvider,
-    // currentUser, // Removed raw Firebase User object to prevent serialization errors
-    
+    // currentUser, // Keep removed
+    idTokenResult, // Expose token result if needed elsewhere (optional)
+
     // Computed
     isAuthenticated,
+    isAdmin, // Expose isAdmin
     userDisplayName,
     userEmail,
     userPhotoURL,
     userInitial,
-    
+
     // Actions
     clearError,
     showToast,
@@ -219,6 +287,7 @@ export const useUserStore = defineStore('user', () => {
     registerUser,
     resetPassword,
     sendMagicLink,
-    signOutUser
+    signOutUser,
+    initAuthListener // Expose the new action
   }
-}) 
+})

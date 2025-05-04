@@ -1,8 +1,9 @@
 <template>
   <div class="flex items-center gap-3">
-    <div v-if="userStore.isAuthenticated" class="relative user-dropdown-container">
-      <button 
-        @click="showUserMenu = !showUserMenu" 
+    <!-- Add check for userStore existence before accessing its properties -->
+    <div v-if="userStore && userStore.isAuthenticated" class="relative user-dropdown-container">
+      <button
+        @click="showUserMenu = !showUserMenu"
         class="flex items-center gap-2 hover:opacity-80 transition"
       >
         <div class="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
@@ -37,9 +38,22 @@
             Account Settings
           </div>
         </NuxtLink>
+
+        <!-- Admin Only: User Management Link -->
+        <NuxtLink
+          v-if="userStore.isAdmin"
+          to="/admin/users"
+          @click="showUserMenu = false"
+          class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          <div class="flex items-center">
+            <span class="i-carbon-user-multiple mr-2"></span>
+            User Management
+          </div>
+        </NuxtLink>
         
-        <button 
-          @click="handleSignOut" 
+        <button
+          @click="handleSignOut"
           class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700"
         >
           <div class="flex items-center">
@@ -49,10 +63,11 @@
         </button>
       </div>
     </div>
-    
-    <NuxtLink 
-      v-else 
-      to="/login" 
+
+    <!-- Add check for userStore existence before accessing its properties -->
+    <NuxtLink
+      v-else-if="userStore"
+      to="/login"
       class="inline-flex items-center justify-center px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 text-white font-medium rounded-md shadow-md shadow-blue-600/20 dark:shadow-blue-900/20 transition hover:-translate-y-0.5 hover:shadow-lg"
     >
       <span class="i-carbon-login mr-1"></span>
@@ -77,7 +92,8 @@ const router = useRouter()
 const userStore = useUserStore()
 const showUserMenu = ref(false)
 const errorMessage = ref('')
-const errorTimeout = ref(null)
+// Explicitly type errorTimeout to handle return type of setTimeout
+const errorTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
 // Close dropdown when clicking outside
 function handleClickOutside(event: MouseEvent) {

@@ -43,6 +43,7 @@
     "@vueuse/core": "^13.1.0",
     "@vueuse/nuxt": "^13.1.0",
     "animate.css": "^4.1.1",
+    "dotenv": "^16.5.0",
     "gsap": "^3.13.0",
     "motion": "^12.9.4",
     "sass": "^1.87.0"

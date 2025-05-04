@@ -41,6 +41,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useDark, useToggle } from '@vueuse/core';
+import { useUserStore } from '~/stores/user'; // Import user store
 // import { useHead } from '#imports'; // Removed useHead import
 import AppHeader from '~/components/AppHeader.vue';
 import AppMobileMenu from '~/components/AppMobileMenu.vue';
@@ -49,13 +50,15 @@ import AppFooter from '~/components/AppFooter.vue';
 
 const isDark = useDark();
 const toggleDark = useToggle(isDark);
+const userStore = useUserStore(); // Initialize user store
 
 // Navigation Links
 const navLinks = [
   { name: 'About', path: '/' },
   { name: 'Products', path: '/products' },
   { name: 'Technologies', path: '/technologies' },
-  { name: 'Instructions', path: '/instructions' }, // Added Instructions link
+  { name: 'Apps', path: '/apps' }, // Added Apps link
+  { name: 'Instructions', path: '/instructions' },
   { name: 'Privacy Policy', path: '/privacy' },
   { name: 'Contact', path: 'mailto:support@sylphx.com', external: true },
 ];
@@ -75,6 +78,9 @@ function handleScroll() {
 onMounted(() => {
   window.addEventListener('scroll', handleScroll);
   handleScroll(); // Check on initial mount
+
+  // Initialize the auth listener on client-side mount
+  userStore.initAuthListener();
 });
 
 onUnmounted(() => {

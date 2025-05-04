@@ -1,0 +1,240 @@
+<template>
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-6">User Management</h1>
+
+    <div v-if="userStore.loading || loadingUsers" class="text-center py-10">
+      <p>Loading data...</p>
+      <!-- Add a spinner or loading indicator here -->
+    </div>
+
+    <div v-else-if="!userStore.isAuthenticated || !userStore.isAdmin" class="text-center py-10">
+      <p class="text-red-500">Access Denied. You must be an administrator to view this page.</p>
+      <NuxtLink to="/" class="text-blue-500 hover:underline">Go to Home</NuxtLink>
+    </div>
+
+    <div v-else>
+      <div v-if="fetchError" class="mb-4 p-4 bg-red-100 text-red-700 border border-red-400 rounded">
+        Error loading users: {{ fetchError }}
+      </div>
+
+      <div class="overflow-x-auto bg-white dark:bg-gray-800 shadow rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead class="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                User
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                UID
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Admin Status
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tr v-for="user in users" :key="user.uid">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                  <div class="flex-shrink-0 h-10 w-10">
+                    <img v-if="user.photoURL" class="h-10 w-10 rounded-full" :src="user.photoURL" alt="User avatar">
+                     <span v-else class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-300 font-medium">
+                       {{ (user.displayName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase() }}
+                     </span>
+                  </div>
+                  <div class="ml-4">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{ user.displayName || 'N/A' }}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ user.email }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                {{ user.uid }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span
+                  :class="user.customClaims?.admin ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'"
+                  class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                >
+                  {{ user.customClaims?.admin ? 'Admin' : 'User' }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <button
+                  @click="toggleAdminRole(user)"
+                  :disabled="settingRoleUid === user.uid || user.uid === getAuth().currentUser?.uid"
+                  :class="{
+                    'opacity-50 cursor-not-allowed': user.uid === getAuth().currentUser?.uid,
+                    'hover:text-indigo-900 dark:hover:text-indigo-300': user.uid !== getAuth().currentUser?.uid
+                  }"
+                  class="text-indigo-600 dark:text-indigo-400 disabled:text-gray-400 dark:disabled:text-gray-500"
+                  :title="user.uid === getAuth().currentUser?.uid ? 'Cannot change your own role' : (user.customClaims?.admin ? 'Revoke Admin' : 'Grant Admin')"
+                >
+                  <span v-if="settingRoleUid === user.uid">Updating...</span>
+                  <span v-else>{{ user.customClaims?.admin ? 'Revoke Admin' : 'Grant Admin' }}</span>
+                </button>
+              </td>
+            </tr>
+             <tr v-if="users.length === 0 && !loadingUsers">
+                <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No users found.
+                </td>
+             </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue' // Added watch
+import { useUserStore } from '~/stores/user'
+import { getAuth } from 'firebase/auth'
+
+// Define User interface based on API response
+interface ApiUser {
+  uid: string;
+  email?: string;
+  displayName?: string;
+  photoURL?: string;
+  disabled: boolean;
+  emailVerified: boolean;
+  customClaims?: { [key: string]: unknown }; // Changed any to unknown
+  metadata: {
+    creationTime?: string;
+    lastSignInTime?: string;
+  };
+}
+
+definePageMeta({
+  middleware: ['auth'] // Apply auth middleware
+})
+
+const userStore = useUserStore()
+const users = ref<ApiUser[]>([])
+const loadingUsers = ref(false)
+const fetchError = ref<string | null>(null)
+const settingRoleUid = ref<string | null>(null) // Track which user's role is being updated
+
+// Fetch users from the API endpoint
+const fetchUsers = async () => {
+  if (!userStore.isAdmin) return; // Double check admin status
+
+  loadingUsers.value = true;
+  fetchError.value = null;
+  try {
+    const auth = getAuth();
+    const idToken = await auth.currentUser?.getIdToken(); // Get current user's token
+    if (!idToken) {
+        throw new Error("Could not retrieve user token.");
+    }
+
+    const response = await $fetch<{ users: ApiUser[] }>('/api/users/list', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${idToken}`
+      }
+    });
+    users.value = response.users;
+  } catch (error: unknown) { // Changed any to unknown
+    console.error("Error fetching users:", error);
+    // Use a helper to extract message, checking if error is an object with data/message
+    const getErrorMessage = (err: unknown): string => {
+        if (typeof err === 'object' && err !== null) {
+            // Check for Nuxt $fetch error structure
+            if ('data' in err && typeof err.data === 'object' && err.data !== null && 'message' in err.data && typeof err.data.message === 'string') {
+                return err.data.message;
+            }
+            // Check for standard Error object
+            if ('message' in err && typeof err.message === 'string') {
+                return (err as { message: string }).message;
+            }
+        }
+        return 'Failed to load users.';
+    };
+    fetchError.value = getErrorMessage(error);
+    // Only show toast if fetchError has a value
+    if (fetchError.value) {
+        userStore.showToast(fetchError.value, 'error');
+    }
+  } finally {
+    loadingUsers.value = false;
+  }
+}
+
+// Toggle admin role for a user
+const toggleAdminRole = async (user: ApiUser) => {
+  // Use getAuth() to get current user UID
+  if (settingRoleUid.value || user.uid === getAuth().currentUser?.uid) return;
+
+  settingRoleUid.value = user.uid; // Set loading state for this user
+  const newAdminStatus = !user.customClaims?.admin;
+  const rolePayload = { admin: newAdminStatus };
+
+  try {
+    const auth = getAuth();
+    const idToken = await auth.currentUser?.getIdToken();
+     if (!idToken) {
+        throw new Error("Could not retrieve user token.");
+    }
+
+    await $fetch('/api/users/setRole', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ uid: user.uid, role: rolePayload })
+    });
+
+    userStore.showToast(`Successfully ${newAdminStatus ? 'granted' : 'revoked'} admin role for ${user.email || user.uid}.`, 'success');
+    // Refresh user list to show updated status
+    await fetchUsers();
+  } catch (error: unknown) { // Changed any to unknown
+    console.error("Error setting user role:", error);
+     // Use a helper to extract message
+    const getErrorMessage = (err: unknown): string => {
+        if (typeof err === 'object' && err !== null) {
+             // Check for Nuxt $fetch error structure
+            if ('data' in err && typeof err.data === 'object' && err.data !== null && 'message' in err.data && typeof err.data.message === 'string') {
+                return err.data.message;
+            }
+             // Check for standard Error object
+            if ('message' in err && typeof err.message === 'string') {
+                return (err as { message: string }).message;
+            }
+        }
+        return 'Failed to update user role.';
+    };
+    userStore.showToast(getErrorMessage(error), 'error');
+  } finally {
+    settingRoleUid.value = null; // Clear loading state
+  }
+}
+
+// Fetch users when component is mounted and user is admin
+onMounted(() => {
+  // Watch for admin status readiness
+  const stopWatch = watch(() => userStore.isAdmin, (isAdmin) => {
+      if (isAdmin) {
+          fetchUsers();
+          stopWatch(); // Stop watching once admin status is confirmed
+      } else if (!userStore.loading && !userStore.isAuthenticated) {
+          // If loading finished and user is not authenticated, stop watching
+          stopWatch();
+      } else if (!userStore.loading && userStore.isAuthenticated && !isAdmin) {
+          // If loading finished, user authenticated but not admin, stop watching
+          stopWatch();
+      }
+  }, { immediate: true });
+});
+
+</script>
+
+<style scoped>
+/* Add any page-specific styles here */
+</style>
