@@ -240,6 +240,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { getAuth, fetchSignInMethodsForEmail } from 'firebase/auth'
+
+// Add page metadata here
+definePageMeta({
+  public: true,
+})
 import { useRouter } from 'vue-router'
 import { useUserStore } from '~/stores/user'
 
@@ -269,15 +274,24 @@ const actionCodeSettings = computed(() => {
 })
 
 // Format error message to be user-friendly
-function formatErrorMessage(err: any): string {
+function formatErrorMessage(err: unknown): string { // Changed any to unknown
   if (!err) return ''
-  
+
   if (typeof err === 'string') return err
-  
-  // Get Firebase error code or message
-  const errorCode = err.code || ''
-  const errorMessage = err.message || 'An unknown error occurred'
-  
+
+  let errorCode = 'unknown';
+  let errorMessage = 'An unknown error occurred';
+
+  // Check if err is an object with code and message properties
+  if (typeof err === 'object' && err !== null) {
+    if ('code' in err && typeof err.code === 'string') {
+      errorCode = err.code;
+    }
+    if ('message' in err && typeof err.message === 'string') {
+      errorMessage = err.message;
+    }
+  }
+
   // Format Firebase error messages to be more user-friendly
   switch (errorCode) {
     case 'auth/invalid-email':
@@ -457,9 +471,10 @@ async function registerUser() {
     // Navigation is handled in the store
   } catch (err) {
     error.value = err as Error
-    
+
     // If we get an email-already-in-use error, redirect to password login
-    if (err.code === 'auth/email-already-in-use') {
+    // Check if err is an object and has a code property before accessing it
+    if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'auth/email-already-in-use') {
       error.value = new Error('This email is already registered. Please sign in with your password.')
       currentStep.value = 'password'
     }

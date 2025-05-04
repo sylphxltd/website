@@ -39,10 +39,12 @@ export const useUserStore = defineStore('user', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const activeProvider = ref<string | null>(null)
-  // Remove top-level useCurrentUser() call
-  // const currentUser = useCurrentUser()
+  // Restore top-level useCurrentUser() call
+  const currentUser = useCurrentUser()
   const router = useRouter()
-  const idTokenResult = ref<IdTokenResult | null>(null) // State to store token result
+  // Remove idTokenResult state
+  // const idTokenResult = ref<IdTokenResult | null>(null)
+  const isAdminState = ref(false) // Add simple boolean state for admin status
 
   // Get toast store for notifications
   const toastStore = useToastStore()
@@ -63,21 +65,24 @@ export const useUserStore = defineStore('user', () => {
     onIdTokenChanged(auth, async (user) => {
       if (user) {
         try {
-        // Force refresh true to get latest claims
-        idTokenResult.value = await user.getIdTokenResult(true);
-      } catch (err) {
-        console.error("Error getting ID token result:", err);
-        idTokenResult.value = null; // Reset on error
-        error.value = formatErrorMessage(err);
-        showToast(error.value, 'error');
+          // Force refresh true to get latest claims
+          const tokenResult = await user.getIdTokenResult(true);
+          // Update the simple boolean state based on claims
+          isAdminState.value = tokenResult.claims.admin === true;
+          console.log(`Admin status updated: ${isAdminState.value}`);
+        } catch (err) {
+          console.error("Error getting ID token result:", err);
+          isAdminState.value = false; // Reset on error
+          error.value = formatErrorMessage(err);
+          showToast(error.value, 'error');
+        }
+      } else {
+        isAdminState.value = false; // Clear on sign out
       }
-    } else {
-      idTokenResult.value = null; // Clear on sign out
-    }
-  }, (err) => { // Add error handler for onIdTokenChanged
-      console.error("Error in onIdTokenChanged listener:", err);
-      idTokenResult.value = null;
-      error.value = formatErrorMessage(err);
+    }, (err) => { // Add error handler for onIdTokenChanged
+        console.error("Error in onIdTokenChanged listener:", err);
+        isAdminState.value = false;
+        error.value = formatErrorMessage(err);
         showToast(error.value, 'error');
     });
      console.log("Firebase Auth listener initialized.");
@@ -85,33 +90,31 @@ export const useUserStore = defineStore('user', () => {
 
 
   // Computed
-  // Call useCurrentUser() inside computed properties
+  // Use the top-level currentUser
   const isAuthenticated = computed(() => {
-      const user = useCurrentUser();
-      return !!user.value;
+      return !!currentUser.value;
   })
-  const isAdmin = computed(() => {
-    // Check if claims exist and admin claim is true
-    return !!idTokenResult.value?.claims.admin
-  })
+  // isAdmin computed now directly returns the state
+  const isAdmin = computed(() => isAdminState.value)
+
   const userDisplayName = computed(() => {
-    const user = useCurrentUser(); // Call inside computed
-    if (!user.value) return null
-    return user.value.displayName || user.value.email?.split('@')[0] || 'User'
+    // Use the top-level currentUser
+    if (!currentUser.value) return null
+    return currentUser.value.displayName || currentUser.value.email?.split('@')[0] || 'User'
   })
   const userEmail = computed(() => {
-      const user = useCurrentUser(); // Call inside computed
-      return user.value?.email || null;
+      // Use the top-level currentUser
+      return currentUser.value?.email || null;
   })
   const userPhotoURL = computed(() => {
-      const user = useCurrentUser(); // Call inside computed
-      return user.value?.photoURL || null;
+      // Use the top-level currentUser
+      return currentUser.value?.photoURL || null;
   })
   const userInitial = computed(() => {
-    const user = useCurrentUser(); // Call inside computed
-    if (!user.value) return 'U'
-    return (user.value.displayName?.charAt(0) ||
-            user.value.email?.charAt(0) ||
+    // Use the top-level currentUser
+    if (!currentUser.value) return 'U'
+    return (currentUser.value.displayName?.charAt(0) ||
+            currentUser.value.email?.charAt(0) ||
             'U').toUpperCase()
   })
 
@@ -139,7 +142,7 @@ export const useUserStore = defineStore('user', () => {
     } catch (err: unknown) {
       error.value = formatErrorMessage(err);
       showToast(error.value, 'error');
-      idTokenResult.value = null; // Clear token result on auth error
+      isAdminState.value = false; // Clear admin status on auth error
     } finally {
       loading.value = false;
       activeProvider.value = null;
@@ -258,7 +261,7 @@ export const useUserStore = defineStore('user', () => {
     await _performAuthAction('signout', async () => {
       const auth = getAuth(); // Call getAuth() inside the action
       await signOut(auth);
-      idTokenResult.value = null; // Explicitly clear token result on sign out
+      isAdminState.value = false; // Explicitly clear admin status on sign out
     }, '/login'); // Redirect to login on success
   }
 
@@ -267,8 +270,8 @@ export const useUserStore = defineStore('user', () => {
     loading,
     error,
     activeProvider,
-    // currentUser, // Keep removed
-    idTokenResult, // Expose token result if needed elsewhere (optional)
+    // currentUser, // REMOVED: Exposing raw User object causes serialization errors
+    // idTokenResult, // Remove complex object from return
 
     // Computed
     isAuthenticated,

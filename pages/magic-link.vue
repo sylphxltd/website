@@ -33,6 +33,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getAuth, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth'
+
+// Add page metadata here
+definePageMeta({
+  public: true,
+})
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -79,11 +84,12 @@ onMounted(async () => {
       // Not a valid sign-in link
       throw new Error('Invalid sign-in link. Please request a new link.')
     }
-  } catch (err) {
+  } catch (err: unknown) { // Add type unknown
     error.value = true
-    const errorMessage = err.message || 'Authentication failed. Please try signing in again.'
+    // Check if err is an Error object before accessing message
+    const errorMessage = err instanceof Error ? err.message : 'Authentication failed. Please try signing in again.'
     statusMessage.value = 'Something went wrong while trying to sign you in.'
-    
+
     console.error('Magic Link Authentication Error:', err)
   } finally {
     loading.value = false

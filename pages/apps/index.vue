@@ -2,20 +2,21 @@
   <div class="container mx-auto px-4 py-8">
     <h1 class="text-3xl font-bold mb-6">Application Management</h1>
 
-    <div v-if="userStore.loading || loadingApps" class="text-center py-10">
-      <p>Loading data...</p>
-      <!-- Add a spinner or loading indicator here -->
-    </div>
-
-    <div v-else-if="!userStore.isAuthenticated" class="text-center py-10">
+    <!-- Main content with v-if structure that works properly -->
+    <div v-if="!userStore.isAuthenticated" class="text-center py-10">
       <p class="text-red-500">Please log in to manage applications.</p>
       <NuxtLink to="/login" class="text-blue-500 hover:underline">Go to Login</NuxtLink>
     </div>
+    
+    <div v-else-if="loadingApps" class="text-center py-10">
+      <p>Loading applications...</p>
+      <!-- TODO: Add a proper spinner component -->
+    </div>
 
-    <div v-else>
+    <div v-else-if="userStore.isAuthenticated">
       <p class="mb-4">Welcome, {{ userStore.userDisplayName }}!</p>
+      <!-- Display isAdmin status directly -->
       <p class="mb-4">Is Admin: {{ userStore.isAdmin ? 'Yes' : 'No' }}</p>
-
       <!-- Admin-only actions -->
       <div v-if="userStore.isAdmin" class="mb-6">
         <button
@@ -29,22 +30,26 @@
       <!-- Application List -->
       <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded shadow">
         <h2 class="text-xl font-semibold mb-3">Application List</h2>
-        <div v-if="fetchError" class="text-red-500 mb-4">
-          Error loading applications: {{ fetchError }}
+        <!-- Use fetchError (error state from useAsyncData) -->
+        <div v-if="appsStore.error" class="text-red-500 mb-4">
+          Error loading applications: {{ appsStore.error.message }}
         </div>
-        <ul v-if="apps.length > 0" class="space-y-3">
-          <li v-for="app in apps" :key="app.id" class="p-3 bg-white dark:bg-gray-700 rounded shadow-sm flex justify-between items-center">
+        <!-- Use computed appsList which defaults to [] -->
+        <ul v-if="appsList.length > 0" class="space-y-3">
+          <li v-for="app in appsList" :key="app.id" class="p-3 bg-white dark:bg-gray-700 rounded shadow-sm flex justify-between items-center">
             <div>
               <h3 class="font-medium">{{ app.name }}</h3>
               <p class="text-sm text-gray-600 dark:text-gray-400">{{ app.description || 'No description' }}</p>
               <!-- Display links later -->
             </div>
+            <!-- Admin-only buttons -->
             <div v-if="userStore.isAdmin" class="space-x-2">
                <button @click="editApp(app)" class="text-sm text-blue-500 hover:underline">Edit</button>
                <button @click="deleteApp(app.id)" class="text-sm text-red-500 hover:underline">Delete</button>
             </div>
-          </li>
+          </li> <!-- Correctly closing li tag -->
         </ul>
+        <!-- This p tag should be adjacent to the ul -->
         <p v-else class="text-gray-600 dark:text-gray-400">
           No applications found.
         </p>
@@ -92,198 +97,85 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, reactive, computed, watchEffect } from 'vue'
 import { useUserStore } from '~/stores/user'
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore' // Removed Timestamp value import
-import type { Timestamp } from 'firebase/firestore' // Added Timestamp type import
-import { useFirestore } from 'vuefire'
+import { useAppsStore } from '~/stores/apps'
+import type { Application, AppFormData } from '~/stores/apps'
 
-// Define the Application interface
-interface Application {
-  id: string; // Firestore document ID
-  name: string;
-  description?: string;
-  // Add other fields like store links, etc.
-  // e.g., googlePlayUrl?: string;
-  // e.g., appStoreUrl?: string;
-  // e.g., githubUrl?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-// Define the structure for the form data (without ID initially)
-interface AppFormData {
-  name: string;
-  description?: string;
-  // Add corresponding fields from Application interface
-}
-
+// Set auth middleware (now simplified to just mark protected routes)
 definePageMeta({
   middleware: ['auth']
 })
 
+// Get stores
 const userStore = useUserStore()
-const db = useFirestore() // Initialize Firestore
-const apps = ref<Application[]>([]) // Typed array for applications
-const loadingApps = ref(false)
-const fetchError = ref<string | null>(null)
+const appsStore = useAppsStore()
 
+// UI state
 const showAddAppModal = ref(false)
-const editingApp = ref<Application | null>(null) // Store the app being edited
-const appForm = reactive<AppFormData>({ // Reactive form data
+const editingApp = ref<Application | null>(null)
+const appForm = reactive<AppFormData>({
   name: '',
   description: '',
 })
 
-// Fetch apps from Firestore
-const fetchApps = async () => {
-  if (!userStore.isAuthenticated || !db) {
-      // If db is not ready yet, wait a bit and retry or handle appropriately
-      // This basic check might not be sufficient if db initialization is slow
-      console.warn("FetchApps: User not authenticated or DB not ready.");
-      return;
-  }
-  loadingApps.value = true;
-  fetchError.value = null;
-  try {
-    const appsCollection = collection(db, "apps");
-    const querySnapshot = await getDocs(appsCollection);
-    apps.value = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      // Ensure timestamps are handled correctly if needed, Firestore might return them directly
-    } as Application)); // Cast to Application type
-  } catch (error: unknown) { // Changed to unknown
-    console.error("Error fetching apps: ", error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to load applications.';
-    fetchError.value = errorMessage;
-    // Only show toast if fetchError has a value (is not null)
-    if (fetchError.value) {
-        userStore.showToast(fetchError.value, 'error');
-    }
-  } finally {
-    loadingApps.value = false;
-  }
-}
+// Computed property for loading state
+const loadingApps = computed(() => appsStore.loading)
 
-// Fetch apps when component is mounted
-// Use watchEffect or ensure user state/db is ready before fetching
-onMounted(() => {
-    // Declare stopWatch variable before the watch call
-    let stopWatch: (() => void) | null = null;
-    // Wait for user store to potentially initialize
-    stopWatch = watch(() => userStore.isAuthenticated, (isAuth) => {
-        if (isAuth && db) {
-            fetchApps();
-            // Check if stopWatch has been assigned before calling it
-            if (stopWatch) stopWatch();
-        } else if (!userStore.loading && !isAuth) {
-            // If loading is finished and user is not authenticated, stop watching
-             if (stopWatch) stopWatch();
-        }
-    }, { immediate: true }); // immediate: true to run check initially
+// Computed property for apps list
+const appsList = computed(() => appsStore.apps || [])
 
-    // Fallback in case db takes time to initialize after auth
-    if (userStore.isAuthenticated && !db) {
-        const dbWatch = watch(db, (newDb) => {
-            if (newDb) {
-                fetchApps();
-                dbWatch();
-            }
-        })
-    }
-});
+// Fetch apps data when authenticated
+watchEffect(() => {
+  if (userStore.isAuthenticated && !userStore.loading) {
+    appsStore.fetchApps()
+  }
+})
 
 
 // Function to open the modal for editing
 const editApp = (app: Application) => {
-  editingApp.value = { ...app }; // Copy app data to avoid direct mutation
-  // Populate form
-  appForm.name = app.name;
-  appForm.description = app.description || '';
-  // Populate other fields...
-  showAddAppModal.value = false; // Ensure add modal is closed if open
-  // Need to set showAddAppModal to false and editingApp to the app to show the modal
-  // The v-if condition is `showAddAppModal || editingApp`
-  // Let's correct the logic:
-  editingApp.value = { ...app };
-  appForm.name = app.name;
-  appForm.description = app.description || '';
-  // showAddAppModal should remain false, editingApp being non-null triggers the modal
+  editingApp.value = { ...app }
+  appForm.name = app.name
+  appForm.description = app.description || ''
 }
 
 // Function to close the modal
 const closeModal = () => {
-  showAddAppModal.value = false;
-  editingApp.value = null;
-  // Reset form
-  appForm.name = '';
-  appForm.description = '';
-  // Reset other fields...
+  showAddAppModal.value = false
+  editingApp.value = null
+  appForm.name = ''
+  appForm.description = ''
 }
 
 // Function to handle saving (add or update)
 const handleSaveApp = async () => {
-  if (!db || !userStore.isAdmin) return; // Ensure admin
-  const appData = {
-    ...appForm,
-    updatedAt: serverTimestamp() // Add/update timestamp
-  };
-
-  // Add loading state for save operation
-  const saveLoading = ref(false);
-  saveLoading.value = true;
+  if (!userStore.isAdmin) return
 
   try {
     if (editingApp.value) {
-      // Update existing app
-      const appRef = doc(db, "apps", editingApp.value.id);
-      // Ensure createdAt is not overwritten on update
-      const updateData = { ...appData };
-      // delete updateData.createdAt; // Firestore update shouldn't include createdAt
-      await updateDoc(appRef, updateData);
-      userStore.showToast('Application updated successfully!', 'success');
+      await appsStore.updateApp(editingApp.value.id, appForm)
     } else {
-      // Add new app
-      const appsCollection = collection(db, "apps");
-      await addDoc(appsCollection, {
-        ...appData,
-        createdAt: serverTimestamp() // Add createdAt timestamp for new docs
-      });
-      userStore.showToast('Application added successfully!', 'success');
+      await appsStore.createApp(appForm)
     }
-    closeModal();
-    await fetchApps(); // Refresh the list
-  } catch (error: unknown) { // Changed to unknown
-    console.error("Error saving app: ", error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to save application.';
-    userStore.showToast(errorMessage, 'error'); // Show toast with derived message
-  } finally {
-      saveLoading.value = false; // Reset loading state
+    closeModal()
+  } catch (error) {
+    console.error("Error saving app:", error)
   }
 }
 
-// Placeholder function for deleting an app
+// Function for deleting an app
 const deleteApp = async (appId: string) => {
-   if (!db || !userStore.isAdmin) return;
-   if (!confirm('Are you sure you want to delete this application? This cannot be undone.')) {
-     return;
-   }
-    // Add loading state for delete operation
-   const deleteLoading = ref(false);
-   deleteLoading.value = true;
-   try {
-     const appRef = doc(db, "apps", appId);
-     await deleteDoc(appRef);
-     userStore.showToast('Application deleted successfully!', 'success');
-     await fetchApps(); // Refresh the list
-   } catch (error: unknown) { // Changed to unknown
-     console.error("Error deleting app: ", error);
-     const errorMessage = error instanceof Error ? error.message : 'Failed to delete application.';
-     userStore.showToast(errorMessage, 'error'); // Show toast with derived message
-   } finally {
-       deleteLoading.value = false; // Reset loading state
-   }
+  if (!userStore.isAdmin) return
+  if (!confirm('Are you sure you want to delete this application? This cannot be undone.')) {
+    return
+  }
+  
+  try {
+    await appsStore.deleteApp(appId)
+  } catch (error) {
+    console.error("Error deleting app:", error)
+  }
 }
 
 </script>

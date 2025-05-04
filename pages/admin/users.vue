@@ -111,7 +111,8 @@ interface ApiUser {
 }
 
 definePageMeta({
-  middleware: ['auth'] // Apply auth middleware
+  middleware: ['auth'], // Apply auth middleware
+  roles: ['admin']      // Add required roles metadata
 })
 
 const userStore = useUserStore()
@@ -218,17 +219,20 @@ const toggleAdminRole = async (user: ApiUser) => {
 
 // Fetch users when component is mounted and user is admin
 onMounted(() => {
+  // Declare stopWatch variable before the watch call
+  let stopWatch: (() => void) | null = null;
   // Watch for admin status readiness
-  const stopWatch = watch(() => userStore.isAdmin, (isAdmin) => {
+  stopWatch = watch(() => userStore.isAdmin, (isAdmin) => {
       if (isAdmin) {
           fetchUsers();
-          stopWatch(); // Stop watching once admin status is confirmed
+          // Check if stopWatch has been assigned before calling it
+          if (stopWatch) stopWatch();
       } else if (!userStore.loading && !userStore.isAuthenticated) {
           // If loading finished and user is not authenticated, stop watching
-          stopWatch();
+          if (stopWatch) stopWatch();
       } else if (!userStore.loading && userStore.isAuthenticated && !isAdmin) {
           // If loading finished, user authenticated but not admin, stop watching
-          stopWatch();
+          if (stopWatch) stopWatch();
       }
   }, { immediate: true });
 });
