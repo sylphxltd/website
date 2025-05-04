@@ -1,276 +1,194 @@
 <template>
-  <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
-    <!-- Admin navbar -->
-    <nav class="fixed top-0 left-0 right-0 z-30 bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/10">
-      <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <!-- Logo and site name -->
-          <div class="flex items-center">
-            <NuxtLink to="/admin" class="flex items-center">
-              <img src="/images/logo.png" alt="SylphX" class="h-8 w-auto">
-              <span class="ml-2 text-lg font-semibold text-gray-900 dark:text-white">Admin</span>
-            </NuxtLink>
+  <div class="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <!-- Sidebar -->
+    <aside
+      :class="[
+        'fixed inset-y-0 z-20 flex flex-col overflow-y-auto border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out lg:relative',
+        sidebarOpen ? 'w-64 shadow-lg lg:shadow-none' : 'w-0 lg:w-64'
+      ]"
+    >
+      <!-- Sidebar header with logo -->
+      <div class="flex items-center justify-between px-4 h-16 border-b border-gray-200 dark:border-gray-700">
+        <NuxtLink to="/admin" class="flex items-center space-x-2">
+          <div class="rounded-md h-8 w-8 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600">
+            <img src="/images/logo.png" alt="SylphX Logo" class="h-5 w-5">
           </div>
-
-          <!-- Right side navigation -->
-          <div class="flex items-center space-x-4">
-            <!-- Dark mode toggle -->
-            <button 
-              @click="toggleDarkMode" 
-              class="flex items-center justify-center w-9 h-9 rounded-full focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
-              aria-label="Toggle dark mode"
-            >
-              <span v-if="isDark" class="i-carbon-moon text-lg"></span>
-              <span v-else class="i-carbon-sun text-lg"></span>
-            </button>
-
-            <!-- Notifications -->
-            <div class="relative">
-              <button class="flex items-center justify-center w-9 h-9 rounded-full focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
-                <span class="i-carbon-notification text-lg"></span>
-                <span class="absolute top-0 right-0 h-4 w-4 rounded-full bg-red-500 text-xs text-white flex items-center justify-center">3</span>
-              </button>
-            </div>
-
-            <!-- Profile dropdown -->
-            <div class="relative">
-              <button 
-                @click="showProfileMenu = !showProfileMenu" 
-                class="flex items-center focus:outline-none"
-              >
-                <div class="h-8 w-8 rounded-full bg-indigo-500 flex items-center justify-center text-white">
-                  {{ userInitials }}
-                </div>
-                <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300 hidden md:block">{{ userName }}</span>
-                <span class="ml-1 i-carbon-chevron-down text-gray-500 dark:text-gray-400 hidden md:block"></span>
-              </button>
-              
-              <!-- Profile dropdown menu -->
-              <div v-if="showProfileMenu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10 ring-1 ring-black ring-opacity-5">
-                <NuxtLink to="/settings" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                  Settings
-                </NuxtLink>
-                <button @click="logout" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                  Sign out
-                </button>
-              </div>
-            </div>
-
-            <!-- Mobile menu button -->
-            <button 
-              @click="isSidebarOpen = !isSidebarOpen" 
-              class="md:hidden flex items-center justify-center w-9 h-9 rounded-full focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
-            >
-              <span v-if="isSidebarOpen" class="i-carbon-close text-lg"></span>
-              <span v-else class="i-carbon-menu text-lg"></span>
-            </button>
+          <div class="flex flex-col">
+            <span class="text-lg font-bold text-gray-900 dark:text-white leading-tight">SylphX</span>
+            <span class="text-xs text-gray-600 dark:text-gray-400 leading-tight -mt-0.5">Admin Dashboard</span>
           </div>
-        </div>
+        </NuxtLink>
+        <button 
+          @click="toggleSidebar" 
+          class="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
+        >
+          <span class="i-carbon-close text-xl"></span>
+        </button>
       </div>
-    </nav>
-
-    <!-- Admin layout with sidebar -->
-    <div class="flex pt-16">
-      <!-- Sidebar navigation -->
-      <aside 
-        class="fixed z-20 h-full bg-white dark:bg-gray-800 shadow transition-all duration-300 transform md:translate-x-0 md:relative" 
-        :class="[isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:w-20']"
-      >
-        <div class="h-full overflow-y-auto">
-          <nav class="px-3 py-4">
-            <ul class="space-y-1">
-              <!-- Dashboard -->
-              <li>
-                <NuxtLink to="/admin" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-dashboard text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Dashboard</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Applications -->
-              <li>
-                <NuxtLink to="/admin/apps" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-application text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Applications</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Users -->
-              <li>
-                <NuxtLink to="/admin/users" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-user-multiple text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Users</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Reviews -->
-              <li>
-                <NuxtLink to="/admin/reviews" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-star-review text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Reviews</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Email Support -->
-              <li>
-                <NuxtLink to="/admin/emails" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-email text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Email Support</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Resources -->
-              <li>
-                <NuxtLink to="/admin/resources" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-content-delivery-network text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Resources</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Media Publishing -->
-              <li>
-                <NuxtLink to="/admin/media" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-share-knowledge text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Media Publishing</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Analytics -->
-              <li>
-                <NuxtLink to="/admin/analytics" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-analytics text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Analytics</span>
-                </NuxtLink>
-              </li>
-              
-              <!-- Settings -->
-              <li>
-                <NuxtLink to="/admin/settings" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <span class="i-carbon-settings text-xl text-gray-500 dark:text-gray-400"></span>
-                  <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Settings</span>
-                </NuxtLink>
-              </li>
-            </ul>
+      
+      <!-- Navigation -->
+      <nav class="flex-1 px-2 py-4 space-y-1">
+        <div v-for="(item, index) in navItems" :key="index">
+          <NuxtLink 
+            :to="item.to" 
+            :class="[
+              'flex items-center px-4 py-2.5 rounded-lg transition-colors',
+              route.path.startsWith(item.to) 
+                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            ]"
+          >
+            <span :class="[item.icon, 'text-xl flex-shrink-0']"></span>
+            <span class="ml-3">{{ item.name }}</span>
             
-            <div class="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <NuxtLink to="/" class="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                <span class="i-carbon-home text-xl text-gray-500 dark:text-gray-400"></span>
-                <span class="ml-3 transition-opacity duration-300" :class="isSidebarOpen ? 'opacity-100' : 'opacity-0 md:absolute'">Back to Site</span>
-              </NuxtLink>
-            </div>
-          </nav>
+            <!-- Badge (if any) -->
+            <span 
+              v-if="item.badge" 
+              :class="[item.badgeColor || 'bg-gray-100 text-gray-800', 'ml-auto text-xs rounded-full']"
+            >
+              {{ item.badge }}
+            </span>
+          </NuxtLink>
         </div>
-      </aside>
-
-      <!-- Main content -->
-      <div 
-        class="flex-1 transition-all duration-300"
-        :class="isSidebarOpen ? 'md:ml-64' : 'md:ml-20'"
-      >
-        <div class="py-6 px-4 sm:px-6 lg:px-8">
-          <slot />
+      </nav>
+      
+      <!-- Bottom section with user info -->
+      <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div class="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <span class="i-carbon-user-avatar text-xl"></span>
+            </div>
+          </div>
+          <div class="ml-3">
+            <div class="text-sm font-medium text-gray-900 dark:text-white">
+              {{ user?.displayName || 'Admin User' }}
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              {{ user?.email || 'admin@example.com' }}
+            </div>
+          </div>
+          <div class="ml-auto">
+            <button @click="logout" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
+              <span class="i-carbon-logout text-lg"></span>
+            </button>
+          </div>
         </div>
       </div>
+    </aside>
+    
+    <!-- Content area -->
+    <div class="flex flex-col flex-1 overflow-hidden">
+      <!-- Top header -->
+      <header class="flex items-center justify-between h-16 px-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <!-- Mobile menu button -->
+        <button 
+          @click="toggleSidebar" 
+          class="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
+        >
+          <span class="i-carbon-menu text-xl"></span>
+        </button>
+        
+        <!-- Page title (mobile) -->
+        <h1 class="text-lg font-medium text-gray-900 dark:text-white lg:hidden">
+          {{ pageTitle }}
+        </h1>
+        
+        <!-- Search bar (desktop) -->
+        <div class="hidden lg:flex lg:flex-1 px-2 max-w-md">
+          <div class="relative w-full">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <span class="i-carbon-search text-gray-400 dark:text-gray-500"></span>
+            </div>
+            <input 
+              type="text" 
+              class="block w-full pl-10 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Search..."
+            >
+          </div>
+        </div>
+        
+        <!-- Right side actions -->
+        <div class="flex items-center space-x-3">
+          <!-- Notifications dropdown -->
+          <div class="relative">
+            <button class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
+              <span class="i-carbon-notification text-xl"></span>
+              <span class="sr-only">Notifications</span>
+              <div class="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+            </button>
+          </div>
+          
+          <!-- Theme toggle -->
+          <button @click="toggleTheme" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
+            <span v-if="isDark" class="i-carbon-sun text-xl"></span>
+            <span v-else class="i-carbon-moon text-xl"></span>
+            <span class="sr-only">Toggle theme</span>
+          </button>
+          
+          <!-- Settings button -->
+          <NuxtLink to="/admin/settings" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
+            <span class="i-carbon-settings text-xl"></span>
+            <span class="sr-only">Settings</span>
+          </NuxtLink>
+        </div>
+      </header>
+      
+      <!-- Main content -->
+      <main class="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900">
+        <slot></slot>
+      </main>
     </div>
     
-    <!-- Overlay for mobile sidebar -->
+    <!-- Mobile sidebar overlay -->
     <div 
-      v-if="isSidebarOpen" 
-      class="fixed inset-0 z-10 bg-black bg-opacity-50 md:hidden"
-      @click="isSidebarOpen = false"
+      v-if="sidebarOpen" 
+      @click="closeSidebar"
+      class="fixed inset-0 z-10 bg-black/50 lg:hidden"
     ></div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '~/stores/user';
-import { useRouter } from 'vue-router';
 
-// Store and router
-const userStore = useUserStore();
+const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 
-// State
-const isDark = ref(false);
-const isSidebarOpen = ref(false);
-const showProfileMenu = ref(false);
+// User data
+const user = computed(() => userStore.user);
 
-// User information
-const userName = computed(() => {
-  return userStore.user?.displayName || userStore.user?.email?.split('@')[0] || 'Admin User';
-});
-
-const userInitials = computed(() => {
-  if (userStore.user?.displayName) {
-    return userStore.user.displayName
-      .split(' ')
-      .map(name => name.charAt(0))
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  }
-  
-  if (userStore.user?.email) {
-    return userStore.user.email.charAt(0).toUpperCase();
-  }
-  
-  return 'A';
-});
-
-// Initialization
-onMounted(() => {
-  // Check if user is authenticated and admin
-  if (!userStore.isAuthenticated || !userStore.isAdmin) {
-    router.push('/login');
-    return;
-  }
-  
-  // Initial dark mode check
-  isDark.value = localStorage.getItem('color-theme') === 'dark' || 
-    (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  
-  // Apply initial theme
-  applyTheme();
-  
-  // Close profile menu when clicking outside
-  const handleClickOutside = (event) => {
-    if (showProfileMenu.value && !event.target.closest('button')) {
-      showProfileMenu.value = false;
-    }
-  };
-  
-  // Add event listener
-  document.addEventListener('click', handleClickOutside);
-  
-  // Adjust sidebar for screen size
-  const handleResize = () => {
-    if (window.innerWidth >= 768) { // md breakpoint
-      isSidebarOpen.value = true;
-    } else {
-      isSidebarOpen.value = false;
-    }
-  };
-  
-  // Initial check
-  handleResize();
-  window.addEventListener('resize', handleResize);
-  
-  // Cleanup
-  onUnmounted(() => {
-    document.removeEventListener('click', handleClickOutside);
-    window.removeEventListener('resize', handleResize);
-  });
-});
-
-// Toggle dark mode
-const toggleDarkMode = () => {
-  isDark.value = !isDark.value;
-  applyTheme();
+// Sidebar state
+const sidebarOpen = ref(false);
+const toggleSidebar = () => {
+  sidebarOpen.value = !sidebarOpen.value;
+};
+const closeSidebar = () => {
+  sidebarOpen.value = false;
 };
 
-// Apply theme to HTML element
-const applyTheme = () => {
+// Page title based on current route
+const pageTitle = computed(() => {
+  const path = route.path;
+  if (path === '/admin') return 'Dashboard';
+  if (path.startsWith('/admin/apps')) return 'Applications';
+  if (path.startsWith('/admin/users')) return 'Users';
+  if (path.startsWith('/admin/reviews')) return 'Reviews';
+  if (path.startsWith('/admin/emails')) return 'Email Support';
+  if (path.startsWith('/admin/resources')) return 'Resources';
+  if (path.startsWith('/admin/media')) return 'Media Publishing';
+  if (path.startsWith('/admin/analytics')) return 'Analytics';
+  if (path.startsWith('/admin/settings')) return 'Settings';
+  return 'Admin';
+});
+
+// Dark mode toggle
+const isDark = ref(false);
+const toggleTheme = () => {
+  isDark.value = !isDark.value;
   if (isDark.value) {
     document.documentElement.classList.add('dark');
     localStorage.setItem('color-theme', 'dark');
@@ -280,16 +198,36 @@ const applyTheme = () => {
   }
 };
 
-// Logout
+// Navigation items
+const navItems = [
+  { name: 'Dashboard', to: '/admin', icon: 'i-carbon-dashboard' },
+  { name: 'Applications', to: '/admin/apps', icon: 'i-carbon-application', badge: '24', badgeColor: 'text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 py-0.5 px-2 rounded-full' },
+  { name: 'Users', to: '/admin/users', icon: 'i-carbon-user-multiple' },
+  { name: 'Reviews', to: '/admin/reviews', icon: 'i-carbon-star-review', badge: '12', badgeColor: 'text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 py-0.5 px-2 rounded-full' },
+  { name: 'Email Support', to: '/admin/emails', icon: 'i-carbon-email', badge: '8', badgeColor: 'text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 py-0.5 px-2 rounded-full' },
+  { name: 'Resources', to: '/admin/resources', icon: 'i-carbon-content-delivery-network' },
+  { name: 'Media', to: '/admin/media', icon: 'i-carbon-share-knowledge' },
+  { name: 'Analytics', to: '/admin/analytics', icon: 'i-carbon-analytics' },
+  { name: 'Settings', to: '/admin/settings', icon: 'i-carbon-settings' }
+];
+
+// Logout function
 const logout = async () => {
   await userStore.logout();
   router.push('/login');
 };
 
-// Close sidebar when route changes (on mobile)
-watch(() => window.location.href, () => {
-  if (window.innerWidth < 768) {
-    isSidebarOpen.value = false;
+// Initialize theme on mount
+onMounted(() => {
+  // Check local storage theme preference
+  isDark.value = localStorage.getItem('color-theme') === 'dark' || 
+    (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  
+  // Apply theme
+  if (isDark.value) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
   }
 });
 </script>

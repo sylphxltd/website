@@ -1,141 +1,254 @@
 <template>
-  <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="text-center mb-12">
-      <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">Our Applications</h1>
-      <p class="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-        Explore our suite of innovative applications designed to enhance productivity and streamline your workflow.
-      </p>
-    </div>
-
-    <!-- Search and filters -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-4">
-      <div class="flex flex-col md:flex-row gap-4">
-        <div class="flex-1">
-          <label for="search" class="sr-only">Search applications</label>
-          <div class="relative">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span class="i-carbon-search text-gray-400 dark:text-gray-500"></span>
+  <div class="min-h-screen bg-white dark:bg-gray-900 pt-24 pb-16">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Header section -->
+      <div class="max-w-4xl mx-auto text-center mb-16">
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+          Our Products &amp; Applications
+        </h1>
+        <p class="text-xl text-gray-600 dark:text-gray-300">
+          Discover our innovative apps, games, and immersive experiences powered by cutting-edge technology.
+        </p>
+      </div>
+      
+      <!-- Filter and search bar -->
+      <div class="max-w-5xl mx-auto mb-10 bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
+        <div class="flex flex-col lg:flex-row gap-4 items-center">
+          <div class="w-full lg:flex-1">
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span class="i-carbon-search text-gray-400 dark:text-gray-500"></span>
+              </div>
+              <input 
+                v-model="search" 
+                type="text" 
+                class="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                placeholder="Search products..."
+              />
             </div>
-            <input
-              id="search"
-              v-model="searchQuery"
-              type="text"
-              class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-              placeholder="Search applications..."
-            />
           </div>
-        </div>
-        <div class="flex gap-4">
-          <div class="w-40">
-            <label for="category" class="sr-only">Filter by category</label>
-            <select
-              id="category"
-              v-model="selectedCategory"
-              class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+          
+          <div class="flex flex-wrap justify-center gap-2">
+            <button 
+              v-for="category in categories" 
+              :key="category.id"
+              @click="toggleCategory(category.id)"
+              :class="[
+                'px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap',
+                selectedCategories.includes(category.id) 
+                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              ]"
             >
-              <option value="">All Categories</option>
-              <option value="mobile">Mobile Apps</option>
-              <option value="web">Web Apps</option>
-              <option value="desktop">Desktop Apps</option>
-              <option value="tools">Developer Tools</option>
-            </select>
-          </div>
-          <div class="w-40">
-            <label for="sortBy" class="sr-only">Sort by</label>
-            <select
-              id="sortBy"
-              v-model="sortBy"
-              class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+              {{ category.name }}
+            </button>
+            
+            <button 
+              v-if="selectedCategories.length > 0"
+              @click="clearFilters"
+              class="px-3 py-2 rounded-md text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors whitespace-nowrap"
             >
-              <option value="name">Name</option>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-            </select>
+              Clear Filters
+            </button>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Loading state -->
-    <div v-if="loading" class="flex justify-center items-center py-20">
-      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-    </div>
-
-    <!-- Error state -->
-    <div v-else-if="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 p-6 rounded-lg text-center">
-      <p class="flex items-center justify-center gap-2 text-lg">
-        <span class="i-carbon-warning-filled"></span>
-        <span>{{ error }}</span>
-      </p>
-      <button @click="fetchApps" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Try Again</button>
-    </div>
-
-    <!-- No apps found -->
-    <div v-else-if="filteredApps.length === 0" class="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-      <div class="mx-auto h-24 w-24 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-6">
-        <span class="i-carbon-application text-4xl text-gray-400 dark:text-gray-500"></span>
+      
+      <!-- Product Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+        <div 
+          v-for="product in filteredProducts" 
+          :key="product.id" 
+          class="group bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-100 dark:border-gray-700"
+        >
+          <!-- Product Header with Gradient -->
+          <div 
+            :class="[
+              'h-48 relative overflow-hidden',
+              product.gradientClass || 'bg-gradient-to-br from-indigo-500 to-purple-600' 
+            ]"
+          >
+            <!-- Logo/Icon -->
+            <div class="absolute top-6 left-6">
+              <div class="h-16 w-16 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center shadow-lg">
+                <img v-if="product.logoUrl" :src="product.logoUrl" :alt="product.name" class="h-10 w-10 object-contain">
+                <span v-else class="text-2xl font-bold" :class="product.iconTextColor || 'text-indigo-600'">
+                  {{ product.name.charAt(0) }}
+                </span>
+              </div>
+            </div>
+            
+            <!-- Category tags -->
+            <div class="absolute top-6 right-6 flex flex-wrap justify-end gap-2">
+              <span 
+                v-for="tag in product.tags" 
+                :key="tag"
+                class="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium"
+              >
+                {{ tag }}
+              </span>
+            </div>
+            
+            <!-- Screenshot Preview (decorative) -->
+            <div class="absolute -bottom-10 right-6 w-32 h-32 bg-white/10 backdrop-blur-sm rounded-lg transform rotate-12 border border-white/20"></div>
+          </div>
+          
+          <!-- Product Content -->
+          <div class="p-6">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+              {{ product.name }}
+            </h3>
+            
+            <p class="text-gray-600 dark:text-gray-300 mb-6 line-clamp-2">
+              {{ product.description }}
+            </p>
+            
+            <div class="flex items-center justify-between">
+              <!-- Platform Labels -->
+              <div class="flex flex-wrap gap-2">
+                <span 
+                  v-for="platform in product.platforms" 
+                  :key="platform.name"
+                  :class="[
+                    'px-2 py-1 rounded-full text-xs font-medium',
+                    platform.class || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                  ]"
+                >
+                  {{ platform.name }}
+                </span>
+              </div>
+              
+              <!-- View Details Link -->
+              <NuxtLink 
+                :to="`/apps/${product.id}`"
+                class="inline-flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+              >
+                Details
+                <span class="i-carbon-arrow-right ml-1"></span>
+              </NuxtLink>
+            </div>
+          </div>
+        </div>
       </div>
-      <h3 class="text-xl font-medium text-gray-900 dark:text-white mb-2">No applications found</h3>
-      <p class="text-gray-500 dark:text-gray-400 mb-6">
-        {{ searchQuery ? `No applications match your search for "${searchQuery}"` : "We couldn't find any applications at the moment." }}
-      </p>
-      <button v-if="searchQuery" @click="resetFilters" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Clear Filters</button>
-    </div>
-
-    <!-- Apps grid -->
-    <div v-else>
-      <!-- Category groups -->
-      <div v-for="(apps, category) in groupedApps" :key="category" class="mb-12">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-          <span>{{ getCategoryName(category) }}</span>
-          <span class="ml-3 text-sm font-normal text-gray-500 dark:text-gray-400">({{ apps.length }})</span>
+      
+      <!-- Empty State -->
+      <div 
+        v-if="filteredProducts.length === 0" 
+        class="py-20 text-center max-w-md mx-auto"
+      >
+        <div class="h-20 w-20 mx-auto bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
+          <span class="i-carbon-search-locate text-3xl text-gray-400 dark:text-gray-500"></span>
+        </div>
+        <h3 class="text-xl font-medium text-gray-900 dark:text-white mb-2">No products found</h3>
+        <p class="text-gray-600 dark:text-gray-400 mb-6">
+          We couldn't find any products matching your search criteria. Please try different filters.
+        </p>
+        <button 
+          @click="clearFilters" 
+          class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          Clear Filters
+        </button>
+      </div>
+      
+      <!-- Featured Product Section -->
+      <div class="mt-32 max-w-6xl mx-auto">
+        <div class="lg:flex lg:items-center lg:gap-12">
+          <div class="lg:w-1/2 mb-10 lg:mb-0">
+            <div class="relative">
+              <!-- Decorative elements -->
+              <div class="absolute -top-10 -left-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl"></div>
+              <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl"></div>
+              
+              <!-- Product image/mockup -->
+              <div class="relative z-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl">
+                <!-- This would be replaced with an actual product mockup image -->
+                <div class="aspect-[4/3] bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                  <span class="text-6xl text-white/80">VR</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="lg:w-1/2">
+            <span class="text-sm font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Featured Product</span>
+            <h2 class="mt-2 text-3xl font-bold text-gray-900 dark:text-white mb-4">VortexVR</h2>
+            <p class="text-lg text-gray-600 dark:text-gray-300 mb-6">
+              Experience immersive virtual worlds with unparalleled visual fidelity and responsive interactions. VortexVR combines cutting-edge graphics with intuitive controls to create a truly next-generation VR experience.
+            </p>
+            
+            <div class="flex flex-wrap gap-3 mb-8">
+              <span class="px-3 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 rounded-full text-sm">
+                Virtual Reality
+              </span>
+              <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 rounded-full text-sm">
+                Gaming
+              </span>
+              <span class="px-3 py-1 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 rounded-full text-sm">
+                Cross-Platform
+              </span>
+            </div>
+            
+            <NuxtLink 
+              to="/apps/vortex-vr" 
+              class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg"
+            >
+              Explore VortexVR
+              <span class="i-carbon-arrow-right ml-2"></span>
+            </NuxtLink>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Coming Soon Section -->
+      <div class="mt-32 max-w-4xl mx-auto text-center">
+        <div class="inline-flex items-center px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded-full text-sm font-medium mb-6">
+          <span class="i-carbon-timer mr-2"></span>
+          Coming Soon
+        </div>
+        
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+          Next-Generation Products in Development
         </h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div v-for="app in apps" :key="app.id" class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col">
-            <!-- App header with logo -->
-            <div class="p-6 flex items-start gap-4">
-              <div class="h-16 w-16 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                <img v-if="app.logoUrl" :src="app.logoUrl" :alt="app.name" class="h-12 w-12 object-contain">
-                <span v-else class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{{ app.name.charAt(0) }}</span>
-              </div>
-              <div>
-                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">{{ app.name }}</h3>
-                <div class="flex flex-wrap gap-2">
-                  <span v-for="(tag, index) in getAppTags(app)" :key="index" class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded-full">
-                    {{ tag }}
-                  </span>
-                </div>
-              </div>
+        <p class="text-xl text-gray-600 dark:text-gray-300 mb-12 max-w-3xl mx-auto">
+          We're constantly pushing the boundaries of what's possible. Stay tuned for our upcoming releases.
+        </p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 text-left shadow-sm">
+            <div class="h-12 w-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white mb-4">
+              <span class="i-carbon-augmented-reality text-xl"></span>
             </div>
-
-            <!-- App description -->
-            <div class="px-6 py-4 flex-grow">
-              <p class="text-gray-600 dark:text-gray-300 text-sm line-clamp-3">{{ app.description || 'No description available' }}</p>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              AR Assistant
+            </h3>
+            <p class="text-gray-600 dark:text-gray-300">
+              Augmented reality personal assistant with AI-powered object recognition and information overlay.
+            </p>
+          </div>
+          
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 text-left shadow-sm">
+            <div class="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white mb-4">
+              <span class="i-carbon-ai-status text-xl"></span>
             </div>
-
-            <!-- App links -->
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
-              <div class="flex items-center justify-between">
-                <div class="flex space-x-3">
-                  <a v-if="app.links?.googlePlay" :href="app.links.googlePlay" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" title="Google Play">
-                    <span class="i-carbon-logo-google text-xl"></span>
-                  </a>
-                  <a v-if="app.links?.appStore" :href="app.links.appStore" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" title="App Store">
-                    <span class="i-carbon-logo-apple text-xl"></span>
-                  </a>
-                  <a v-if="app.links?.github" :href="app.links.github" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" title="GitHub">
-                    <span class="i-carbon-logo-github text-xl"></span>
-                  </a>
-                  <a v-if="app.links?.website" :href="app.links.website" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" title="Website">
-                    <span class="i-carbon-globe text-xl"></span>
-                  </a>
-                </div>
-                <NuxtLink :to="`/apps/${app.id}`" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm font-medium">
-                  View Details
-                </NuxtLink>
-              </div>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Neural Studio
+            </h3>
+            <p class="text-gray-600 dark:text-gray-300">
+              Creative suite with AI-powered image, video, and audio generation tools for artists and designers.
+            </p>
+          </div>
+          
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 text-left shadow-sm">
+            <div class="h-12 w-12 bg-gradient-to-br from-emerald-500 to-green-500 rounded-lg flex items-center justify-center text-white mb-4">
+              <span class="i-carbon-game-wireless text-xl"></span>
             </div>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Quantum Rush
+            </h3>
+            <p class="text-gray-600 dark:text-gray-300">
+              High-speed racing game with procedurally generated tracks and physics-defying gameplay mechanics.
+            </p>
           </div>
         </div>
       </div>
@@ -144,167 +257,142 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { useAppsStore } from '~/stores/apps';
 
-// States
-const loading = ref(true);
-const error = ref(null);
-const searchQuery = ref('');
-const selectedCategory = ref('');
-const sortBy = ref('name');
+// Define page meta
+definePageMeta({
+  layout: 'default'
+});
 
-// Store access
-const appsStore = useAppsStore();
+// Category filters
+const categories = [
+  { id: 'mobile', name: 'Mobile Apps' },
+  { id: 'vr', name: 'VR Experiences' },
+  { id: 'ar', name: 'AR Applications' },
+  { id: 'games', name: 'Games' },
+  { id: 'productivity', name: 'Productivity' },
+  { id: 'creative', name: 'Creative Tools' }
+];
 
-// Categories with fallback assignment
-const getAppCategory = (app) => {
-  if (!app) return 'other';
-  
-  // Determine category based on app links and description
-  const hasGooglePlay = !!app.links?.googlePlay;
-  const hasAppStore = !!app.links?.appStore;
-  const hasWebsite = !!app.links?.website;
-  const hasGithub = !!app.links?.github;
-  const hasNpm = !!app.links?.npm;
-  
-  const description = (app.description || '').toLowerCase();
-  
-  if (hasAppStore || hasGooglePlay || description.includes('mobile') || description.includes('ios') || description.includes('android')) {
-    return 'mobile';
+const selectedCategories = ref([]);
+const search = ref('');
+
+// Toggle category selection
+const toggleCategory = (categoryId) => {
+  if (selectedCategories.value.includes(categoryId)) {
+    selectedCategories.value = selectedCategories.value.filter(id => id !== categoryId);
+  } else {
+    selectedCategories.value.push(categoryId);
   }
-  
-  if (hasNpm || hasGithub || description.includes('library') || description.includes('package') || description.includes('framework')) {
-    return 'tools';
-  }
-  
-  if (hasWebsite || description.includes('web') || description.includes('browser')) {
-    return 'web';
-  }
-  
-  if (description.includes('desktop') || description.includes('windows') || description.includes('mac') || description.includes('linux')) {
-    return 'desktop';
-  }
-  
-  return 'other';
 };
 
-// Get tags for an app
-const getAppTags = (app) => {
-  const tags = [];
-  const category = getAppCategory(app);
-  
-  // Add the category as a tag
-  tags.push(getCategoryName(category));
-  
-  // Add platform tags based on links
-  if (app.links?.googlePlay) tags.push('Android');
-  if (app.links?.appStore) tags.push('iOS');
-  if (app.links?.github) tags.push('Open Source');
-  if (app.links?.npm) tags.push('NPM');
-  
-  return tags;
+// Clear all filters
+const clearFilters = () => {
+  selectedCategories.value = [];
+  search.value = '';
 };
 
-// Get readable category name
-const getCategoryName = (category) => {
-  const categoryNames = {
-    'mobile': 'Mobile Apps',
-    'web': 'Web Apps',
-    'desktop': 'Desktop Apps',
-    'tools': 'Developer Tools',
-    'other': 'Other Apps'
-  };
-  
-  return categoryNames[category] || 'Applications';
-};
+// Mock products data (in a real app, this would come from the apps store)
+const products = ref([
+  {
+    id: 'sylph-note',
+    name: 'SylphNote',
+    description: 'AI-powered note-taking application with smart organization and cross-platform sync.',
+    tags: ['Productivity', 'AI'],
+    platforms: [
+      { name: 'iOS', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
+      { name: 'Android', class: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' },
+      { name: 'Web', class: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' }
+    ],
+    categories: ['mobile', 'productivity'],
+    gradientClass: 'bg-gradient-to-br from-blue-500 to-indigo-600'
+  },
+  {
+    id: 'vortex-vr',
+    name: 'VortexVR',
+    description: 'Immersive virtual reality experience with stunning visuals and interactive environments.',
+    tags: ['VR', 'Gaming'],
+    platforms: [
+      { name: 'Oculus', class: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+      { name: 'SteamVR', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' }
+    ],
+    categories: ['vr', 'games'],
+    gradientClass: 'bg-gradient-to-br from-purple-500 to-pink-600'
+  },
+  {
+    id: 'sylph-chat',
+    name: 'SylphChat',
+    description: 'AI-powered messaging app with smart replies and real-time translation.',
+    tags: ['Communication', 'AI'],
+    platforms: [
+      { name: 'iOS', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
+      { name: 'Android', class: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' }
+    ],
+    categories: ['mobile'],
+    gradientClass: 'bg-gradient-to-br from-green-500 to-teal-600'
+  },
+  {
+    id: 'cosmic-explorer',
+    name: 'Cosmic Explorer',
+    description: 'Space exploration game with procedurally generated galaxies and immersive gameplay.',
+    tags: ['Gaming', 'Adventure'],
+    platforms: [
+      { name: 'PC', class: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+      { name: 'Console', class: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' }
+    ],
+    categories: ['games'],
+    gradientClass: 'bg-gradient-to-br from-indigo-500 to-blue-600'
+  },
+  {
+    id: 'pocket-ar',
+    name: 'PocketAR',
+    description: 'Augmented reality tool for visualizing 3D models in real-world environments.',
+    tags: ['AR', 'Design'],
+    platforms: [
+      { name: 'iOS', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
+      { name: 'Android', class: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' }
+    ],
+    categories: ['mobile', 'ar', 'creative'],
+    gradientClass: 'bg-gradient-to-br from-amber-500 to-orange-600'
+  },
+  {
+    id: 'code-flow',
+    name: 'CodeFlow',
+    description: 'Programming editor with AI code completion and intelligent refactoring suggestions.',
+    tags: ['Developer', 'AI'],
+    platforms: [
+      { name: 'macOS', class: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+      { name: 'Windows', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
+      { name: 'Linux', class: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300' }
+    ],
+    categories: ['productivity', 'creative'],
+    gradientClass: 'bg-gradient-to-br from-gray-700 to-gray-900'
+  }
+]);
 
-// Filtered and sorted apps
-const filteredApps = computed(() => {
-  if (!appsStore.apps) return [];
-  
-  let result = [...appsStore.apps];
+// Filtered products based on search and category selections
+const filteredProducts = computed(() => {
+  let result = products.value;
   
   // Apply search filter
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    result = result.filter(app => 
-      app.name.toLowerCase().includes(query) || 
-      app.description?.toLowerCase().includes(query)
+  if (search.value) {
+    const searchQuery = search.value.toLowerCase();
+    result = result.filter(product => 
+      product.name.toLowerCase().includes(searchQuery) || 
+      product.description.toLowerCase().includes(searchQuery) ||
+      product.tags.some(tag => tag.toLowerCase().includes(searchQuery)) ||
+      product.platforms.some(platform => platform.name.toLowerCase().includes(searchQuery))
     );
   }
   
-  // Apply category filter
-  if (selectedCategory.value) {
-    result = result.filter(app => getAppCategory(app) === selectedCategory.value);
-  }
-  
-  // Apply sorting
-  switch (sortBy.value) {
-    case 'name':
-      result.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-    case 'newest':
-      result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      break;
-    case 'oldest':
-      result.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      break;
+  // Apply category filters
+  if (selectedCategories.value.length > 0) {
+    result = result.filter(product => {
+      return selectedCategories.value.some(category => product.categories.includes(category));
+    });
   }
   
   return result;
-});
-
-// Group apps by category
-const groupedApps = computed(() => {
-  const groups = {};
-  
-  // If category filter is applied, only include that category
-  if (selectedCategory.value) {
-    groups[selectedCategory.value] = filteredApps.value;
-    return groups;
-  }
-  
-  // Group apps by category
-  for (const app of filteredApps.value) {
-    const category = getAppCategory(app);
-    if (!groups[category]) {
-      groups[category] = [];
-    }
-    groups[category].push(app);
-  }
-  
-  return groups;
-});
-
-// Methods
-const fetchApps = async () => {
-  loading.value = true;
-  error.value = null;
-  
-  try {
-    await appsStore.fetchApps();
-  } catch (err) {
-    console.error('Error fetching apps:', err);
-    error.value = 'Failed to load applications. Please try again.';
-  } finally {
-    loading.value = false;
-  }
-};
-
-const resetFilters = () => {
-  searchQuery.value = '';
-  selectedCategory.value = '';
-  sortBy.value = 'name';
-};
-
-// Watch for filter changes to update results
-watch([searchQuery, selectedCategory, sortBy], () => {
-  // Nothing to do here as computed properties will handle the updates
-});
-
-// Fetch apps on mount
-onMounted(() => {
-  fetchApps();
 });
 </script>

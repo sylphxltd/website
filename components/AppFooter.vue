@@ -1,130 +1,176 @@
 <template>
   <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-12">
-        <!-- Logo and company info -->
-        <div class="md:col-span-2">
-          <div class="flex items-center mb-4">
-            <img src="/images/logo.png" alt="SylphX" class="h-10 w-auto">
-            <span class="ml-2 text-xl font-bold text-gray-900 dark:text-white">SylphX</span>
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <!-- Logo and about section -->
+        <div class="col-span-1 md:col-span-1">
+          <div class="flex items-center space-x-2 mb-4">
+            <div class="h-9 w-9 flex items-center justify-center rounded overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-600">
+              <img src="/images/logo.png" alt="SylphX Logo" class="h-6 w-6">
+            </div>
+            <span class="text-xl font-bold text-gray-900 dark:text-white">SylphX</span>
           </div>
-          <p class="text-gray-600 dark:text-gray-300 mb-4">
-            Powering the next generation of applications with innovative solutions for modern businesses.
+          <p class="text-gray-600 dark:text-gray-400 text-sm mb-4">
+            Innovative cross-platform applications and immersive experiences powered by cutting-edge technologies.
           </p>
           <div class="flex space-x-4">
-            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
-              <span class="i-carbon-logo-github text-xl"></span>
-            </a>
-            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+            <a href="#" class="text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors">
               <span class="i-carbon-logo-twitter text-xl"></span>
+              <span class="sr-only">Twitter</span>
             </a>
-            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
-              <span class="i-carbon-logo-linkedin text-xl"></span>
-            </a>
-            <a href="#" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+            <a href="#" class="text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors">
               <span class="i-carbon-logo-facebook text-xl"></span>
+              <span class="sr-only">Facebook</span>
+            </a>
+            <a href="#" class="text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors">
+              <span class="i-carbon-logo-instagram text-xl"></span>
+              <span class="sr-only">Instagram</span>
+            </a>
+            <a href="#" class="text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors">
+              <span class="i-carbon-logo-github text-xl"></span>
+              <span class="sr-only">GitHub</span>
             </a>
           </div>
         </div>
         
-        <!-- Quick links -->
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Links</h3>
-          <ul class="space-y-2">
+        <!-- Products section -->
+        <div class="col-span-1">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
+            Products
+          </h3>
+          <ul class="space-y-3">
             <li>
-              <NuxtLink to="/" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                Home
+              <NuxtLink to="/apps" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                All Products
               </NuxtLink>
             </li>
             <li>
-              <NuxtLink to="/apps" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                Applications
+              <NuxtLink to="/apps/sylph-note" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                SylphNote
               </NuxtLink>
             </li>
             <li>
-              <NuxtLink to="/technologies" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+              <NuxtLink to="/apps/vortex-vr" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                VortexVR
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/apps/sylph-chat" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                SylphChat
+              </NuxtLink>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Company section -->
+        <div class="col-span-1">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
+            Company
+          </h3>
+          <ul class="space-y-3">
+            <li>
+              <NuxtLink to="/about" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                About Us
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/technologies" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                 Technologies
               </NuxtLink>
             </li>
             <li>
-              <NuxtLink to="/privacy" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                Privacy Policy
+              <NuxtLink to="/contact" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                Contact
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/careers" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                Careers
               </NuxtLink>
             </li>
           </ul>
         </div>
         
-        <!-- Resources -->
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Resources</h3>
-          <ul class="space-y-2">
+        <!-- Legal section -->
+        <div class="col-span-1">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
+            Legal
+          </h3>
+          <ul class="space-y-3">
             <li>
-              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                Documentation
-              </a>
-            </li>
-            <li>
-              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                Tutorials
-              </a>
+              <NuxtLink to="/privacy" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                Privacy Policy
+              </NuxtLink>
             </li>
             <li>
-              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                Blog
-              </a>
+              <NuxtLink to="/terms" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                Terms of Service
+              </NuxtLink>
             </li>
             <li>
-              <a href="#" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                API Reference
-              </a>
-            </li>
-          </ul>
-        </div>
-        
-        <!-- Contact -->
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Contact</h3>
-          <ul class="space-y-2">
-            <li class="flex items-start">
-              <span class="i-carbon-email mt-1 mr-2 text-gray-400"></span>
-              <a href="mailto:info@sylphx.com" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                info@sylphx.com
-              </a>
-            </li>
-            <li class="flex items-start">
-              <span class="i-carbon-phone mt-1 mr-2 text-gray-400"></span>
-              <a href="tel:+15551234567" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                +1 (555) 123-4567
-              </a>
-            </li>
-            <li class="flex items-start">
-              <span class="i-carbon-location mt-1 mr-2 text-gray-400"></span>
-              <span class="text-gray-600 dark:text-gray-300">
-                123 Tech Avenue<br>
-                San Francisco, CA 94107
-              </span>
+              <NuxtLink to="/cookies" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                Cookie Policy
+              </NuxtLink>
             </li>
           </ul>
         </div>
       </div>
       
-      <!-- Copyright -->
-      <div class="border-t border-gray-200 dark:border-gray-700 mt-10 pt-8 flex flex-col md:flex-row justify-between items-center">
-        <p class="text-gray-500 dark:text-gray-400 text-sm">
-          &copy; {{ new Date().getFullYear() }} SylphX. All rights reserved.
-        </p>
-        <div class="mt-4 md:mt-0 flex space-x-6">
-          <NuxtLink to="/privacy" class="text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white">
-            Privacy Policy
-          </NuxtLink>
-          <NuxtLink to="/terms" class="text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white">
-            Terms of Service
-          </NuxtLink>
-          <NuxtLink to="/cookies" class="text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white">
-            Cookie Policy
-          </NuxtLink>
+      <!-- Bottom section with copyright -->
+      <div class="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
+        <div class="flex flex-col md:flex-row justify-between items-center">
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            © {{ new Date().getFullYear() }} SylphX. All rights reserved.
+          </p>
+          <div class="mt-4 md:mt-0">
+            <button @click="toggleTheme" class="text-sm text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+              <span v-if="isDark">
+                <span class="i-carbon-sun inline-block align-text-bottom mr-1"></span>
+                Switch to Light Mode
+              </span>
+              <span v-else>
+                <span class="i-carbon-moon inline-block align-text-bottom mr-1"></span>
+                Switch to Dark Mode
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </footer>
 </template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+// Check dark mode preference
+const isDark = ref(false);
+
+// Toggle theme
+const toggleTheme = () => {
+  isDark.value = !isDark.value;
+  
+  // Update class on document element
+  if (isDark.value) {
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('color-theme', 'dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+    localStorage.setItem('color-theme', 'light');
+  }
+};
+
+// Initialize theme on mount
+onMounted(() => {
+  // Check local storage theme preference
+  isDark.value = localStorage.getItem('color-theme') === 'dark' || 
+    (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  
+  // Apply theme
+  if (isDark.value) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+});
+</script>
