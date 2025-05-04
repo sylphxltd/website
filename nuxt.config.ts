@@ -28,6 +28,7 @@ export default defineNuxtConfig({
     // Private keys are only available on the server side
     // Values can be overridden by environment variables (e.g., NUXT_GOOGLE_APPLICATION_CREDENTIALS)
     googleApplicationCredentials: process.env.GOOGLE_APPLICATION_CREDENTIALS || '', // Read from env var
+    firebaseServiceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '', // Service account JSON string
     public: {
       // Public keys that are exposed to the client side
       // Note: vuefire config is automatically made public

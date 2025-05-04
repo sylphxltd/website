@@ -2,7 +2,7 @@
   <div class="container mx-auto px-4 py-8">
     <h1 class="text-3xl font-bold mb-6">User Management</h1>
 
-    <div v-if="userStore.loading || loadingUsers" class="text-center py-10">
+    <div v-if="userStore.loading || adminUsersStore.loading" class="text-center py-10">
       <p>Loading data...</p>
       <!-- Add a spinner or loading indicator here -->
     </div>
@@ -64,8 +64,8 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <button
-                  @click="toggleAdminRole(user)"
-                  :disabled="settingRoleUid === user.uid || user.uid === getAuth().currentUser?.uid"
+                  @click="adminUsersStore.toggleAdminRole(user)"
+                  :disabled="adminUsersStore.settingRoleUid === user.uid || user.uid === getAuth().currentUser?.uid"
                   :class="{
                     'opacity-50 cursor-not-allowed': user.uid === getAuth().currentUser?.uid,
                     'hover:text-indigo-900 dark:hover:text-indigo-300': user.uid !== getAuth().currentUser?.uid
@@ -73,7 +73,7 @@
                   class="text-indigo-600 dark:text-indigo-400 disabled:text-gray-400 dark:disabled:text-gray-500"
                   :title="user.uid === getAuth().currentUser?.uid ? 'Cannot change your own role' : (user.customClaims?.admin ? 'Revoke Admin' : 'Grant Admin')"
                 >
-                  <span v-if="settingRoleUid === user.uid">Updating...</span>
+                  <span v-if="adminUsersStore.settingRoleUid === user.uid">Updating...</span>
                   <span v-else>{{ user.customClaims?.admin ? 'Revoke Admin' : 'Grant Admin' }}</span>
                 </button>
               </td>
@@ -91,151 +91,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue' // Added watch
-import { useUserStore } from '~/stores/user'
+import { computed, watchEffect } from 'vue'
 import { getAuth } from 'firebase/auth'
-
-// Define User interface based on API response
-interface ApiUser {
-  uid: string;
-  email?: string;
-  displayName?: string;
-  photoURL?: string;
-  disabled: boolean;
-  emailVerified: boolean;
-  customClaims?: { [key: string]: unknown }; // Changed any to unknown
-  metadata: {
-    creationTime?: string;
-    lastSignInTime?: string;
-  };
-}
+import { useUserStore } from '~/stores/user'
+import { useAdminUsersStore, type ApiUser } from '~/stores/adminUsers'
 
 definePageMeta({
   middleware: ['auth'], // Apply auth middleware
   roles: ['admin']      // Add required roles metadata
 })
 
+// Get stores
 const userStore = useUserStore()
-const users = ref<ApiUser[]>([])
-const loadingUsers = ref(false)
-const fetchError = ref<string | null>(null)
-const settingRoleUid = ref<string | null>(null) // Track which user's role is being updated
+const adminUsersStore = useAdminUsersStore()
 
-// Fetch users from the API endpoint
-const fetchUsers = async () => {
-  if (!userStore.isAdmin) return; // Double check admin status
+// Get reactive refs from the store
+const users = computed(() => adminUsersStore.users)
+const loadingUsers = computed(() => adminUsersStore.loading)
+const settingRoleUid = computed(() => adminUsersStore.settingRoleUid)
 
-  loadingUsers.value = true;
-  fetchError.value = null;
-  try {
-    const auth = getAuth();
-    const idToken = await auth.currentUser?.getIdToken(); // Get current user's token
-    if (!idToken) {
-        throw new Error("Could not retrieve user token.");
-    }
-
-    const response = await $fetch<{ users: ApiUser[] }>('/api/users/list', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${idToken}`
-      }
-    });
-    users.value = response.users;
-  } catch (error: unknown) { // Changed any to unknown
-    console.error("Error fetching users:", error);
-    // Use a helper to extract message, checking if error is an object with data/message
-    const getErrorMessage = (err: unknown): string => {
-        if (typeof err === 'object' && err !== null) {
-            // Check for Nuxt $fetch error structure
-            if ('data' in err && typeof err.data === 'object' && err.data !== null && 'message' in err.data && typeof err.data.message === 'string') {
-                return err.data.message;
-            }
-            // Check for standard Error object
-            if ('message' in err && typeof err.message === 'string') {
-                return (err as { message: string }).message;
-            }
-        }
-        return 'Failed to load users.';
-    };
-    fetchError.value = getErrorMessage(error);
-    // Only show toast if fetchError has a value
-    if (fetchError.value) {
-        userStore.showToast(fetchError.value, 'error');
-    }
-  } finally {
-    loadingUsers.value = false;
-  }
-}
-
-// Toggle admin role for a user
-const toggleAdminRole = async (user: ApiUser) => {
-  // Use getAuth() to get current user UID
-  if (settingRoleUid.value || user.uid === getAuth().currentUser?.uid) return;
-
-  settingRoleUid.value = user.uid; // Set loading state for this user
-  const newAdminStatus = !user.customClaims?.admin;
-  const rolePayload = { admin: newAdminStatus };
-
-  try {
-    const auth = getAuth();
-    const idToken = await auth.currentUser?.getIdToken();
-     if (!idToken) {
-        throw new Error("Could not retrieve user token.");
-    }
-
-    await $fetch('/api/users/setRole', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ uid: user.uid, role: rolePayload })
-    });
-
-    userStore.showToast(`Successfully ${newAdminStatus ? 'granted' : 'revoked'} admin role for ${user.email || user.uid}.`, 'success');
-    // Refresh user list to show updated status
-    await fetchUsers();
-  } catch (error: unknown) { // Changed any to unknown
-    console.error("Error setting user role:", error);
-     // Use a helper to extract message
-    const getErrorMessage = (err: unknown): string => {
-        if (typeof err === 'object' && err !== null) {
-             // Check for Nuxt $fetch error structure
-            if ('data' in err && typeof err.data === 'object' && err.data !== null && 'message' in err.data && typeof err.data.message === 'string') {
-                return err.data.message;
-            }
-             // Check for standard Error object
-            if ('message' in err && typeof err.message === 'string') {
-                return (err as { message: string }).message;
-            }
-        }
-        return 'Failed to update user role.';
-    };
-    userStore.showToast(getErrorMessage(error), 'error');
-  } finally {
-    settingRoleUid.value = null; // Clear loading state
-  }
-}
+// Display error message
+const fetchError = computed(() => adminUsersStore.error)
 
 // Fetch users when component is mounted and user is admin
-onMounted(() => {
-  // Declare stopWatch variable before the watch call
-  let stopWatch: (() => void) | null = null;
-  // Watch for admin status readiness
-  stopWatch = watch(() => userStore.isAdmin, (isAdmin) => {
-      if (isAdmin) {
-          fetchUsers();
-          // Check if stopWatch has been assigned before calling it
-          if (stopWatch) stopWatch();
-      } else if (!userStore.loading && !userStore.isAuthenticated) {
-          // If loading finished and user is not authenticated, stop watching
-          if (stopWatch) stopWatch();
-      } else if (!userStore.loading && userStore.isAuthenticated && !isAdmin) {
-          // If loading finished, user authenticated but not admin, stop watching
-          if (stopWatch) stopWatch();
-      }
-  }, { immediate: true });
-});
+watchEffect(() => {
+  if (userStore.isAdmin && !userStore.loading) {
+    adminUsersStore.fetchUsers()
+  }
+})
 
 </script>
 

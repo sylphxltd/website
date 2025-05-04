@@ -1,92 +1,123 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, cert, type ServiceAccount } from 'firebase-admin/app';
+import { getAuth, type Auth } from 'firebase-admin/auth';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { useRuntimeConfig } from '#imports';
+import { readFileSync, existsSync } from 'node:fs';
 
-let adminAuthInstance: admin.auth.Auth | null = null;
-let adminDbInstance: admin.firestore.Firestore | null = null;
-let isInitialized = false;
+// 單例實例
+let adminAuthInstance: Auth | null = null;
+let adminDbInstance: Firestore | null = null;
+let appInitialized = false;
 
+/**
+ * 初始化 Firebase Admin SDK
+ */
 function initializeAdminApp() {
-  // Only initialize once
-  if (isInitialized || (admin.apps && admin.apps.length > 0)) {
-    if (!adminAuthInstance) adminAuthInstance = admin.auth();
-    if (!adminDbInstance) adminDbInstance = admin.firestore();
-    isInitialized = true;
+  // 如果已經初始化過，直接返回
+  if (appInitialized) {
     return;
   }
-
-  console.log('Attempting Firebase Admin SDK initialization (lazy in util)...');
-  const config = useRuntimeConfig();
-  const googleAppCreds = config.googleApplicationCredentials;
-
-  if (!googleAppCreds) {
-    throw new Error('Firebase Admin SDK init failed: googleApplicationCredentials runtime config is not set.');
-  }
-
-  let credential: admin.credential.Credential | undefined;
-  let initError: unknown = null;
-
-  // Priority 1: Try parsing GOOGLE_APPLICATION_CREDENTIALS as JSON content
+  
+  console.log('Initializing Firebase Admin SDK...');
+  
   try {
-    const serviceAccount = JSON.parse(googleAppCreds);
-    credential = admin.credential.cert(serviceAccount);
-    console.log('Attempting Admin SDK init via parsed JSON content...');
-  } catch (parseError) {
-    console.warn(`Parsing JSON content failed: ${parseError instanceof Error ? parseError.message : parseError}. Falling back to ADC...`);
-    initError = parseError;
-    // Priority 2: Try standard Application Default Credentials (ADC)
-    try {
-      credential = admin.credential.applicationDefault();
-      console.log('Attempting Admin SDK init via ADC...');
-      initError = null; // Clear previous error if ADC is attempted
-    } catch (adcError) {
-      console.error('ADC initialization also failed:', adcError);
-      initError = initError || adcError;
+    // 獲取 Nuxt 運行時配置
+    const config = useRuntimeConfig();
+    
+    // 從 runtime config 獲取 GOOGLE_APPLICATION_CREDENTIALS 
+    const googleAppCreds = config.googleApplicationCredentials;
+    
+    if (!googleAppCreds) {
+      throw new Error('GOOGLE_APPLICATION_CREDENTIALS not set in runtimeConfig');
     }
-  }
-
-  if (!credential) {
-    throw new Error(`Firebase Admin SDK init failed. Could not obtain credential. Last error: ${initError instanceof Error ? initError.message : initError}`);
-  }
-
-  // Initialize the app
-  try {
-    // Check again if already initialized by a concurrent request perhaps
-    if (!admin.apps || !admin.apps.length) {
-        admin.initializeApp({ credential });
-        console.log('Firebase Admin SDK initialized successfully (lazy in util).');
-        isInitialized = true;
-        adminAuthInstance = admin.auth();
-        adminDbInstance = admin.firestore();
+    
+    let serviceAccount: ServiceAccount;
+    
+    // 透過檢查首個字符是否為 '{' 來判斷是否為 JSON 字符串
+    if (googleAppCreds.toString().trim().startsWith('{')) {
+      // 看起來是 JSON 字符串
+      try {
+        serviceAccount = JSON.parse(googleAppCreds.toString()) as ServiceAccount;
+        console.log('Using service account JSON from GOOGLE_APPLICATION_CREDENTIALS');
+      } catch (parseError) {
+        throw new Error(`Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
     } else {
-        console.log('Firebase Admin SDK already initialized (checked before final init).');
-        isInitialized = true; // Assume initialized if apps exist
-        if (!adminAuthInstance) adminAuthInstance = admin.auth();
-        if (!adminDbInstance) adminDbInstance = admin.firestore();
+      // 看起來是文件路徑
+      const credPath = googleAppCreds.toString();
+      console.log(`Checking service account file at path: ${credPath}`);
+      
+      if (!existsSync(credPath)) {
+        throw new Error(`Service account file not found at path: ${credPath}`);
+      }
+      
+      try {
+        // 讀取文件內容
+        const fileContent = readFileSync(credPath, 'utf8');
+        serviceAccount = JSON.parse(fileContent) as ServiceAccount;
+        console.log('Using service account from file content');
+      } catch (fileError) {
+        throw new Error(`Failed to read or parse service account file: ${fileError instanceof Error ? fileError.message : String(fileError)}`);
+      }
     }
-  } catch (finalInitError) {
-    console.error('Firebase Admin SDK initializeApp failed (lazy in util):', finalInitError);
-    throw new Error(`Firebase Admin SDK initializeApp failed (lazy in util). Error: ${finalInitError instanceof Error ? finalInitError.message : finalInitError}`);
+    
+    // 使用服務帳戶初始化 app
+    // 注意: 這裡我們直接初始化而不先檢查現有的 apps
+    const app = initializeApp({
+      credential: cert(serviceAccount)
+    });
+    
+    // 初始化 auth 和 firestore 實例
+    adminAuthInstance = getAuth(app);
+    adminDbInstance = getFirestore(app);
+    appInitialized = true;
+    
+    console.log('Firebase Admin SDK initialized successfully');
+  } catch (error) {
+    console.error('Error initializing Firebase Admin:', error);
+    
+    const errorMessage = `Firebase Admin SDK initialization failed: ${error instanceof Error ? error.message : String(error)}
+    
+    Please make sure GOOGLE_APPLICATION_CREDENTIALS is set correctly:
+    
+    1. For a service account file path:
+       GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+       
+    2. For a JSON string (ensure it's properly quoted):
+       GOOGLE_APPLICATION_CREDENTIALS='{"type":"service_account","project_id":"...",...}'
+    
+    Note for JSON string: Make sure the entire JSON is properly escaped and quoted in your environment variable.`;
+    
+    throw new Error(errorMessage);
   }
 }
 
-// Getter function for Admin Auth, ensures initialization
-export function getAdminAuth(): admin.auth.Auth {
-    if (!isInitialized) {
-        initializeAdminApp();
-    }
-    if (!adminAuthInstance) {
-        throw new Error("Failed to get adminAuth instance after initialization attempt.");
-    }
-    return adminAuthInstance;
+/**
+ * 獲取 Firebase Admin Auth 實例
+ */
+export function getAdminAuth(): Auth {
+  if (!appInitialized || !adminAuthInstance) {
+    initializeAdminApp();
+  }
+  
+  if (!adminAuthInstance) {
+    throw new Error("Failed to get adminAuth instance after initialization attempt");
+  }
+  
+  return adminAuthInstance;
 }
 
-// Getter function for Admin Firestore, ensures initialization
-export function getAdminDb(): admin.firestore.Firestore {
-     if (!isInitialized) {
-        initializeAdminApp();
-    }
-    if (!adminDbInstance) {
-        throw new Error("Failed to get adminDb instance after initialization attempt.");
-    }
-    return adminDbInstance;
+/**
+ * 獲取 Firebase Admin Firestore 實例
+ */
+export function getAdminDb(): Firestore {
+  if (!appInitialized || !adminDbInstance) {
+    initializeAdminApp();
+  }
+  
+  if (!adminDbInstance) {
+    throw new Error("Failed to get adminDb instance after initialization attempt");
+  }
+  
+  return adminDbInstance;
 }
