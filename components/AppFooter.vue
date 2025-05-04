@@ -28,7 +28,7 @@
         <div>
           <h4 class="font-semibold mb-5 text-base">Pages</h4>
           <div class="flex flex-col gap-3">
-            <template v-for="link in navLinks.filter(l => !l.external)" :key="link.path">
+            <template v-for="link in footerLinks" :key="link.path">
               <NuxtLink :to="link.path" class="text-gray-300 hover:text-blue-400 transition decoration-none">{{ link.name }}</NuxtLink>
             </template>
           </div>
@@ -70,7 +70,7 @@
 <script setup>
 defineProps({
   isDark: Boolean,
-  navLinks: Array
+  footerLinks: Array // Changed prop name
 });
 
 defineEmits(['toggle-dark']);

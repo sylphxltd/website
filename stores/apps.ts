@@ -9,10 +9,8 @@ export interface Application {
   id: string
   name: string
   description?: string
-  // Add other fields like store links, etc.
-  // googlePlayUrl?: string
-  // appStoreUrl?: string
-  // githubUrl?: string
+  links?: { [key: string]: string }
+  logoUrl?: string // Added logoUrl field
   createdAt: string
   updatedAt: string
 }
@@ -21,7 +19,8 @@ export interface Application {
 export interface AppFormData {
   name: string
   description?: string
-  // Add corresponding fields from Application interface
+  links?: { [key: string]: string }
+  logoUrl?: string // Added logoUrl field
 }
 
 export const useAppsStore = defineStore('apps', () => {
@@ -55,6 +54,7 @@ export const useAppsStore = defineStore('apps', () => {
       apps.value = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
+        links: doc.data().links || {}, // Ensure links is always an object
         // Convert Timestamps to ISO strings for serialization
         createdAt: doc.data().createdAt?.toDate().toISOString() || new Date(0).toISOString(),
         updatedAt: doc.data().updatedAt?.toDate().toISOString() || new Date(0).toISOString(),
@@ -78,7 +78,10 @@ export const useAppsStore = defineStore('apps', () => {
     try {
       const appsCollection = collection(db, "apps")
       const appData = {
-        ...formData,
+        name: formData.name,
+        description: formData.description || '',
+        links: formData.links || {},
+        logoUrl: formData.logoUrl || '', // Save logoUrl
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       }
@@ -105,11 +108,16 @@ export const useAppsStore = defineStore('apps', () => {
     
     try {
       const appRef = doc(db, "apps", appId)
+      // Construct the update payload directly, letting TypeScript infer the type
       const updateData = {
-        ...formData,
+        name: formData.name,
+        description: formData.description || '',
+        links: formData.links || {},
+        logoUrl: formData.logoUrl || '', // Update logoUrl
         updatedAt: serverTimestamp()
       }
       
+      // Pass the object to updateDoc
       await updateDoc(appRef, updateData)
       userStore.showToast('Application updated successfully!', 'success')
       

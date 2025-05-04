@@ -29,6 +29,7 @@ export default defineNuxtConfig({
     // Values can be overridden by environment variables (e.g., NUXT_GOOGLE_APPLICATION_CREDENTIALS)
     googleApplicationCredentials: process.env.GOOGLE_APPLICATION_CREDENTIALS || '', // Read from env var
     firebaseServiceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '', // Service account JSON string
+    openaiApiKey: process.env.OPENAI_API_KEY || '', // Add OpenAI API Key for server-side use
     public: {
       // Public keys that are exposed to the client side
       // Note: vuefire config is automatically made public

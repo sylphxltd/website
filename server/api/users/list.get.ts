@@ -35,7 +35,14 @@ export default defineEventHandler(async (event: H3Event) => {
       metadata: {
         creationTime: userRecord.metadata.creationTime,
         lastSignInTime: userRecord.metadata.lastSignInTime,
-      }
+      },
+      providerData: userRecord.providerData.map(provider => ({ // Add providerData
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoURL: provider.photoURL,
+        uid: provider.uid
+      }))
     }));
 
     return { users };

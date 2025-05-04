@@ -15,6 +15,13 @@ export interface ApiUser {
     creationTime?: string
     lastSignInTime?: string
   }
+  providerData?: { // Added providerData array
+    providerId: string;
+    displayName?: string | null;
+    email?: string | null;
+    photoURL?: string | null;
+    uid: string;
+  }[]
 }
 
 export const useAdminUsersStore = defineStore('adminUsers', () => {

@@ -27,8 +27,8 @@
 
       <!-- Use AppFooter Component -->
       <AppFooter 
-        :is-dark="isDark" 
-        :nav-links="navLinks"
+        :is-dark="isDark"
+        :nav-links="footerLinks"
         @toggle-dark="toggleDark"
       />
       
@@ -42,6 +42,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useDark, useToggle } from '@vueuse/core';
 import { useUserStore } from '~/stores/user'; // Import user store
+import { useNavigation } from '~/composables/useNavigation'; // Import the new composable
 // import { useHead } from '#imports'; // Removed useHead import
 import AppHeader from '~/components/AppHeader.vue';
 import AppMobileMenu from '~/components/AppMobileMenu.vue';
@@ -51,17 +52,7 @@ import AppFooter from '~/components/AppFooter.vue';
 const isDark = useDark();
 const toggleDark = useToggle(isDark);
 const userStore = useUserStore(); // Initialize user store
-
-// Navigation Links
-const navLinks = [
-  { name: 'About', path: '/' },
-  { name: 'Products', path: '/products' },
-  { name: 'Technologies', path: '/technologies' },
-  { name: 'Apps', path: '/apps' }, // Added Apps link
-  { name: 'Instructions', path: '/instructions' },
-  { name: 'Privacy Policy', path: '/privacy' },
-  { name: 'Contact', path: 'mailto:support@sylphx.com', external: true },
-];
+const { navLinks, footerLinks } = useNavigation(); // Use the composable
 
 const isScrolled = ref(false);
 // const navbar = ref(null); // No longer needed as it's inside AppHeader
