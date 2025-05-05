@@ -8,6 +8,7 @@ export default defineNuxtConfig({
     '@pinia/nuxt', // Add Pinia module
     '@nuxt/ui',     // Add Nuxt UI module
     '@vueuse/nuxt', // Add VueUse Nuxt module
+    'nuxt-particles', // Add Nuxt Particles module
   ],
   vuefire: { // This is needed for nuxt-vuefire module initialization
     auth: {

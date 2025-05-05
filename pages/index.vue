@@ -6,26 +6,8 @@
       <div class="absolute inset-0 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 z-0"></div>
       <div class="absolute inset-0 bg-[url('/images/hero-bg.jpg')] bg-cover bg-center bg-no-repeat mix-blend-overlay opacity-30"></div>
       
-      <!-- Animated particles/shapes for visual interest -->
-      <div class="absolute inset-0 overflow-hidden">
-        <!-- Using fixed positioning with style binding instead of class binding -->
-        <div v-for="n in 5" :key="n" 
-          :class="[
-            'absolute rounded-full mix-blend-screen animate-float',
-            n % 2 === 0 ? 'bg-blue-500' : 'bg-purple-500'
-          ]"
-          :style="{
-            top: `${Math.random() * 80 + 10}%`,
-            left: `${Math.random() * 80 + 10}%`,
-            width: `${(Math.random() * 80) + 140}px`,
-            height: `${(Math.random() * 80) + 140}px`,
-            opacity: Math.random() * 0.15 + 0.05,
-            animationDelay: `${Math.random() * 10}s`,
-            animationDuration: `${Math.random() * 10 + 20}s`
-          }"
-        ></div>
-      </div>
-      
+<!-- Particles Background -->
+        <NuxtParticles id="tsparticles" class="absolute inset-0" :options="particlesOptions" @load="onLoad"></NuxtParticles>
       <!-- Hero content -->
       <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div class="max-w-3xl">
@@ -332,8 +314,69 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import type { Container } from "@tsparticles/engine";
+import type { MoveDirection, OutMode } from "@tsparticles/engine";
+
+// Define basic options (can be customized later)
+// Example using a preset:
+const particlesOptions = {
+  particles: {
+    number: {
+      value: 10, // Fewer particles for subtlety
+    },
+    color: {
+      value: ["#3b82f6", "#8b5cf6"], // Array of blue and purple
+    },
+    shape: {
+      type: "circle",
+    },
+    opacity: {
+      value: { min: 0.05, max: 0.15 }, // Very low random opacity
+      random: true,
+      // Optional: subtle fade animation
+      // anim: { enable: true, speed: 0.5, sync: false },
+    },
+    size: {
+      value: { min: 100, max: 180 }, // Larger random size, similar to original attempt
+      random: true,
+      // Optional: subtle size animation
+      // anim: { enable: true, speed: 3, sync: false },
+    },
+    move: {
+      enable: true,
+      speed: { min: 0.3, max: 1 }, // Very slow random speed
+      direction: "none" as MoveDirection,
+      random: true, // Move in random directions
+      straight: false, // Add some wobble
+      outModes: "out" as OutMode, // Disappear at edges
+      attract: { enable: false },
+    },
+    links: { // Ensure no lines are drawn between particles
+        enable: false,
+    },
+  },
+  interactivity: { // Disable interactivity
+    events: {
+      onHover: { enable: false },
+      onClick: { enable: false },
+    },
+  },
+  background: {
+    color: { value: "transparent" }, // Transparent background
+  },
+  fullScreen: {
+    enable: false, // Disable fixed positioning
+    // zIndex removed from here
+  },
+  zIndex: 0, // Set zIndex at the root level for correct layering within the section
+};
+
+const onLoad = (container: Container) => {
+  // Optional: Do something after particles are loaded
+  console.log("Particles loaded", container);
+};
 
 definePageMeta({
   layout: 'default'
