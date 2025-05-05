@@ -21,20 +21,6 @@ import { useRouter } from 'vue-router'
 import { useToastStore } from '~/stores/toast'
 import type { ToastType } from '~/components/Toast.vue'
 
-// TypeScript 類型定義，解決 nuxtApp.$toast 嘅類型問題
-declare module '#app' {
-  interface NuxtApp {
-    $toast: {
-      success: (message: string, timeout?: number) => number;
-      error: (message: string, timeout?: number) => number;
-      warning: (message: string, timeout?: number) => number;
-      info: (message: string, timeout?: number) => number;
-      add: (options: { message: string, type?: ToastType, timeout?: number }) => number;
-      remove: (id: number) => void;
-      clear: () => void;
-    }
-  }
-}
 
 export const useUserStore = defineStore('user', () => {
   // State
