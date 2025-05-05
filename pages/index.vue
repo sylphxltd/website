@@ -7,7 +7,7 @@
       <div class="absolute inset-0 bg-[url('/images/hero-bg.jpg')] bg-cover bg-center bg-no-repeat mix-blend-overlay opacity-30"></div>
       
 <!-- Particles Background -->
-        <NuxtParticles id="tsparticles" class="absolute inset-0" :options="particlesOptions" @load="onLoad"></NuxtParticles>
+      <NuxtParticles id="tsparticles" class="absolute inset-0 animate-fade-in animate-duration-5s  animate-ease-in-out" :options="particlesOptions" @load="onLoad"></NuxtParticles>
       <!-- Hero content -->
       <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div class="max-w-3xl">
@@ -401,4 +401,5 @@ definePageMeta({
 .bg-grid-white {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(255 255 255 / 0.05)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e");
 }
+/* UnoCSS classes added to #tsparticles for fade-in */
 </style>
