@@ -1,18 +1,25 @@
 import type { H3Event } from 'h3';
 import { getQuery } from 'h3';
 import { getStorage } from 'firebase-admin/storage';
-import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+import { getAdminAuth, getAdminDb } from '~/server/utils/firebaseAdmin';
+import type { Query, DocumentData, Timestamp } from 'firebase-admin/firestore'; // Import Firestore types
 import type { Resource } from '~/stores/resources'; // Import type
 
-// Helper to format size
-function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  // Use template literal, Number.parseFloat, and ** operator
-  return `${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
+// Helper function to generate signed URL (consider moving to a shared util if used elsewhere)
+async function generateSignedUrl(filePath: string): Promise<string | null> {
+  if (!filePath) return null;
+  try {
+    const bucket = getStorage().bucket();
+    const file = bucket.file(filePath);
+    const [url] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour expiration
+    });
+    return url;
+  } catch (error) {
+    console.error(`Failed to generate signed URL for ${filePath}:`, error);
+    return null; // Return null on error
+  }
 }
 
 export default defineEventHandler(async (event: H3Event) => {
@@ -35,64 +42,81 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   // 2. Get Query Parameters
-  const query = getQuery(event);
-  const appId = query.appId?.toString();
-  const pageToken = query.pageToken?.toString(); // For pagination
-  const pageSize = Number.parseInt(query.limit?.toString() || '20', 10); // Default page size
+  const queryParams = getQuery(event);
+  const appId = queryParams.appId?.toString();
+  // Pagination parameters (optional for now, can be added later)
+  // const pageSize = Number.parseInt(queryParams.limit?.toString() || '20', 10);
+  // const afterCursor = queryParams.cursor?.toString() || null;
 
   if (!appId) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing appId query parameter' });
   }
 
-  // 3. List Files from Firebase Storage
+  // 3. Query Firestore 'app_resources' Collection
   try {
-    const bucket = getStorage().bucket(); // Use default bucket
-    const prefix = `apps/${appId}/resources/`;
+    const db = getAdminDb();
+    let resourcesQuery: Query<DocumentData> = db.collection("app_resources");
 
-    const [files, nextQuery] = await bucket.getFiles({
-      prefix: prefix,
-      maxResults: pageSize + 1, // Fetch one extra to check if there's a next page
-      pageToken: pageToken,
-      autoPaginate: false, // Important for manual pagination control
+    // Filter by appId
+    resourcesQuery = resourcesQuery.where("appId", "==", appId);
+
+    // Add sorting (e.g., by creation date)
+    resourcesQuery = resourcesQuery.orderBy("createdAt", "desc");
+
+    // Add pagination if implemented later
+    // if (afterCursor) { ... resourcesQuery = resourcesQuery.startAfter(cursorDoc); }
+    // resourcesQuery = resourcesQuery.limit(pageSize);
+
+    const querySnapshot = await resourcesQuery.get();
+
+    // 4. Format and Return Resource List with Signed URLs
+    const resourcesPromises = querySnapshot.docs.map(async (docSnapshot) => {
+        const data = docSnapshot.data();
+        const storagePath = data.storagePath;
+
+        // Generate signed URL for download
+        const downloadUrl = await generateSignedUrl(storagePath);
+
+        const toISOStringSafe = (timestamp: Timestamp | undefined | null): string => {
+            try { return timestamp?.toDate().toISOString() || new Date(0).toISOString(); }
+            catch { return new Date(0).toISOString(); }
+        };
+
+        // Map Firestore data and generated URL to Resource interface
+        return {
+          id: docSnapshot.id, // Use Firestore document ID
+          name: data.name || data.filename || 'Unnamed Resource', // Prefer user-defined name
+          path: storagePath, // Keep storage path
+          url: downloadUrl || undefined, // Add the signed URL (or undefined if generation failed)
+          size: Number(data.size || 0),
+          contentType: data.contentType || 'application/octet-stream',
+          createdAt: toISOStringSafe(data.createdAt),
+          appId: data.appId,
+          // Include other metadata stored in Firestore
+          description: data.description,
+          type: data.type,
+          isPublic: data.isPublic,
+          filename: data.filename, // Original filename
+          uploaderUid: data.uploaderUid,
+        } as Resource; // Cast to Resource, ensure interface matches
     });
 
-    // Determine if there's a next page
-    let nextPageToken: string | undefined = undefined;
-    if (files.length > pageSize) {
-      // If we fetched more than pageSize, the last one is the start of the next page
-      nextPageToken = files[pageSize].name; // Use the name as a simple token (adjust if needed)
-      files.length = pageSize; // Trim the extra file
-    } else if (nextQuery?.pageToken) {
-        // Use the pageToken provided by the API if available and we didn't fetch extra
-         nextPageToken = nextQuery.pageToken;
-    }
+    // Wait for all signed URL promises to resolve
+    const resources = await Promise.all(resourcesPromises);
 
+    // Pagination info (if implemented)
+    // const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+    // const nextPageCursor = lastVisibleDoc ? lastVisibleDoc.id : null;
 
-    // 4. Format and Return Resource List
-    const resources: Resource[] = files
-      // Filter out the "folder" itself if it appears as an empty object
-      // Safely convert size to number before comparison
-      .filter(file => file.name !== prefix || Number(file.metadata.size || 0) > 0)
-      .map(file => ({
-        id: file.name, // Use full path as ID for now
-        name: file.name.substring(prefix.length), // Extract filename
-        path: file.name,
-        size: Number(file.metadata.size || 0), // Ensure size is a number
-        contentType: file.metadata.contentType || 'application/octet-stream',
-        createdAt: file.metadata.timeCreated || new Date(0).toISOString(),
-        appId: appId,
-        // url: // Generate signed URL if needed, requires separate logic/API call
-      }));
-
-    // Note: Total count is not easily available with getFiles pagination
+    // Note: Total count would require a separate count query on Firestore if needed
     return {
       resources,
-      nextPageToken: nextPageToken, // Send token for next page
-      // total: // Not available directly
+      // nextPageCursor: nextPageCursor, // If pagination added
+      // total: total // If count query added
     };
 
   } catch (error) {
-    console.error(`Error listing resources for appId ${appId}:`, error);
+    console.error(`Error listing resources for appId ${appId} from Firestore:`, error);
     throw createError({ statusCode: 500, statusMessage: 'Internal Server Error fetching resources' });
   }
 });

@@ -1,26 +1,17 @@
 import type { H3Event } from 'h3';
 import { getQuery } from 'h3';
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  limit as firestoreLimit,
-  // startAfter, // Not used in current simplified pagination
-  where,
-  getCountFromServer,
-  // Import types separately
-  type Query,
-  type DocumentData,
-  type QueryConstraint,
-  // type DocumentSnapshot // Not used currently
-} from 'firebase/firestore';
-// import { useFirestore } from 'vuefire/server'; // REMOVED
-import { getAdminAuth, getAdminDb } from '~/server/utils/firebaseAdmin'; // Import getAdminDb
+import type {
+  // Import types from firebase-admin/firestore
+  Query,
+  DocumentData,
+  DocumentSnapshot,
+  Timestamp, // Import Timestamp for date conversion
+} from 'firebase-admin/firestore';
+import { getAdminAuth, getAdminDb } from '~/server/utils/firebaseAdmin';
 import type { Application } from '~/stores/apps';
 
 export default defineEventHandler(async (event: H3Event) => {
-  // 1. Authorization Check (Same as other admin endpoints)
+  // 1. Authorization Check
   const authorization = getHeader(event, 'Authorization');
   if (!authorization || !authorization.startsWith('Bearer ')) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Missing Bearer token' });
@@ -40,101 +31,111 @@ export default defineEventHandler(async (event: H3Event) => {
 
   // 2. Get Query Parameters
   const queryParams = getQuery(event);
-  const page = Number.parseInt(queryParams.page?.toString() || '1', 10);
   const pageSize = Number.parseInt(queryParams.limit?.toString() || '10', 10);
   const search = queryParams.search?.toString().toLowerCase() || '';
   const platform = queryParams.platform?.toString() || '';
-  const status = queryParams.status?.toString() || ''; // 'active', 'draft', 'archived'
+  const status = queryParams.status?.toString() || '';
+  const afterCursor = queryParams.cursor?.toString() || null; // Expecting cursor ID
 
-  // 3. Firestore Query Construction
-  const db = getAdminDb(); // Use getAdminDb()
-  const appsCollection = collection(db, "apps");
-  const constraints: QueryConstraint[] = [];
+  // 3. Firestore Query Construction using Admin SDK
+  const db = getAdminDb();
+  let appsQuery: Query<DocumentData> = db.collection("apps"); // Use db.collection
 
   // Add filtering constraints
-  // NOTE: Firestore requires composite indexes for multiple inequality/orderBy clauses.
-  // Text search is limited. For robust search, consider Algolia/Typesense/Meilisearch.
   if (status) {
-      // Assuming 'status' field exists in Firestore documents
-      constraints.push(where("status", "==", status)); 
+      appsQuery = appsQuery.where("status", "==", status);
   }
   if (platform) {
-      // Assuming 'platforms' is an array field in Firestore
-      constraints.push(where("platforms", "array-contains", platform)); 
+      appsQuery = appsQuery.where("platforms", "array-contains", platform);
   }
-  // Basic name search (case-sensitive prefix match - limited)
+  // Basic name search
   if (search) {
-      constraints.push(where("name", ">=", search));
-      constraints.push(where("name", "<=", `${search}\uf8ff`)); // Use template literal
-      // Add orderBy('name') if using range filters on name
-      constraints.push(orderBy("name"));
+      appsQuery = appsQuery.where("name", ">=", search);
+      appsQuery = appsQuery.where("name", "<=", `${search}\uf8ff`);
+      appsQuery = appsQuery.orderBy("name", "asc"); // Order by name when searching
   } else {
-      // Default sort order if not searching by name
-      constraints.push(orderBy("updatedAt", "desc")); 
+      // Default sort order
+      appsQuery = appsQuery.orderBy("updatedAt", "desc");
   }
 
-  // 4. Get Total Count (for pagination info) - Runs a separate query
+  // 4. Get Total Count - Apply only filtering constraints
   let total = 0;
   try {
-      // Apply only filtering constraints for count
-      const countQuery = query(appsCollection, ...constraints.filter(c => c.type !== 'orderBy' && c.type !== 'limit' && c.type !== 'startAfter'));
-      const snapshot = await getCountFromServer(countQuery);
+      let countQuery: Query<DocumentData> = db.collection("apps");
+      if (status) countQuery = countQuery.where("status", "==", status);
+      if (platform) countQuery = countQuery.where("platforms", "array-contains", platform);
+      if (search) {
+          countQuery = countQuery.where("name", ">=", search);
+          countQuery = countQuery.where("name", "<=", `${search}\uf8ff`);
+      }
+      const snapshot = await countQuery.count().get(); // Use count().get()
       total = snapshot.data().count;
   } catch (countError) {
       console.error("Error getting app count:", countError);
       // Proceed without total count if it fails
   }
 
-  // 5. Get Paginated Data
-  // Firestore pagination typically uses cursors (startAfter). 
-  // Mapping page numbers to cursors requires fetching intermediate docs or storing cursors.
-  // Simplification: Using offset/limit for now, less efficient for large datasets.
-  // For better performance, implement cursor-based pagination.
-  const offset = (page - 1) * pageSize; 
-  // Note: Firestore doesn't have a direct 'offset'. We'll fetch docs up to the offset+limit 
-  // and slice, which is inefficient. Cursor-based is preferred.
-  
-  // Add limit constraint
-  constraints.push(firestoreLimit(pageSize)); 
-  
-  // TODO: Implement proper cursor-based pagination instead of offset.
-  // If using offset: Need to fetch `offset + pageSize` and slice, or fetch previous page cursors.
-  
-  // For now, just fetch the first page based on filters/order
-  const finalQuery = query(appsCollection, ...constraints);
+  // 5. Handle Cursor for Pagination
+  if (afterCursor) {
+      try {
+          const cursorRef = db.collection("apps").doc(afterCursor); // Use db.collection().doc()
+          const cursorDoc = await cursorRef.get(); // Use docRef.get()
+          if (cursorDoc.exists) {
+              appsQuery = appsQuery.startAfter(cursorDoc); // Use startAfter directly on the query
+          } else {
+              console.warn(`Cursor document with ID ${afterCursor} not found. Fetching from beginning.`);
+          }
+      } catch (cursorError) {
+          console.error(`Error fetching cursor document ${afterCursor}:`, cursorError);
+          // Fetch from beginning if cursor is invalid
+      }
+  }
 
+  // Add limit constraint AFTER potential startAfter constraint
+  appsQuery = appsQuery.limit(pageSize); // Use limit directly on the query
+
+  // 6. Get Paginated Data
   try {
-    const querySnapshot = await getDocs(finalQuery);
-    
-    const appsData = querySnapshot.docs.map(doc => {
-        const data = doc.data();
+    const querySnapshot = await appsQuery.get(); // Use query.get()
+
+    const appsData = querySnapshot.docs.map(docSnapshot => {
+        const data = docSnapshot.data();
+        // Helper to convert Admin SDK Timestamp to ISO string safely
+        const toISOStringSafe = (timestamp: Timestamp | undefined | null): string => {
+            try {
+                return timestamp?.toDate().toISOString() || new Date(0).toISOString();
+            } catch {
+                return new Date(0).toISOString(); // Fallback for invalid timestamps
+            }
+        };
+
         return {
-          id: doc.id,
+          id: docSnapshot.id,
           name: data.name || 'Unnamed App',
           description: data.description,
           links: data.links || {},
           logoUrl: data.logoUrl,
-          createdAt: data.createdAt?.toDate().toISOString() || new Date(0).toISOString(),
-          updatedAt: data.updatedAt?.toDate().toISOString() || new Date(0).toISOString(),
+          createdAt: toISOStringSafe(data.createdAt),
+          updatedAt: toISOStringSafe(data.updatedAt),
           platforms: data.platforms || [],
           status: data.status || 'draft',
           appId: data.appId,
-          tags: data.tags || [], // Fetch tags
-          features: data.features || [], // Fetch features
-          screenshotUrls: data.screenshotUrls || [], // Fetch screenshots
-          // Placeholders - remove or fetch real data later
+          tags: data.tags || [],
+          features: data.features || [],
+          screenshotUrls: data.screenshotUrls || [],
           downloads: data.downloads || 0,
           rating: data.rating || 0,
         } as Application;
     });
 
-    // TODO: Implement logic to get the correct cursor for the *next* page if using cursors.
-    // const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
+    // Determine the next cursor
+    const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+    const nextPageCursor = lastVisibleDoc ? lastVisibleDoc.id : null;
 
-    return { 
-      apps: appsData, 
-      total: total 
-      // nextPageCursor: lastVisible // If using cursors
+    return {
+      apps: appsData,
+      total: total,
+      nextPageCursor: nextPageCursor
     };
 
   } catch (error) {

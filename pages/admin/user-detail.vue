@@ -522,39 +522,35 @@ const timeAgo = (dateString: string | undefined | null): string => {
 // Actions
 const fetchUserData = async () => {
   if (!userId.value) {
-    error.value = 'No user ID provided'
-    loading.value = false
-    return
+    error.value = 'No user ID provided';
+    loading.value = false;
+    return;
   }
 
-  loading.value = true
-  error.value = null
+  loading.value = true;
+  error.value = null;
+  currentUser.value = null; // Clear previous user data
 
   try {
-    // If users aren't loaded yet, fetch them
-    if (!adminUsersStore.users.length) {
-      // Fetch without pagination for now, assuming list isn't huge
-      // Or pass current page/token if detail page should sync with list page pagination
-      await adminUsersStore.fetchUsers({ pageSize: 1000 }); 
-    }
+    // Call the store action to fetch the specific user by ID
+    const fetchedUser = await adminUsersStore.fetchUserById(userId.value);
 
-    // Find the user by ID
-    const user = adminUsersStore.users.find(u => u.uid === userId.value)
-
-    if (user) {
-      currentUser.value = user
+    if (fetchedUser) {
+      currentUser.value = fetchedUser; // Assign the fetched user data
     } else {
-      // Optionally try fetching the specific user via API if not in list?
-      // For now, assume if not in list, it's not found.
-      error.value = 'User not found in the current list.'
-      currentUser.value = null; // Clear previous user if any
+      // Error should have been set by the store action if fetch failed
+      if (!error.value) { // Set a generic error if store didn't set one
+          error.value = 'User not found.';
+      }
     }
-  } catch (err) {
-    console.error('Error fetching user:', err)
-    error.value = 'Failed to load user data'
-    currentUser.value = null;
+  } catch (err: unknown) { // Catch potential errors re-thrown by the store action
+    console.error('Error in fetchUserData:', err);
+    // Error message should be set by the store action's catch block
+    if (!error.value) { // Set a generic error if store didn't set one
+        error.value = err instanceof Error ? err.message : 'Failed to load user data';
+    }
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 

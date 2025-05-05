@@ -16,21 +16,22 @@
       <div class="flex items-center justify-between mb-4">
         <h4 class="text-lg font-medium text-gray-900 dark:text-white">Upload New Resource</h4>
       </div>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="md:col-span-2">
           <label for="resourceName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Resource Name
+            Resource Name *
           </label>
           <input
             type="text"
             id="resourceName"
             v-model="newResource.name"
             placeholder="Enter resource name"
+            required
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
-        
+
         <div>
           <label for="resourceType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Type
@@ -48,7 +49,7 @@
             <option value="other">Other</option>
           </select>
         </div>
-        
+
         <div class="md:col-span-3">
           <label for="resourceDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Description
@@ -61,18 +62,18 @@
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white"
           ></textarea>
         </div>
-        
+
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            File
+            File *
           </label>
           <div class="flex items-center">
             <label class="relative cursor-pointer bg-white dark:bg-gray-700 rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 focus-within:outline-none">
               <span class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm">Select file</span>
-              <input 
-                ref="fileInput" 
-                type="file" 
-                class="sr-only" 
+              <input
+                ref="fileInputRef"
+                type="file"
+                class="sr-only"
                 @change="handleFileSelect"
               >
             </label>
@@ -81,7 +82,7 @@
             </p>
           </div>
         </div>
-        
+
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Visibility
@@ -98,9 +99,10 @@
           </div>
         </div>
       </div>
-      
+
       <div class="flex justify-end mt-4">
         <button
+          type="button"
           @click="uploadResource"
           :disabled="isUploading || !newResource.name || !selectedFile"
           class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -124,7 +126,7 @@
       <!-- Error state -->
       <div v-else-if="error" class="p-6 text-red-600 dark:text-red-400">
         <p>{{ error }}</p>
-        <button @click="fetchResources" class="text-sm underline mt-1">Try again</button>
+        <button @click="fetchResources(props.appId)" class="text-sm underline mt-1">Try again</button>
       </div>
 
       <!-- Empty state -->
@@ -172,15 +174,15 @@
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
                     <div class="flex-shrink-0 h-10 w-10 bg-gray-100 dark:bg-gray-700 rounded-md flex items-center justify-center">
-                      <span 
+                      <span
                         :class="{
                           'i-carbon-document': resource.type === 'document',
                           'i-carbon-image': resource.type === 'image',
                           'i-carbon-video': resource.type === 'video',
                           'i-carbon-music': resource.type === 'audio',
                           'i-carbon-code': resource.type === 'code',
-                          'i-carbon-document-unknown': resource.type === 'other'
-                        }" 
+                          'i-carbon-document-unknown': resource.type === 'other' || !resource.type
+                        }"
                         class="text-xl text-gray-500 dark:text-gray-400"
                       ></span>
                     </div>
@@ -195,7 +197,7 @@
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm text-gray-900 dark:text-white capitalize">{{ resource.type }}</div>
+                  <div class="text-sm text-gray-900 dark:text-white capitalize">{{ resource.type || 'other' }}</div>
                 </td>
                 <td class="px-6 py-4">
                   <div class="text-sm text-gray-900 dark:text-white line-clamp-2">{{ resource.description || "No description" }}</div>
@@ -216,21 +218,25 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div class="flex justify-end space-x-2">
-                    <button 
+                    <button
                       @click="downloadResource(resource)"
-                      class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
+                      :disabled="downloadingId === resource.id"
+                      class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 disabled:opacity-50"
                       title="Download"
                     >
-                      <span class="i-carbon-download"></span>
+                      <span v-if="downloadingId === resource.id" class="i-carbon-circle-dash animate-spin"></span>
+                      <span v-else class="i-carbon-download"></span>
                     </button>
-                    <button 
+                    <button
                       @click="copyResourceLink(resource)"
-                      class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
+                      :disabled="copyingId === resource.id"
+                      class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 disabled:opacity-50"
                       title="Copy link"
                     >
-                      <span class="i-carbon-link"></span>
+                      <span v-if="copyingId === resource.id" class="i-carbon-circle-dash animate-spin"></span>
+                      <span v-else class="i-carbon-link"></span>
                     </button>
-                    <button 
+                    <button
                       @click="confirmDeleteResource(resource)"
                       class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                       title="Delete"
@@ -243,20 +249,16 @@
             </tbody>
           </table>
         </div>
-        
-        <!-- Pagination -->
+
+        <!-- Pagination (Placeholder - Add if needed) -->
+        <!--
         <div class="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
-          <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p class="text-sm text-gray-700 dark:text-gray-300">
-                Showing <span class="font-medium">{{ filteredResources.length }}</span> resources
-              </p>
-            </div>
-          </div>
+          ... Pagination controls ...
         </div>
+        -->
       </div>
     </div>
-    
+
     <!-- Delete confirmation modal -->
     <Teleport to="body">
       <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
@@ -279,33 +281,39 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts"> // Added lang="ts"
 import { ref, computed, onMounted, watch } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { useUserStore } from '~/stores/user';
+import { useResourcesStore, type Resource } from '~/stores/resources'; // Import store and type
+import { useToastStore } from '~/stores/toast'; // Import toast store
 
 // Props
-const props = defineProps({
-  appId: {
-    type: String,
-    required: true
-  }
-});
+const props = defineProps<{
+  appId: string;
+}>();
 
 // State
 const userStore = useUserStore();
-const resources = ref([]);
-const loading = ref(true);
-const error = ref(null);
+const resourcesStore = useResourcesStore(); // Use the dedicated store
+const toastStore = useToastStore(); // Use toast store
+
+// Use computed properties to get state from the store
+const resources = computed(() => resourcesStore.resources);
+const loading = computed(() => resourcesStore.loading);
+const error = computed(() => resourcesStore.error);
+
 const showPublicOnly = ref(false);
-const selectedFile = ref(null);
-const fileInput = ref(null);
+const selectedFile = ref<File | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null); // Ref for file input element
 const isUploading = ref(false);
 const showDeleteModal = ref(false);
-const resourceToDelete = ref(null);
+const resourceToDelete = ref<Resource | null>(null); // Add type annotation
 const isDeleting = ref(false);
+const downloadingId = ref<string | null>(null); // Track which resource is downloading
+const copyingId = ref<string | null>(null); // Track which resource link is being copied
 
-// New resource form
+// New resource form state
 const newResource = ref({
   name: '',
   description: '',
@@ -314,9 +322,11 @@ const newResource = ref({
 });
 
 // Computed
-const filteredResources = computed(() => {
+const filteredResources = computed<Resource[]>(() => { // Add explicit return type
   if (showPublicOnly.value) {
-    return resources.value.filter(resource => resource.isPublic);
+    // Ensure resource.isPublic exists before filtering
+    // Assuming Resource type includes isPublic: boolean | undefined
+    return resources.value.filter(resource => resource.isPublic === true);
   }
   return resources.value;
 });
@@ -326,198 +336,155 @@ const selectedFileName = computed(() => {
 });
 
 // Methods
-const fetchResources = async () => {
-  loading.value = true;
-  error.value = null;
-  
-  try {
-    const auth = getAuth();
-    const token = await auth.currentUser?.getIdToken();
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-    
-    const response = await fetch(`/api/resources/list?appId=${props.appId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    resources.value = data.resources;
-    
-    // Sort by date (newest first)
-    resources.value.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
-  } catch (err) {
-    console.error('Error fetching resources:', err);
-    error.value = err instanceof Error ? err.message : 'Failed to load resources';
-    userStore.showToast(error.value, 'error');
-  } finally {
-    loading.value = false;
-  }
+const fetchResources = (appId: string) => {
+  resourcesStore.fetchResources(appId); // Call store action
 };
 
-const handleFileSelect = (event) => {
-  selectedFile.value = event.target.files[0] || null;
+const handleFileSelect = (event: Event) => { // Add type annotation
+  const target = event.target as HTMLInputElement;
+  selectedFile.value = target.files?.[0] || null;
 };
+
+// Define the structure for metadata expected by the store action
+interface ResourceMetadata {
+    name: string;
+    description: string;
+    type: string;
+    isPublic: boolean;
+}
 
 const uploadResource = async () => {
   if (!selectedFile.value || !newResource.value.name || isUploading.value) return;
-  
+
   isUploading.value = true;
-  
+
   try {
-    const auth = getAuth();
-    const token = await auth.currentUser?.getIdToken();
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-    
-    // Create form data
-    const formData = new FormData();
-    formData.append('file', selectedFile.value);
-    formData.append('name', newResource.value.name);
-    formData.append('description', newResource.value.description || '');
-    formData.append('type', newResource.value.type);
-    formData.append('isPublic', newResource.value.isPublic.toString());
-    formData.append('appId', props.appId);
-    
-    const response = await fetch('/api/resources/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
-    }
-    
-    userStore.showToast('Resource uploaded successfully', 'success');
-    
-    // Reset form
-    newResource.value = {
-      name: '',
-      description: '',
-      type: 'document',
-      isPublic: true
+    // Prepare metadata object
+    const metadata: ResourceMetadata = {
+        name: newResource.value.name,
+        description: newResource.value.description,
+        type: newResource.value.type,
+        isPublic: newResource.value.isPublic,
     };
+    // Call store action with file and metadata
+    await resourcesStore.uploadResource(props.appId, selectedFile.value, metadata);
+
+    // Reset form
+    newResource.value = { name: '', description: '', type: 'document', isPublic: true };
     selectedFile.value = null;
-    
-    if (fileInput.value) {
-      fileInput.value.value = '';
+    if (fileInputRef.value) { // Use correct ref name
+      fileInputRef.value.value = ''; // Reset file input visually
     }
-    
-    // Refresh resources
-    fetchResources();
-    
+    // Toast is handled by the store action now
+
   } catch (err) {
-    console.error('Error uploading resource:', err);
-    userStore.showToast(err instanceof Error ? err.message : 'Failed to upload resource', 'error');
+    // Error handling might be redundant if store action handles toasts
+    console.error('Upload failed in component:', err);
   } finally {
     isUploading.value = false;
   }
 };
 
-const downloadResource = (resource) => {
-  // In a real implementation, this would initiate a download
-  // For this demo, we'll just show a success toast
-  userStore.showToast(`Downloading "${resource.name}"...`, 'info');
-  
-  // This would normally redirect to a download URL
-  window.open(resource.url, '_blank');
+const downloadResource = async (resource: Resource) => { // Add type
+  if (!resource.path || downloadingId.value === resource.id) return; // Check path exists
+
+  downloadingId.value = resource.id;
+  try {
+    // Use the store action to get the URL
+    const url = await resourcesStore.getDownloadUrl(resource.path);
+    if (url) {
+      window.open(url, '_blank'); // Open the signed URL
+      // toastStore.success(`Download started for ${resource.name}`); // Optional: confirmation toast
+    } else {
+      // Error toast is shown by the store action if getDownloadUrl fails
+    }
+  } catch (err) {
+      // Error handled by store action
+      console.error("Component level download error:", err);
+  } finally {
+      downloadingId.value = null;
+  }
 };
 
-const copyResourceLink = (resource) => {
-  // In a real implementation, this would copy the resource URL to clipboard
-  navigator.clipboard.writeText(resource.url)
-    .then(() => {
-      userStore.showToast('Resource link copied to clipboard', 'success');
-    })
-    .catch(err => {
-      console.error('Failed to copy:', err);
-      userStore.showToast('Failed to copy link', 'error');
-    });
+const copyResourceLink = async (resource: Resource) => { // Add type and async
+  if (!resource.path || copyingId.value === resource.id) return; // Check path exists
+
+  copyingId.value = resource.id;
+  try {
+      // Use the store action to get a fresh URL
+      const url = await resourcesStore.getDownloadUrl(resource.path);
+      if (url) {
+          await navigator.clipboard.writeText(url);
+          toastStore.success('Resource link copied to clipboard');
+      } else {
+          // Error toast shown by store if URL generation fails
+      }
+  } catch (err) {
+      console.error('Failed to copy link:', err);
+      toastStore.error('Failed to copy link'); // Fallback error toast
+  } finally {
+      copyingId.value = null;
+  }
 };
 
-const confirmDeleteResource = (resource) => {
+
+const confirmDeleteResource = (resource: Resource) => { // Add type
   resourceToDelete.value = resource;
   showDeleteModal.value = true;
 };
 
 const deleteResource = async () => {
   if (!resourceToDelete.value || isDeleting.value) return;
-  
+
   isDeleting.value = true;
-  
+
   try {
-    const auth = getAuth();
-    const token = await auth.currentUser?.getIdToken();
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-    
-    const response = await fetch('/api/resources/delete', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        resourceId: resourceToDelete.value.id,
-        appId: props.appId
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
-    }
-    
-    userStore.showToast('Resource deleted successfully', 'success');
-    showDeleteModal.value = false;
-    
-    // Remove from local resources array
-    resources.value = resources.value.filter(r => r.id !== resourceToDelete.value.id);
-    
+    // Pass the Firestore document ID (resource.id) to the store action
+    await resourcesStore.deleteResource(resourceToDelete.value.id);
+    // Toast and list refresh are handled by the store action
+    showDeleteModal.value = false; // Close modal on success
+
   } catch (err) {
-    console.error('Error deleting resource:', err);
-    userStore.showToast(err instanceof Error ? err.message : 'Failed to delete resource', 'error');
+    // Error handled by store action
+    console.error('Component level delete error:', err);
   } finally {
     isDeleting.value = false;
-    resourceToDelete.value = null;
+    resourceToDelete.value = null; // Clear selection regardless of outcome
   }
 };
 
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  
+const formatFileSize = (bytes: number | undefined | null): string => { // Add type annotation
+  if (bytes === undefined || bytes === null || bytes === 0) return '0 Bytes';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
   return `${Number.parseFloat((bytes / (k ** i)).toFixed(2))} ${sizes[i]}`;
 };
 
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString(undefined, { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric'
-  });
+const formatDate = (dateString: string | undefined | null): string => { // Add type annotation
+  if (!dateString) return 'Unknown';
+  try {
+      const date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) return 'Invalid Date'; // Use Number.isNaN
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+  } catch {
+      return 'Invalid Date';
+  }
 };
 
 // Initialize
 onMounted(() => {
-  fetchResources();
+  fetchResources(props.appId); // Pass appId on initial fetch
+});
+
+// Watch for appId changes if the component might be reused without unmounting
+watch(() => props.appId, (newAppId) => {
+    if (newAppId) {
+        fetchResources(newAppId);
+    }
 });
 </script>

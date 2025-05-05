@@ -111,11 +111,11 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useUserStore } from '~/stores/user';
-import { useAppsStore } from '~/stores/apps';
+import { useAppsStore, type Application } from '~/stores/apps'; // Import Application type
 
 // Define page meta
 definePageMeta({
@@ -129,9 +129,9 @@ const userStore = useUserStore();
 const appsStore = useAppsStore();
 
 // Local state
-const app = ref(null);
+const app = ref<Application | null>(null); // Correct type for app
 const loading = ref(true);
-const error = ref(null);
+const error = ref<string | null>(null); // Correct type for error message
 const activeTab = ref('details');
 
 // Available tabs
@@ -143,31 +143,41 @@ const tabs = [
   { id: 'media', name: 'Social Media', icon: 'i-carbon-share-knowledge' }
 ];
 
-// Fetch the app data
+// Fetch the app data using the dedicated store action
 const fetchApp = async () => {
   loading.value = true;
   error.value = null;
-  
-  try {
-    // Check if we already have the app data
-    if (appsStore.apps.length === 0) {
-      await appsStore.fetchApps();
-    }
-    
-    // Find the app by ID
-    const appId = route.params.id;
-    const foundApp = appsStore.apps.find(a => a.id === appId);
-    
-    if (!foundApp) {
-      error.value = 'Application not found';
+  const appId = route.params.id as string; // Get appId from route
+
+  if (!appId) {
+      const msg = 'Application ID is missing from the route.';
+      error.value = msg;
+      loading.value = false;
+      userStore.showToast(msg, 'error'); // Pass the string directly
       return;
+  }
+
+  try {
+    // Call the new store action to fetch the specific app by ID
+    const fetchedApp = await appsStore.fetchAppById(appId);
+
+    if (!fetchedApp) {
+      // The action itself should throw an error if not found, but double-check
+      const msg = `Application with ID ${appId} not found.`;
+      error.value = msg;
+      userStore.showToast(msg, 'error'); // Pass the string directly
+    } else {
+      app.value = fetchedApp; // Assign the fetched app data to the local ref
     }
-    
-    app.value = foundApp;
-  } catch (err) {
+
+  } catch (err: unknown) { // Catch unknown type
     console.error('Error fetching app:', err);
-    error.value = err instanceof Error ? err.message : 'An error occurred while loading the application';
-    userStore.showToast(error.value, 'error');
+    // Error message is likely already set by the store action's error handling
+    // If not, or for extra safety:
+    const message = err instanceof Error ? err.message : 'An error occurred while loading the application';
+    error.value = message;
+    // Toast might be redundant if store action already shows it
+    // userStore.showToast(message, 'error');
   } finally {
     loading.value = false;
   }

@@ -232,15 +232,17 @@
         <div class="flex-1 flex justify-between sm:hidden">
           <button
             @click="previousPage"
-            :disabled="!pagination || pagination.currentPage <= 1"
+            :disabled="isFirstPage"
             class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            ><!-- Disable based on if it's the first fetch -->
           >
-            Previous
+            Previous (First Page)
           </button>
           <button
             @click="nextPage"
-            :disabled="!hasNextPage"
+            :disabled="!pagination.nextPageCursor"
             class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            ><!-- Disable based on cursor -->
           >
             Next
           </button>
@@ -249,33 +251,27 @@
         <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
           <div>
             <p v-if="pagination" class="text-sm text-gray-700 dark:text-gray-300">
-              Showing
-              <span class="font-medium">{{ apps.length > 0 ? (pagination.currentPage - 1) * pagination.pageSize + 1 : 0 }}</span>
-              to
-              <span class="font-medium">{{ Math.min(pagination.currentPage * pagination.pageSize, pagination.totalApps || 0) }}</span>
-              of
-              <span class="font-medium">{{ pagination.totalApps ?? 'many' }}</span>
-              results
+              Showing <span class="font-medium">{{ apps.length }}</span> applications
+              <span v-if="pagination.totalApps !== null"> of ~<span class="font-medium">{{ pagination.totalApps }}</span> total</span>
             </p>
           </div>
           <div>
-            <nav v-if="pagination && pagination.totalApps && pagination.totalApps > pagination.pageSize" class="relative z-0 inline-flex rounded-lg shadow-sm -space-x-px" aria-label="Pagination">
+            <nav v-if="pagination" class="relative z-0 inline-flex rounded-lg shadow-sm -space-x-px" aria-label="Pagination">
               <button
                 @click="previousPage"
-                :disabled="pagination.currentPage <= 1"
+                :disabled="isFirstPage"
                 class="relative inline-flex items-center px-2 py-2 rounded-l-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                ><!-- Disable based on if it's the first fetch -->
               >
-                <span class="sr-only">Previous</span>
+                <span class="sr-only">Previous (First Page)</span>
                 <span class="i-carbon-chevron-left"></span>
               </button>
-              <!-- Page number display (can be enhanced later) -->
-              <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
-                {{ pagination.currentPage }}
-              </span>
+              <!-- Page number display removed as it's not accurate with cursors -->
               <button
                 @click="nextPage"
-                :disabled="!hasNextPage"
+                :disabled="!pagination.nextPageCursor"
                 class="relative inline-flex items-center px-2 py-2 rounded-r-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                ><!-- Disable based on cursor -->
               >
                 <span class="sr-only">Next</span>
                 <span class="i-carbon-chevron-right"></span>
@@ -306,43 +302,31 @@ const toastStore = useToastStore();
 
 // --- Local State ---
 const searchQuery = ref<string>('');
-const platformFilter = ref<string>(''); 
-const statusFilter = ref<string>(''); 
-// const showDeleteModal = ref<boolean>(false); // For custom modal later
-// const appToDelete = ref<App | null>(null); // For custom modal later
+const platformFilter = ref<string>('');
+const statusFilter = ref<string>('');
+// Keep track if the current view is the result of the initial fetch or filter change (i.e., page 1 / no cursor used)
+const isFirstPage = ref(true);
 
 // --- Store State Refs ---
-const loading = computed<boolean>(() => appsStore.loading); 
-const apps = computed<App[]>(() => appsStore.apps); 
-const pagination = computed(() => appsStore.pagination); 
+const loading = computed<boolean>(() => appsStore.loading);
+const apps = computed<App[]>(() => appsStore.apps);
+const pagination = computed(() => appsStore.pagination);
 
 // --- Computed Properties ---
-// Determine if there's a next page
-const hasNextPage = computed(() => {
-    // Check if pagination object and totalApps exist
-    if (!pagination.value || pagination.value.totalApps === null) {
-        // If total is unknown, assume next page exists if a full page was returned
-        // Ensure pageSize is valid before comparison
-        return pagination.value.pageSize > 0 && apps.value.length === pagination.value.pageSize;
-    }
-    // If total is known, check if current items reach or exceed total
-    return pagination.value.currentPage * pagination.value.pageSize < pagination.value.totalApps;
-});
-
+// Removed hasNextPage - use pagination.nextPageCursor directly
 
 // --- Helper Functions ---
-const formatDate = (timestamp: string | undefined | null): string => { 
+const formatDate = (timestamp: string | undefined | null): string => {
   if (!timestamp) return 'Unknown';
   try {
     const date = new Date(timestamp);
-    // Check if date is valid after parsing
     if (Number.isNaN(date.getTime())) {
         return 'Invalid Date';
     }
-    return new Intl.DateTimeFormat('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     }).format(date);
   } catch (e) {
     console.error("Error formatting date:", e);
@@ -350,9 +334,9 @@ const formatDate = (timestamp: string | undefined | null): string => {
   }
 };
 
-const platformBadgeClass = (platform: string): string => { 
-  const platformMap: Record<string, string> = { 
-    'ios': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300', 
+const platformBadgeClass = (platform: string): string => {
+  const platformMap: Record<string, string> = {
+    'ios': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
     'android': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
     'web': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
     'windows': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
@@ -360,19 +344,16 @@ const platformBadgeClass = (platform: string): string => {
     'linux': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
     'github': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
     'npm': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-    // Add others as needed
   };
-  
-  return platformMap[platform.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'; 
+  return platformMap[platform.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
 };
 
-const statusBadgeClass = (status: string): string => { 
-  const statusMap: Record<string, string> = { 
+const statusBadgeClass = (status: string): string => {
+  const statusMap: Record<string, string> = {
     'active': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
     'draft': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
     'archived': 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
   };
-  
   return statusMap[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
 };
 
@@ -381,11 +362,11 @@ const clearFilters = () => {
   searchQuery.value = '';
   platformFilter.value = '';
   statusFilter.value = '';
-  fetchAppsWithFilters(1); // Fetch page 1 with cleared filters
+  // fetchAppsWithFilters will be called by the watcher, fetching the first page
 };
 
 const editApp = (app: App) => {
-  navigateTo(`/admin/apps/${app.id}`); 
+  navigateTo(`/admin/apps/${app.id}`);
 };
 
 const viewStats = (app: App) => {
@@ -393,7 +374,7 @@ const viewStats = (app: App) => {
 };
 
 const showDeleteConfirm = (app: App) => {
-  // TODO: Replace confirm with a UI component
+  // TODO: Replace confirm with a Nuxt UI modal component (UModal)
   if (confirm(`Are you sure you want to delete "${app.name}"? This action cannot be undone.`)) {
     deleteApp(app);
   }
@@ -403,9 +384,8 @@ const deleteApp = async (app: App) => {
   if (!app) return;
   try {
     toastStore.info(`Deleting ${app.name}...`);
-    await appsStore.deleteApp(app.id); // Store action handles API call and refresh
+    await appsStore.deleteApp(app.id); // Store action handles refresh
     toastStore.success(`"${app.name}" has been deleted.`);
-    // The store's deleteApp should refresh the current page view
   } catch (error: unknown) {
     console.error('Error deleting app:', error);
     const message = error instanceof Error ? error.message : 'Failed to delete app.';
@@ -414,33 +394,29 @@ const deleteApp = async (app: App) => {
 };
 
 const openImportModal = () => {
-  // TODO: Implement import modal
+  // TODO: Implement import modal using UModal
   toastStore.info('Import functionality coming soon');
 };
 
 // --- Pagination Actions ---
 const nextPage = () => {
-    // Ensure pagination is loaded before trying to access currentPage
-    if (hasNextPage.value && pagination.value) { 
-        fetchAppsWithFilters(pagination.value.currentPage + 1);
+    if (pagination.value?.nextPageCursor) {
+        fetchAppsWithFilters(pagination.value.nextPageCursor); // Pass the cursor
     }
 };
 
 const previousPage = () => {
-    // Ensure pagination is loaded
-    if (pagination.value && pagination.value.currentPage > 1) { 
-         fetchAppsWithFilters(pagination.value.currentPage - 1);
-    }
+    // Go back to the first page (simplification for cursor pagination)
+    fetchAppsWithFilters(); // Fetch without cursor
 };
 
 // --- Data Fetching ---
-const fetchAppsWithFilters = async (page = 1) => {
-    // Loading state is handled by the store now
-    // Ensure pagination is available before accessing pageSize
-    const pageSize = pagination.value?.pageSize || 10; // Default to 10 if pagination not ready
+const fetchAppsWithFilters = async (cursor?: string | null) => {
+    // Update isFirstPage based on whether a cursor is provided
+    isFirstPage.value = !cursor;
     await appsStore.fetchApps({
-        page: page,
-        pageSize: pageSize, 
+        cursor: cursor, // Pass cursor to store action
+        pageSize: pagination.value?.pageSize || 10,
         search: searchQuery.value,
         platform: platformFilter.value,
         status: statusFilter.value,
@@ -448,14 +424,14 @@ const fetchAppsWithFilters = async (page = 1) => {
 };
 
 // --- Watchers ---
-// Watch filters and trigger refetch (resetting to page 1)
+// Watch filters and trigger refetch (fetching the first page, no cursor)
 watch([searchQuery, platformFilter, statusFilter], () => {
-    fetchAppsWithFilters(1); 
+    fetchAppsWithFilters(); // Fetch first page when filters change
 });
 
 // --- Lifecycle Hooks ---
-// Initial fetch on component mount
+// Initial fetch on component mount (first page, no cursor)
 onMounted(() => {
-  fetchAppsWithFilters(1);
+  fetchAppsWithFilters(); // Fetch first page
 });
 </script>

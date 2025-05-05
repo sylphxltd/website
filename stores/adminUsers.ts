@@ -12,7 +12,7 @@ export interface ApiUser {
   disabled: boolean;
   emailVerified: boolean;
   customClaims?: { [key: string]: unknown };
-  tenantId?: string; // Add tenantId
+  tenantId?: string | null; // Allow null for tenantId
   metadata: {
     creationTime?: string
     lastSignInTime?: string
@@ -179,24 +179,54 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
         'success'
       )
       
-      // Refresh the CURRENT page after role change
-      await fetchUsers({
-          // Use current pagination state, but reset pageToken to fetch the current view again
-          pageSize: pagination.value.pageSize,
-          // We need a way to get the token for the *current* page, not just next.
-          // Simplification: Refetch page 1 for now, or implement more complex page token storage.
-          // Let's refetch the current view based on filters/search without page token for simplicity now.
-           search: /* Need current search query */ '',
-           role: /* Need current role filter */ '',
-           status: /* Need current status filter */ '',
-           // pageToken: pagination.value.currentPageToken // Need to store current page token
-      });
+      // Refresh the user list (refetch page 1 with current filters via watcher)
+      // We trigger this by calling fetchUsers without arguments, which defaults to page 1.
+      // The watcher in the component will pick up the current filter values.
+      await fetchUsers();
     } catch (err: unknown) {
       console.error("Error setting user role:", err)
       userStore.showToast(getErrorMessage(err), 'error')
     } finally {
       settingRoleUid.value = null
     }
+  }
+
+  // Fetch a single user by ID
+  const fetchUserById = async (userId: string): Promise<ApiUser | null> => {
+      if (!userId || !userStore.isAdmin) return null;
+
+      loading.value = true; // Use general loading state
+      error.value = null;
+
+      try {
+          const auth = getAuth(); // Get auth instance
+          const token = await auth.currentUser?.getIdToken(); // Use auth instance
+          if (!token) {
+              throw new Error("Could not retrieve user token");
+          }
+          const userData = await $fetch<ApiUser>(`/api/users/${userId}`, {
+              method: 'GET',
+              headers: { 'Authorization': `Bearer ${token}` },
+          });
+
+          // Optional: Update user in the local list if present?
+          const index = users.value.findIndex(u => u.uid === userId);
+          if (index !== -1) {
+              users.value[index] = userData;
+          }
+
+          return userData; // Return fetched user data
+
+      } catch (err: unknown) {
+          console.error(`Error fetching user ${userId}:`, err);
+          error.value = getErrorMessage(err);
+          // Get toast store instance directly in catch block if scope issue persists
+          const toast = useToastStore();
+          toast.error(error.value || 'Failed to fetch user data.'); // Use the instance
+          return null; // Return null on error
+      } finally {
+          loading.value = false;
+      }
   }
 
   // Return state and methods
@@ -208,6 +238,6 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
     pagination, // Expose pagination state
     fetchUsers,
     toggleAdminRole,
-    // Consider adding actions for changing page size, going to next/prev page
+    fetchUserById, // Expose the new action
   }
 })

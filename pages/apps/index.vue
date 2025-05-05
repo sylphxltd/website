@@ -28,29 +28,8 @@
             </div>
           </div>
           
-          <div class="flex flex-wrap justify-center gap-2">
-            <button 
-              v-for="category in categories" 
-              :key="category.id"
-              @click="toggleCategory(category.id)"
-              :class="[
-                'px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap',
-                selectedCategories.includes(category.id) 
-                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-              ]"
-            >
-              {{ category.name }}
-            </button>
-            
-            <button 
-              v-if="selectedCategories.length > 0"
-              @click="clearFilters"
-              class="px-3 py-2 rounded-md text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors whitespace-nowrap"
-            >
-              Clear Filters
-            </button>
-          </div>
+          <!-- Category filter buttons removed for now, pending backend support -->
+          <!-- <div class="flex flex-wrap justify-center gap-2"> ... </div> -->
         </div>
       </div>
       
@@ -286,30 +265,15 @@ definePageMeta({
   layout: 'default'
 });
 
-// Category filters
-const categories = [
-  { id: 'mobile', name: 'Mobile Apps' },
-  { id: 'vr', name: 'VR Experiences' },
-  { id: 'ar', name: 'AR Applications' },
-  { id: 'games', name: 'Games' },
-  { id: 'productivity', name: 'Productivity' },
-  { id: 'creative', name: 'Creative Tools' }
-];
-
-const selectedCategories = ref<string[]>([]); // Typed array
 const search = ref<string>('');
 
-// Toggle category selection
-const toggleCategory = (categoryId: string) => { // Added type
-  if (selectedCategories.value.includes(categoryId)) {
-    selectedCategories.value = selectedCategories.value.filter(id => id !== categoryId);
-  } else {
-    selectedCategories.value.push(categoryId);
-  }
-};
+// Category filter state and logic removed for now
+// const categories = [ ... ];
+// const selectedCategories = ref<string[]>([]);
+// const toggleCategory = (categoryId: string) => { ... };
 
 const clearFilters = () => {
-  selectedCategories.value = [];
+  // Only clear search for now
   search.value = '';
 };
 
@@ -336,12 +300,7 @@ const filteredApps = computed(() => {
     );
   }
 
-  // Apply category filters (requires 'categories' field in App data)
-  // if (selectedCategories.value.length > 0) {
-  //   result = result.filter(app =>
-  //     selectedCategories.value.some(category => app.categories?.includes(category))
-  //   );
-  // }
+  // Category filtering logic removed
 
   return result;
 });
@@ -364,7 +323,7 @@ const platformBadgeClass = (platform: string): string => {
 // --- Fetch initial data ---
 onMounted(() => {
   // Fetch all apps (or implement public-specific fetching if needed)
-  // Assuming fetchApps without args gets all relevant public apps
-  appsStore.fetchApps();
+  // Fetch public apps using the dedicated action
+  appsStore.fetchPublicApps();
 });
 </script>

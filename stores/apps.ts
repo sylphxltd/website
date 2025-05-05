@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
-import { getAuth } from 'firebase/auth' // Import getAuth
-import { useFirestore } from 'vuefire'
+// Removed client SDK imports for CUD: collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp
+// Removed useFirestore import as it's no longer needed for CUD
+import { getAuth } from 'firebase/auth'
 import { useUserStore } from '~/stores/user'
-import { createError } from '#imports'
+import { createError } from '#imports' // Keep for potential client-side errors if needed
 
 // Define the interface for an Application, including fields used in the UI
 export interface Application {
@@ -17,13 +17,11 @@ export interface Application {
   platforms?: string[];
   status?: 'active' | 'draft' | 'archived' | string;
   appId?: string;
-  // gradientClass?: string; // Removed - UI concern, not core data
   downloads?: number; // Placeholder
   rating?: number; // Placeholder
-  // New fields for richer data
-  tags?: string[]; // e.g., ['Productivity', 'AI', 'Cross-Platform']
-  features?: { title: string; description: string }[]; // List of key features
-  screenshotUrls?: string[]; // URLs for app screenshots
+  tags?: string[];
+  features?: { title: string; description: string }[];
+  screenshotUrls?: string[];
 }
 
 // Define the structure for form data (without ID)
@@ -35,47 +33,58 @@ export interface AppFormData {
   platforms?: string[];
   status?: 'active' | 'draft' | 'archived' | string;
   appId?: string;
-  // New fields
   tags?: string[];
   features?: { title: string; description: string }[];
   screenshotUrls?: string[];
 }
 
-// Define structure for pagination state (can be shared or redefined)
+// Define structure for pagination state using cursor
 interface AppPaginationState {
-  currentPage: number;
   pageSize: number;
-  // Firestore uses DocumentSnapshot for cursors, harder to manage client-side directly.
-  // We might rely on page number or offset, or handle cursors if API returns them.
-  // Let's use page number for simplicity for now, assuming API supports it.
-  totalApps: number | null;
+  nextPageCursor: string | null; // Store the cursor for the next page
+  totalApps: number | null; // Total count remains useful
 }
 
 export const useAppsStore = defineStore('apps', () => {
   // State
-  const apps = ref<Application[]>([]) // Holds apps for the CURRENT page
+  const apps = ref<Application[]>([]) // Holds apps for the CURRENT page/batch
   const loading = ref(false)
   const error = ref<Error | { message: string } | null>(null)
-  const pagination = ref<AppPaginationState>({ // Add pagination state
-      currentPage: 1,
+  const pagination = ref<AppPaginationState>({ // Updated pagination state
       pageSize: 10, // Default page size
+      nextPageCursor: null, // Initialize cursor as null
       totalApps: null,
   })
 
   // Get dependencies
-  const db = useFirestore() // Firestore instance
+  // const db = useFirestore() // Removed - CUD operations moved to API
   const userStore = useUserStore()
 
-  // Fetch apps from the API endpoint with pagination and filtering
+  // Helper to extract error messages from various error types (including $fetch errors)
+  const getErrorMessage = (err: unknown): string => {
+    if (typeof err === 'object' && err !== null) {
+      // Check for Nuxt $fetch error structure
+      if ('data' in err && typeof err.data === 'object' && err.data !== null && 'statusMessage' in err.data && typeof err.data.statusMessage === 'string') {
+        return err.data.statusMessage; // Use statusMessage from $fetch error
+      }
+      // Check for standard Error object
+      if ('message' in err && typeof err.message === 'string') {
+        return (err as { message: string }).message;
+      }
+    }
+    return 'An unexpected error occurred';
+  }
+
+
+  // Fetch apps from the API endpoint with cursor pagination and filtering
   const fetchApps = async (options: {
-      page?: number;
+      cursor?: string | null;
       pageSize?: number;
       search?: string;
       platform?: string;
       status?: string;
     } = {}) => {
 
-    // Skip if not authenticated (API endpoint will also check admin status)
     if (!userStore.isAuthenticated) {
       console.warn("AppsStore: User not authenticated")
       return
@@ -83,22 +92,21 @@ export const useAppsStore = defineStore('apps', () => {
 
     loading.value = true
     error.value = null
-
-    const requestedPage = options.page ?? 1;
+    const isFreshFetch = !options.cursor;
     const requestedPageSize = options.pageSize ?? pagination.value.pageSize;
 
     try {
-      // Get ID token for authorization
       const auth = getAuth();
       const idToken = await auth.currentUser?.getIdToken();
       if (!idToken) {
         throw new Error("Could not retrieve user token");
       }
 
-      // Construct query parameters for the API call
       const queryParams = new URLSearchParams();
-      queryParams.append('page', requestedPage.toString());
       queryParams.append('limit', requestedPageSize.toString());
+      if (options.cursor) {
+          queryParams.append('cursor', options.cursor);
+      }
       if (options.search) {
           queryParams.append('search', options.search);
       }
@@ -109,9 +117,7 @@ export const useAppsStore = defineStore('apps', () => {
           queryParams.append('status', options.status);
       }
 
-      // Make the API call to a new/updated endpoint
-      // Assuming API returns { apps: Application[], total: number }
-      const response = await $fetch<{ apps: Application[]; total: number }>('/api/apps/list', { // Updated API path
+      const response = await $fetch<{ apps: Application[]; total: number; nextPageCursor: string | null }>('/api/apps/list', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${idToken}`
@@ -119,14 +125,15 @@ export const useAppsStore = defineStore('apps', () => {
         query: queryParams
       });
 
-      // Update state
+      // Always replace data for now, simplifies pagination logic
       apps.value = response.apps;
       pagination.value.totalApps = response.total;
-      pagination.value.currentPage = requestedPage;
+      pagination.value.nextPageCursor = response.nextPageCursor;
       pagination.value.pageSize = requestedPageSize;
-    } catch (err) {
+
+    } catch (err: unknown) { // Use unknown type
       console.error("Error fetching apps:", err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load applications'
+      const errorMessage = getErrorMessage(err); // Use helper
       error.value = { message: errorMessage }
       userStore.showToast(errorMessage, 'error')
     } finally {
@@ -134,130 +141,214 @@ export const useAppsStore = defineStore('apps', () => {
     }
   }
 
-  // Create a new application
-  const createApp = async (formData: AppFormData) => {
-    if (!db || !userStore.isAdmin) {
-      throw new Error('Unauthorized or DB not available')
+  // Fetch a single application by ID
+  const fetchAppById = async (appId: string): Promise<Application | null> => {
+    // No need to check admin here, API endpoint handles authorization
+    if (!userStore.isAuthenticated) {
+      console.warn("AppsStore: User not authenticated for fetchAppById");
+      throw new Error("User not authenticated");
     }
+
+    loading.value = true; // Use the general loading state for simplicity
+    error.value = null;
 
     try {
-      const appsCollection = collection(db, "apps")
-      const appData = {
-        name: formData.name,
-        description: formData.description || '',
-        links: formData.links || {},
-        logoUrl: formData.logoUrl || '',
-        platforms: formData.platforms || [],
-        status: formData.status || 'draft',
-        appId: formData.appId || '',
-        tags: formData.tags || [], // Save tags
-        features: formData.features || [], // Save features
-        screenshotUrls: formData.screenshotUrls || [], // Save screenshots
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      const docRef = await addDoc(appsCollection, appData)
-      userStore.showToast('Application created successfully!', 'success')
-
-      // Refresh the list (go back to page 1)
-      await fetchApps({ page: 1, pageSize: pagination.value.pageSize })
-      return docRef.id
-    } catch (err) {
-      console.error("Error creating app:", err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create application'
-      userStore.showToast(errorMessage, 'error')
-      throw err
-    }
-  }
-
-  // Update an existing application
-  const updateApp = async (appId: string, formData: AppFormData) => {
-    if (!db || !userStore.isAdmin) {
-      throw new Error('Unauthorized or DB not available')
-    }
-
-    try {
-      const appRef = doc(db, "apps", appId)
-      // Construct the update payload, including new fields
-      const updateData = {
-        name: formData.name,
-        description: formData.description || '',
-        links: formData.links || {},
-        logoUrl: formData.logoUrl || '',
-        platforms: formData.platforms || [],
-        status: formData.status || 'draft',
-        appId: formData.appId || '',
-        tags: formData.tags || [], // Update tags
-        features: formData.features || [], // Update features
-        screenshotUrls: formData.screenshotUrls || [], // Update screenshots
-        updatedAt: serverTimestamp()
-      };
-
-      // Pass the object to updateDoc
-      await updateDoc(appRef, updateData)
-      userStore.showToast('Application updated successfully!', 'success')
-
-      // Refresh the current page view
-      await fetchApps({
-          page: pagination.value.currentPage,
-          pageSize: pagination.value.pageSize,
-          // Include current filters if needed for consistency
-      });
-    } catch (err) {
-      console.error("Error updating app:", err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update application'
-      userStore.showToast(errorMessage, 'error')
-      throw err
-    }
-  }
-
-  // Delete an application
-  const deleteApp = async (appId: string) => {
-    if (!db || !userStore.isAdmin) {
-      throw new Error('Unauthorized or DB not available')
-    }
-
-    try {
-      const appRef = doc(db, "apps", appId)
-      await deleteDoc(appRef)
-      userStore.showToast('Application deleted successfully!', 'success')
-
-      // Refresh the current page view
-      // Consider edge case: if deleting last item on a page > 1, should go to previous page
-      const currentPage = pagination.value.currentPage;
-      const pageSize = pagination.value.pageSize;
-      const totalApps = pagination.value.totalApps;
-      let pageToFetch = currentPage;
-
-      if (totalApps !== null && apps.value.length === 1 && currentPage > 1) {
-         // If it was the last item on a page > 1, fetch the previous page
-         pageToFetch = currentPage - 1;
+      const auth = getAuth();
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("Could not retrieve user token");
       }
 
-      await fetchApps({
-          page: pageToFetch,
-          pageSize: pageSize,
-          // Include current filters if needed for consistency
+      // Call the backend API to get a single app
+      const response = await $fetch<Application>(`/api/apps/${appId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
       });
-    } catch (err) {
-      console.error("Error deleting app:", err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete application'
+
+      // Optional: Update the app in the local list if it exists?
+      // Or just return the fetched app data for the component to use.
+      // Let's just return it for now.
+      return response;
+
+    } catch (err: unknown) {
+      console.error(`Error fetching app with ID ${appId}:`, err);
+      const errorMessage = getErrorMessage(err);
+      error.value = { message: errorMessage };
+      userStore.showToast(errorMessage, 'error');
+      throw new Error(errorMessage); // Re-throw error
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Define options type for public fetching, even if empty for now
+  interface FetchPublicAppsOptions {
+      // Add public filters like category later if needed
+      // category?: string;
+      // cursor?: string | null; // Add pagination later if needed
+      // pageSize?: number;
+  }
+
+  // Fetch public (active) apps - No auth needed for API call
+  const fetchPublicApps = async (options: FetchPublicAppsOptions = {}) => {
+
+    loading.value = true;
+    error.value = null;
+    // const requestedPageSize = options.pageSize ?? 20; // Example public page size
+
+    try {
+      const queryParams = new URLSearchParams();
+      // queryParams.append('limit', requestedPageSize.toString());
+      // if (options.cursor) queryParams.append('cursor', options.cursor);
+      // if (options.category) queryParams.append('category', options.category);
+
+      // Call the public API endpoint
+      const response = await $fetch<{ apps: Partial<Application>[] /*, nextPageCursor: string | null */ }>('/api/apps/public', {
+        method: 'GET',
+        query: queryParams // Pass constructed query params
+      });
+
+      // Replace the apps state with public apps
+      // Consider using a separate state property like `publicApps` if admin apps are also needed simultaneously
+      apps.value = response.apps as Application[]; // Cast to Application[] for now
+      pagination.value.nextPageCursor = null; // Reset cursor as public API doesn't support it yet
+      pagination.value.totalApps = response.apps.length; // Total is just the fetched count for now
+
+    } catch (err: unknown) {
+      console.error("Error fetching public apps:", err);
+      const errorMessage = getErrorMessage(err);
+      error.value = { message: errorMessage };
+      // Avoid showing toast for public errors unless critical?
+      // userStore.showToast(errorMessage, 'error');
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Create a new application by calling the backend API
+  const createApp = async (formData: AppFormData): Promise<string> => {
+    if (!userStore.isAdmin) { // Check admin status from user store
+      throw new Error('Unauthorized: Only admins can create applications.')
+    }
+
+    try {
+      const auth = getAuth();
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("Could not retrieve user token");
+      }
+
+      // Call the backend API
+      const response = await $fetch<{ success: boolean, id: string }>('/api/apps/create', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: formData // Send the form data directly
+      });
+
+      if (!response.success || !response.id) {
+          throw new Error("API did not return a success status or new ID.");
+      }
+
+      userStore.showToast('Application created successfully!', 'success')
+
+      // Refresh the list (fetch first page)
+      await fetchApps({ pageSize: pagination.value.pageSize })
+      return response.id // Return the new ID from the API response
+
+    } catch (err: unknown) { // Use unknown type
+      console.error("Error creating app via API:", err)
+      const errorMessage = getErrorMessage(err); // Use helper
       userStore.showToast(errorMessage, 'error')
-      throw err
+      throw new Error(errorMessage); // Re-throw error with message
+    }
+  }
+
+  // Update an existing application by calling the backend API
+  const updateApp = async (appId: string, formData: AppFormData): Promise<void> => {
+    if (!userStore.isAdmin) {
+      throw new Error('Unauthorized: Only admins can update applications.')
+    }
+
+    try {
+      const auth = getAuth();
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("Could not retrieve user token");
+      }
+
+      // Call the backend API
+      await $fetch<{ success: boolean, id: string }>(`/api/apps/${appId}`, { // Use template literal for URL
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: formData
+      });
+
+      userStore.showToast('Application updated successfully!', 'success')
+
+      // Refresh the list (fetch first page)
+      await fetchApps({ pageSize: pagination.value.pageSize });
+
+    } catch (err: unknown) { // Use unknown type
+      console.error("Error updating app via API:", err)
+      const errorMessage = getErrorMessage(err); // Use helper
+      userStore.showToast(errorMessage, 'error')
+      throw new Error(errorMessage); // Re-throw error with message
+    }
+  }
+
+  // Delete an application by calling the backend API
+  const deleteApp = async (appId: string): Promise<void> => {
+    if (!userStore.isAdmin) {
+      throw new Error('Unauthorized: Only admins can delete applications.')
+    }
+
+    try {
+      const auth = getAuth();
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("Could not retrieve user token");
+      }
+
+      // Call the backend API
+      await $fetch<{ success: boolean, id: string }>(`/api/apps/${appId}`, { // Use template literal for URL
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+
+      userStore.showToast('Application deleted successfully!', 'success')
+
+      // Refresh the list (fetch first page)
+      await fetchApps({ pageSize: pagination.value.pageSize });
+
+    } catch (err: unknown) { // Use unknown type
+      console.error("Error deleting app via API:", err)
+      const errorMessage = getErrorMessage(err); // Use helper
+      userStore.showToast(errorMessage, 'error')
+      throw new Error(errorMessage); // Re-throw error with message
     }
   }
 
   // Return state and methods
   return {
-    apps, // Current page of apps
+    apps,
     loading,
     error,
-    pagination, // Expose pagination state
+    pagination,
     fetchApps,
-    createApp,
-    updateApp,
-    deleteApp,
-    // Consider adding actions for changing page, page size etc.
+    createApp, // Now calls API
+    updateApp, // Now calls API
+    deleteApp, // Now calls API
+    fetchAppById,
+    fetchPublicApps, // Add the new public fetch action
   }
 })

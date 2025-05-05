@@ -3,16 +3,21 @@ import { getAuth } from 'firebase/auth';
 import { useUserStore } from '~/stores/user';
 import { useToastStore } from '~/stores/toast';
 
-// Interface for Resource Metadata (adjust based on API response)
+// Interface for Resource Metadata (matching API response)
 export interface Resource {
-  id: string; // Firestore document ID or unique identifier
-  name: string; // File name
-  path: string; // Full path in Firebase Storage (e.g., apps/appId/resources/fileName.pdf)
-  url?: string; // Optional: Download URL (e.g., signed URL)
+  id: string; // Firestore document ID
+  name: string; // User-defined name (or original filename)
+  path: string; // Full path in Firebase Storage
+  url?: string; // Optional: Download URL (signed URL)
   size: number; // File size in bytes
   contentType: string; // MIME type
   createdAt: string; // ISO timestamp string
   appId: string; // Associated application ID
+  description?: string; // Description from Firestore
+  type?: string; // Type from Firestore (e.g., 'document', 'image')
+  isPublic?: boolean; // Visibility from Firestore
+  filename?: string; // Original filename from Firestore
+  uploaderUid?: string; // Uploader's UID from Firestore
 }
 
 // Interface for pagination state (if needed)
@@ -118,9 +123,17 @@ export const useResourcesStore = defineStore('resources', () => {
     }
   };
 
+  // Define interface for metadata passed from component
+  interface ResourceMetadata {
+      name: string;
+      description: string;
+      type: string;
+      isPublic: boolean;
+  }
+
   // Upload a resource
-  const uploadResource = async (appId: string, file: File) => {
-    if (!appId || !file || !userStore.isAdmin) return;
+  const uploadResource = async (appId: string, file: File, metadata: ResourceMetadata) => { // Add metadata parameter
+    if (!appId || !file || !metadata || !userStore.isAdmin) return;
 
     loading.value = true; // Consider a separate loading state for upload
     error.value = null;
@@ -129,7 +142,12 @@ export const useResourcesStore = defineStore('resources', () => {
       const token = await getIdToken();
       const formData = new FormData();
       formData.append('file', file);
-      // Pass appId in query params for the API endpoint
+      // Append metadata to FormData
+      formData.append('name', metadata.name);
+      formData.append('description', metadata.description || '');
+      formData.append('type', metadata.type);
+      formData.append('isPublic', metadata.isPublic.toString());
+      // Keep appId in query params as API expects it there
       const queryParams = new URLSearchParams({ appId });
 
       await $fetch(`/api/resources/upload?${queryParams.toString()}`, {
@@ -153,8 +171,11 @@ export const useResourcesStore = defineStore('resources', () => {
   };
 
   // Delete a resource
-  const deleteResource = async (resource: Resource) => {
-    if (!resource || !userStore.isAdmin) return;
+  const deleteResource = async (resourceId: string) => { // Change parameter to resourceId
+    if (!resourceId || !userStore.isAdmin) return;
+
+    // Find the resource locally first to get the name for the toast message (optional)
+    const resourceName = resources.value.find(r => r.id === resourceId)?.name || resourceId;
 
     loading.value = true; // Consider separate loading state
     error.value = null;
@@ -167,13 +188,13 @@ export const useResourcesStore = defineStore('resources', () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
          },
-        body: { path: resource.path } // Send the full storage path for deletion
+        body: { resourceId: resourceId } // Send the Firestore document ID
       });
 
-      toastStore.success(`Successfully deleted ${resource.name}`);
-      // Refresh list for the currently selected app
+      toastStore.success(`Successfully deleted ${resourceName}`); // Use resourceName
+      // Refresh list for the currently selected app by fetching page 1
       if (selectedAppId.value) {
-        await fetchResources(selectedAppId.value);
+        await fetchResources(selectedAppId.value); // Re-fetch the list
       }
 
     } catch (err: unknown) { // Use unknown

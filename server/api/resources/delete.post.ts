@@ -1,10 +1,12 @@
 import type { H3Event } from 'h3';
 import { readBody } from 'h3';
 import { getStorage } from 'firebase-admin/storage';
-import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+import { getAdminAuth, getAdminDb } from '~/server/utils/firebaseAdmin'; // Import getAdminDb
 
 interface DeleteRequestBody {
-  path: string; // Expecting the full path to the file in storage
+  resourceId: string; // Expecting the Firestore document ID
+  // Optional: Keep appId if needed for verification, but resourceId should be enough
+  // appId: string;
 }
 
 export default defineEventHandler(async (event: H3Event) => {
@@ -28,41 +30,65 @@ export default defineEventHandler(async (event: H3Event) => {
 
   // 2. Read Request Body
   const body = await readBody<DeleteRequestBody>(event);
-  if (!body || typeof body.path !== 'string' || !body.path.trim()) {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing or invalid file path in request body' });
+  if (!body || typeof body.resourceId !== 'string' || !body.resourceId.trim()) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing or invalid resourceId in request body' });
   }
 
-  const filePath = body.path.trim();
+  const resourceId = body.resourceId.trim();
+  const db = getAdminDb();
+  const resourceRef = db.collection("app_resources").doc(resourceId);
+  let storagePath: string | null = null;
 
-  // Basic validation: Ensure path looks somewhat valid (e.g., starts with 'apps/')
-  if (!filePath.startsWith('apps/')) {
-      throw createError({ statusCode: 400, statusMessage: 'Bad Request: Invalid file path format' });
+  // 3. Get Metadata (including storagePath) from Firestore first
+  try {
+      const docSnap = await resourceRef.get();
+      if (!docSnap.exists) {
+          console.warn(`Resource metadata with ID ${resourceId} not found in Firestore.`);
+          // Consider if this should be an error or success (idempotency)
+          return { success: true, message: `Resource metadata ${resourceId} not found.` };
+      }
+      storagePath = docSnap.data()?.storagePath;
+      if (!storagePath || typeof storagePath !== 'string') {
+          console.error(`Missing or invalid storagePath for resource ${resourceId}. Cannot delete storage file.`);
+          // Decide how to handle: delete only Firestore doc or throw error?
+          // Let's delete Firestore doc and return success with warning for now.
+          await resourceRef.delete();
+          return { success: true, message: `Resource metadata ${resourceId} deleted, but storage file path was missing or invalid.` };
+      }
+  } catch (error) {
+      console.error(`Error fetching resource metadata ${resourceId}:`, error);
+      throw createError({ statusCode: 500, statusMessage: 'Internal Server Error fetching resource metadata' });
   }
 
-  // 3. Delete File from Firebase Storage
+
+  // 4. Delete File from Firebase Storage
   try {
     const bucket = getStorage().bucket();
-    const file = bucket.file(filePath);
+    const file = bucket.file(storagePath); // Use path from Firestore
 
-    // Check if file exists before attempting delete
     const [exists] = await file.exists();
-    if (!exists) {
-        console.warn(`Attempted to delete non-existent file: ${filePath}`);
-        // Decide whether to return success or error if file doesn't exist
-        // Returning success might be better UX if the goal is just to ensure it's gone
-        return { success: true, message: `File ${filePath} does not exist or already deleted.` };
-        // throw createError({ statusCode: 404, statusMessage: 'Not Found: File does not exist' });
+    if (exists) {
+        await file.delete();
+        console.log(`Successfully deleted storage file: ${storagePath}`);
+    } else {
+        console.warn(`Storage file not found, but proceeding: ${storagePath}`);
     }
 
-    await file.delete();
-    console.log(`Successfully deleted ${filePath}`);
-
-    // Optionally: Delete corresponding Firestore metadata document here if needed
-
-    return { success: true, message: `File ${filePath} deleted successfully.` };
-
   } catch (error) {
-    console.error(`Error deleting file ${filePath}:`, error);
-    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error during file deletion' });
+    console.error(`Error deleting storage file ${storagePath}:`, error);
+    // Log the error but proceed to delete Firestore record anyway? Or throw?
+    // Let's throw for now to indicate a potential inconsistency.
+    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error during file deletion from storage' });
   }
+
+  // 5. Delete Firestore Document (after attempting storage deletion)
+   try {
+       await resourceRef.delete();
+       console.log(`Successfully deleted Firestore document: ${resourceId}`);
+       return { success: true, message: `Resource ${resourceId} deleted successfully.` };
+   } catch (error) {
+       console.error(`Error deleting Firestore document ${resourceId}:`, error);
+       // Storage file might have been deleted, but Firestore failed. Log this inconsistency.
+       throw createError({ statusCode: 500, statusMessage: 'Internal Server Error deleting resource metadata' });
+   }
 });
