@@ -1,22 +1,35 @@
-import { useUserStore } from '~/stores/user';
+// File: middleware/admin-only.ts - Reverted to client-side focus
+import { defineNuxtRouteMiddleware, navigateTo } from '#app'
+import { useUserStore } from '~/stores/user'
 
 export default defineNuxtRouteMiddleware((to, from) => {
-  // Skip this middleware during SSR
-  if (process.server) return;
-  
+  // This middleware primarily handles client-side redirection after hydration,
+  // relying on the store state which includes SSR-initialized data.
+  // It also acts as a final check if SSR somehow failed.
+
+  // Skip server-side execution for this version
+  if (process.server) {
+    console.log('[Admin Only Middleware - Server] Skipping server-side execution.');
+    return;
+  }
+
+  console.log('[Admin Only Middleware - Client] Checking access...');
   const userStore = useUserStore();
-  
-  // Check if user is authenticated
+
+  // Wait for auth to be ready client-side (optional, depends on store setup)
+  // await userStore.waitForAuthInit(); // Assuming such a method exists or is added
+
+  // Check authentication first
   if (!userStore.isAuthenticated) {
-    // Redirect to login with the redirect parameter in the URL
-    return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`);
+    console.log('[Admin Only Middleware - Client] Not authenticated. Redirecting.');
+    return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`, { replace: true });
   }
-  
-  // Check if user is admin
+
+  // Check admin status using the store's computed property (which reads useState)
   if (!userStore.isAdmin) {
-    console.warn('Admin access required but user is not an admin');
-    return navigateTo('/');
+    console.warn(`[Admin Only Middleware - Client] Admin access required but userStore.isAdmin is false. Redirecting from ${to.path}.`);
+    return navigateTo('/', { replace: true }); // Redirect non-admins home
   }
-  
-  console.log('Admin access granted.');
-});
+
+  console.log('[Admin Only Middleware - Client] Admin access granted.');
+})

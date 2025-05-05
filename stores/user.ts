@@ -11,11 +11,13 @@ import {
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
-  onIdTokenChanged // Import onIdTokenChanged
+  onIdTokenChanged, // Import onIdTokenChanged
+  getIdTokenResult
 } from 'firebase/auth'
-import type { User, IdTokenResult } from 'firebase/auth' // Import IdTokenResult
-import { useCurrentUser } from 'vuefire'
+import type { ParsedToken, User } from 'firebase/auth'
+import { useCurrentUser } from 'vuefire' // Remove useUserClaims import
 import { useRouter } from 'vue-router'
+// Removed useState import
 import { useToastStore } from '~/stores/toast'
 import type { ToastType } from '~/components/Toast.vue'
 
@@ -42,9 +44,7 @@ export const useUserStore = defineStore('user', () => {
   // Restore top-level useCurrentUser() call
   const currentUser = useCurrentUser()
   const router = useRouter()
-  // Remove idTokenResult state
-  // const idTokenResult = ref<IdTokenResult | null>(null)
-  const isAdminState = ref(false) // Add simple boolean state for admin status
+  // REMOVED isAdminState ref - will derive from currentUser.customClaims
 
   // Get toast store for notifications
   const toastStore = useToastStore()
@@ -52,7 +52,7 @@ export const useUserStore = defineStore('user', () => {
   // Flag to prevent multiple listener initializations
   let authListenerInitialized = false;
 
-  // Action to initialize the auth state change listener
+  // Action to initialize the auth state change listener (CLIENT-SIDE ONLY)
   const initAuthListener = () => {
     // Ensure listener is initialized only once and on the client side
     if (authListenerInitialized || typeof window === 'undefined') {
@@ -62,26 +62,30 @@ export const useUserStore = defineStore('user', () => {
     console.log("Initializing Firebase Auth listener...");
 
     const auth = getAuth(); // Get auth instance here
+    // Use local isAdminState ref
+
     onIdTokenChanged(auth, async (user) => {
       if (user) {
         try {
           // Force refresh true to get latest claims
           const tokenResult = await user.getIdTokenResult(true);
-          // Update the simple boolean state based on claims
-          isAdminState.value = tokenResult.claims.admin === true;
-          console.log(`Admin status updated: ${isAdminState.value}`);
+          // Update the shared state based on claims
+          const hasAdminClaim = tokenResult.claims.admin === true;
+          // No need to update useState anymore
+          console.log(`Client listener confirmed admin claim: ${hasAdminClaim}`);
         } catch (err) {
           console.error("Error getting ID token result:", err);
-          isAdminState.value = false; // Reset on error
+          // No useState to reset
           error.value = formatErrorMessage(err);
           showToast(error.value, 'error');
         }
       } else {
-        isAdminState.value = false; // Clear on sign out
+        // No user, computed property will handle this via currentUser.value being null
+        console.log("Client listener: No user found.");
       }
     }, (err) => { // Add error handler for onIdTokenChanged
         console.error("Error in onIdTokenChanged listener:", err);
-        isAdminState.value = false;
+        // No useState to reset
         error.value = formatErrorMessage(err);
         showToast(error.value, 'error');
     });
@@ -94,8 +98,23 @@ export const useUserStore = defineStore('user', () => {
   const isAuthenticated = computed(() => {
       return !!currentUser.value;
   })
-  // isAdmin computed now directly returns the state
-  const isAdmin = computed(() => isAdminState.value)
+
+  // 使用 useAsyncData 替代 computedAsync
+  const { data: claims } = useAsyncData<ParsedToken>(
+    'user-claims',
+    async () => {
+      console.log("Current user:", currentUser.value); // Debug log
+      if (!currentUser.value) return {}; // No user, not admin
+      const idTokenResult = await getIdTokenResult(currentUser.value);
+      console.log("ID Token Result:", idTokenResult); // Debug log
+      return idTokenResult.claims; // Return claims or empty object
+    }, {
+      default: () => ({}), // Default value for claims
+      watch: [currentUser], // Re-run when currentUser changes
+    }
+  )
+  
+  const isAdmin = computed(() => claims.value.admin === true)
 
   const userDisplayName = computed(() => {
     // Use the top-level currentUser
@@ -142,7 +161,7 @@ export const useUserStore = defineStore('user', () => {
     } catch (err: unknown) {
       error.value = formatErrorMessage(err);
       showToast(error.value, 'error');
-      isAdminState.value = false; // Clear admin status on auth error
+      // isAdminState.value = false; // REMOVED - No need to clear local state
     } finally {
       loading.value = false;
       activeProvider.value = null;
@@ -261,7 +280,7 @@ export const useUserStore = defineStore('user', () => {
     await _performAuthAction('signout', async () => {
       const auth = getAuth(); // Call getAuth() inside the action
       await signOut(auth);
-      isAdminState.value = false; // Explicitly clear admin status on sign out
+      // isAdminState.value = false; // REMOVED - currentUser will become null, computed will be false
     }, '/login'); // Redirect to login on success
   }
 
