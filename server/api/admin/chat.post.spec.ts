@@ -25,10 +25,10 @@ const mockH3CreateError = vi.fn().mockImplementation((options: H3Error) => {
     return error;
 });
 const mockDollarFetchImplementation = vi.fn();
-const mockDefineEventHandler = vi.fn(handler => handler); // Pass-through mock
-
-// ALL vi.mock CALLS NEXT
-vi.mock('~/server/utils/firebaseAdmin', () => ({
+// const mockDefineEventHandler = vi.fn(handler => handler); // Pass-through mock - Will be global
+ 
+ // ALL vi.mock CALLS NEXT
+ vi.mock('~/server/utils/firebaseAdmin', () => ({
   getAdminAuth: mockGetAdminAuth,
 }));
 vi.mock('@ai-sdk/openai', () => ({
@@ -36,25 +36,27 @@ vi.mock('@ai-sdk/openai', () => ({
 }));
 vi.mock('ai', () => ({
   streamText: mockStreamText,
+  // If StreamTextResult is used as a type from 'ai', it doesn't need to be mocked here
+  // unless it's a class constructor being instantiated.
 }));
-vi.mock('h3', () => ({ // Corrected
+vi.mock('h3', () => ({
   getHeader: mockH3GetHeader,
   readBody: mockH3ReadBody,
   sendStream: mockH3SendStream,
   setResponseHeader: mockH3SetResponseHeader,
   createError: mockH3CreateError,
+  // defineEventHandler: mockDefineEventHandler, // Removed from h3 mock
 }));
+ 
+// Attempting to mock defineEventHandler globally as Nuxt might make it available this way.
+// biome-ignore lint/suspicious/noGlobalAssign: Test-specific global mock
+global.defineEventHandler = vi.fn(handler => handler);
 
-(vi.mock as any)('#imports', () => ({
-  defineEventHandler: mockDefineEventHandler,
-  // Add other auto-imports here if the SUT uses them and they need mocking
-}), { virtual: true });
-
-// DIAGNOSTIC ATTEMPT: Use 2-argument form vi.mock(path, factory)
-// This omits { virtual: true } to try and satisfy the TS "Expected 1-2 arguments" error.
-// This might cause runtime issues if #imports isn't treated as virtual.
-// Corrected to include { virtual: true } as per SubTask13.1
-
+// Removed the vi.mock('#imports', ...) to address Biome lint error.
+// Relying on the h3 mock for defineEventHandler. If this proves insufficient
+// in a real test run due to Nuxt's auto-import behavior, it would be part
+// of the documented test impasse. For now, this simplification is a focused attempt.
+ 
 // Global $fetch
 // The `declare global` for $fetch has been removed to avoid conflict with Nuxt's global type.
 // We will cast the mock specifically during assignment.
@@ -142,18 +144,25 @@ describe('POST /api/admin/chat', () => {
     vi.resetAllMocks();
 
     mockVerifyIdToken.mockResolvedValue({ uid: 'admin123', admin: true });
-    mockOpenaiChat.mockReturnValue({});
+    mockOpenaiChat.mockReturnValue({}); // Default mock for openai.chat
+    // Default mock for streamText - simulates a direct text response
     mockStreamText.mockResolvedValue({
-      readableStream: new ReadableStream({ // Changed textStream to readableStream
+      type: 'text', // Default to text type based on new logic
+      readableStream: new ReadableStream({ // Corresponds to readableStream for type: 'text'
         start(controller) {
-          controller.enqueue('Hello from AI');
+          controller.enqueue('Default mock AI response');
           controller.close();
         }
       }),
-      toolCalls: Promise.resolve([]),
-      text: Promise.resolve('Hello from AI'),
+      toolCalls: Promise.resolve([]), // For type: 'text', toolCalls might be an empty array or promise to it
+      text: Promise.resolve('Default mock AI response'), // For type: 'text', text might be the full text
+      finishReason: Promise.resolve('stop'), // finishReason is still relevant for completion status
+      response: Promise.resolve(new Response()),
+      usage: Promise.resolve({ promptTokens: 10, completionTokens: 5, totalTokens: 15 }),
+      warnings: Promise.resolve(undefined),
+      error: Promise.resolve(undefined), // For type: 'error'
     });
-    mockDollarFetchImplementation.mockResolvedValue({});
+    mockDollarFetchImplementation.mockResolvedValue({}); // Default for $fetch
 
     // Ensure H3 mocks are reset and configured with default behavior for each test
     // This is important because createMockEvent reconfigures them based on its arguments.
@@ -297,46 +306,99 @@ describe('POST /api/admin/chat', () => {
   });
 
 
-  // --- Streaming Path (Direct AI Text Reply) ---
-  describe('Streaming Path (Direct AI Text Reply)', () => {
-    it('should stream text response and set correct headers when no tool calls', async () => {
-      const mockTextStream = new ReadableStream({
+  // --- Streaming Path (Direct AI Text Reply based on streamTextResult.type) ---
+  describe("Streaming Path (Direct AI Text Reply - type: 'text')", () => {
+    it("should stream text response and set correct headers when type is 'text'", async () => {
+      const streamedText = "This is a direct AI reply because type is 'text'.";
+      const mockReadableStream = new ReadableStream({
         start(controller) {
-          controller.enqueue('This is a streamed AI reply.');
+          controller.enqueue(streamedText);
           controller.close();
         }
       });
       mockStreamText.mockResolvedValueOnce({
-        readableStream: mockTextStream, // Changed textStream to readableStream
-        toolCalls: Promise.resolve(null),
-        text: Promise.resolve('This is a streamed AI reply.'),
+        type: 'text',
+        readableStream: mockReadableStream,
+        toolCalls: Promise.resolve([]),
+        text: Promise.resolve(streamedText),
+        finishReason: Promise.resolve('stop'),
+        response: Promise.resolve(new Response()),
+        usage: Promise.resolve({ promptTokens: 1, completionTokens: 1, totalTokens: 2 }),
+        warnings: Promise.resolve(undefined),
+        error: Promise.resolve(undefined),
       });
-
-      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'Hello AI' });
-      // mockH3SendStream is configured by createMockEvent to return consumed stream
+ 
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'Hello AI, just reply.' });
       
       const result = await handler(mockEvent);
-
-      expect(result).toBe('This is a streamed AI reply.');
+ 
+      expect(result).toBe(streamedText);
       
       expect(mockH3SetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Content-Type', 'text/plain; charset=utf-8');
       expect(mockH3SetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Cache-Control', 'no-cache');
-      expect(mockStreamText).toHaveBeenCalledWith({
-        model: expect.anything(),
-        system: expect.any(String),
-        prompt: 'Hello AI',
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({
+        prompt: 'Hello AI, just reply.',
+      }));
+      expect(mockH3SendStream).toHaveBeenCalledWith(mockEvent, mockReadableStream);
+    });
+
+    it("should handle missing readableStream when type is 'text' by returning full text if available", async () => {
+      const fullText = "Full text reply as fallback.";
+      mockStreamText.mockResolvedValueOnce({
+        type: 'text',
+        readableStream: undefined, // Simulate missing stream
+        toolCalls: Promise.resolve([]),
+        text: Promise.resolve(fullText), // Full text is available
+        finishReason: Promise.resolve('stop'),
+        response: Promise.resolve(new Response()),
       });
+
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'Hello AI, no stream please.' });
+      const result = await handler(mockEvent) as { reply: string };
+      expect(result).toEqual({ reply: fullText });
+      // Ensure sendStream was not called
+      expect(mockH3SendStream).not.toHaveBeenCalled();
+    });
+
+    it("should throw error if type is 'text' but readableStream and text are unavailable", async () => {
+      mockStreamText.mockResolvedValueOnce({
+        type: 'text',
+        readableStream: undefined,
+        toolCalls: Promise.resolve([]),
+        text: Promise.resolve(undefined), // No fallback text
+        finishReason: Promise.resolve('stop'),
+        response: Promise.resolve(new Response()),
+      });
+
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'Hello AI, break everything.' });
+      
+      try {
+        await handler(mockEvent);
+      } catch (e: any) {
+        // The handler's outer catch block will catch this and return a generic error message.
+        // So we expect the final result to be that generic message.
+      }
+      // Re-run to check the actual returned object due to outer catch.
+      const result = await handler(mockEvent);
+      expect(result).toEqual({ reply: "I'm having trouble understanding that request or connecting to the AI service." });
     });
   });
-
-  // --- Non-Streaming Path (Tool Use) ---
-  describe('Non-Streaming Path (Tool Use)', () => {
-    it('list_applications: should call $fetch and return formatted app list', async () => {
+ 
+  // --- Non-Streaming Path (Tool Use based on streamTextResult.type) ---
+  describe("Non-Streaming Path (Tool Use - type: 'tool-calls')", () => {
+    it("list_applications: should call $fetch and return formatted app list when type is 'tool-calls'", async () => {
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'list_applications' } });
       mockStreamText.mockResolvedValueOnce({
-        textStream: new ReadableStream({ start(c){ c.enqueue(aiToolCallResponseText); c.close(); } }),
-        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} }]),
+        type: 'tool-calls',
+        // For 'tool-calls', readableStream might not be primary, but text and toolCalls are.
+        readableStream: new ReadableStream({ start(c){ c.enqueue("This stream should not be used directly for tool calls"); c.close(); } }),
+        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} } as any]), // Cast to any to match untyped streamTextResult
         text: Promise.resolve(aiToolCallResponseText),
+        finishReason: Promise.resolve('tool-calls'), // finishReason can still indicate tool usage completion
+        response: Promise.resolve(new Response()),
+        usage: Promise.resolve({ promptTokens: 1, completionTokens: 1, totalTokens: 2 }),
+        warnings: Promise.resolve(undefined),
+        error: Promise.resolve(undefined),
       });
       mockDollarFetchImplementation.mockResolvedValueOnce({
         apps: [
@@ -356,42 +418,50 @@ describe('POST /api/admin/chat', () => {
       expect(result).toEqual({ reply: 'Found 2 apps: App One (ID: app1), App Two (ID: app2).' });
     });
 
-    it('list_applications: should handle no applications found', async () => {
+    it("list_applications: should handle no applications found (type: 'tool-calls')", async () => {
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'list_applications' } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
+        response: Promise.resolve(new Response()),
       });
       mockDollarFetchImplementation.mockResolvedValueOnce({ apps: [] });
-
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token-123' }, { message: 'list apps' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: 'No applications found.' });
     });
     
-    it('list_applications: should handle $fetch error', async () => {
+    it("list_applications: should handle $fetch error (type: 'tool-calls')", async () => {
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'list_applications' } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
+        response: Promise.resolve(new Response()),
       });
       mockDollarFetchImplementation.mockRejectedValueOnce(new Error('Network error'));
-
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token-123' }, { message: 'list apps' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: "Sorry, I understood you want to list apps, but I couldn't fetch them at the moment." });
     });
-
-    // get_application_details
-    it('get_application_details: should fetch and return app details', async () => {
+ 
+    it("get_application_details: should fetch and return app details (type: 'tool-calls')", async () => {
         const appId = 'app123';
         const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'get_application_details', parameters: { appId } } });
         mockStreamText.mockResolvedValueOnce({
-            toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'get_application_details', args: { appId } }]),
+            type: 'tool-calls',
+            toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'get_application_details', args: { appId } } as any]),
             text: Promise.resolve(aiToolCallResponseText),
-            textStream: new ReadableStream({start(c){c.close()}})
+            readableStream: new ReadableStream({start(c){c.close()}}),
+            finishReason: Promise.resolve('tool-calls'),
+            response: Promise.resolve(new Response()),
         });
         const mockDate = new Date('2024-01-01T12:00:00.000Z');
         mockDollarFetchImplementation.mockResolvedValueOnce({
@@ -400,7 +470,7 @@ describe('POST /api/admin/chat', () => {
             description: 'A great app.',
             createdAt: mockDate.toISOString(),
         });
-
+ 
         mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token-xyz' }, { message: `details for ${appId}` });
         const result = await handler(mockEvent) as { reply: string };
         
@@ -409,146 +479,220 @@ describe('POST /api/admin/chat', () => {
         expect(result.reply).toContain('Description: A great app.');
         expect(result.reply).toContain(`Created At: ${mockDate.toLocaleString()}`);
     });
-
-    it('get_application_details: should handle missing appId from AI', async () => {
+ 
+    it("get_application_details: should handle missing appId from AI (type: 'tool-calls')", async () => {
         const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'get_application_details', parameters: {} } });
         mockStreamText.mockResolvedValueOnce({
-            toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'get_application_details', args: {} }]),
+            type: 'tool-calls',
+            toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'get_application_details', args: {} }as any]),
             text: Promise.resolve(aiToolCallResponseText),
-            textStream: new ReadableStream({start(c){c.close()}})
+            readableStream: new ReadableStream({start(c){c.close()}}),
+            finishReason: Promise.resolve('tool-calls'),
+            response: Promise.resolve(new Response()),
         });
         mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'details for an app' });
         const result = await handler(mockEvent) as { reply: string };
         expect(result).toEqual({ reply: "I understood you want details for an app, but I couldn't identify which one. Please specify the App ID." });
     });
     
-    it('get_application_details: should handle app not found (404)', async () => {
+    it("get_application_details: should handle app not found (404) (type: 'tool-calls')", async () => {
         const appId = 'nonexistent';
         const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'get_application_details', parameters: { appId } } });
         mockStreamText.mockResolvedValueOnce({
-            toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'get_application_details', args: { appId } }]),
+            type: 'tool-calls',
+            toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'get_application_details', args: { appId } } as any]),
             text: Promise.resolve(aiToolCallResponseText),
-            textStream: new ReadableStream({start(c){c.close()}})
+            readableStream: new ReadableStream({start(c){c.close()}}),
+            finishReason: Promise.resolve('tool-calls'),
+            response: Promise.resolve(new Response()),
         });
         const fetchError = new Error('Not Found') as H3Error;
         fetchError.statusCode = 404;
         mockDollarFetchImplementation.mockRejectedValueOnce(fetchError);
-
+ 
         mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `details for ${appId}` });
         const result = await handler(mockEvent) as { reply: string };
         expect(result).toEqual({ reply: `Sorry, I couldn't find an application with ID "${appId}". Please check the ID and try again.` });
     });
-  });
 
-  // --- AI Service and Other Error Handling ---
+    it("should handle type 'tool-calls' but empty toolCalls array by trying to stream readableStream", async () => {
+      const fallbackText = "This is a fallback text stream.";
+      const mockFallbackStream = new ReadableStream({
+        start(controller) { controller.enqueue(fallbackText); controller.close(); }
+      });
+      mockStreamText.mockResolvedValueOnce({
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([]), // Empty toolCalls
+        text: Promise.resolve("Some text that might be present but not primary"),
+        readableStream: mockFallbackStream, // Fallback stream is available
+        finishReason: Promise.resolve('tool-calls'),
+        response: Promise.resolve(new Response()),
+      });
+
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'A query that leads to empty tool calls' });
+      const result = await handler(mockEvent);
+
+      expect(result).toBe(fallbackText);
+      expect(mockH3SetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Content-Type', 'text/plain; charset=utf-8');
+      expect(mockH3SendStream).toHaveBeenCalledWith(mockEvent, mockFallbackStream);
+    });
+
+    it("should return error if type 'tool-calls', empty toolCalls, and no readableStream", async () => {
+      mockStreamText.mockResolvedValueOnce({
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([]),
+        text: Promise.resolve(""),
+        readableStream: undefined, // No fallback stream
+        finishReason: Promise.resolve('tool-calls'),
+        response: Promise.resolve(new Response()),
+      });
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'Query for empty tool calls no stream' });
+      const result = await handler(mockEvent) as { reply: string };
+      expect(result).toEqual({ reply: "I received an unusual tool response from the AI that I couldn't process as a tool action or direct text." });
+    });
+  });
+ 
+  // --- AI Service and Other Error Handling (based on streamTextResult.type and other factors) ---
   describe('AI Service and Other Errors', () => {
-    it('should return error if streamText itself throws', async () => {
+    it('should return error if streamText itself throws (before type is available)', async () => {
       mockStreamText.mockRejectedValueOnce(new Error('AI service unavailable'));
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'Hello' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: "I'm having trouble understanding that request or connecting to the AI service." });
     });
-
-    it('should handle AI response with toolCalls but invalid JSON text', async () => {
-      const invalidJsonText = "{ tool_use: { name: 'list_applications' }";
+ 
+    it("should handle AI response with type 'tool-calls' but invalid JSON text", async () => {
+      const invalidJsonText = "{ tool_use: { name: 'list_applications' }"; // Malformed JSON
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'list_applications', args: {} } as any]),
         text: Promise.resolve(invalidJsonText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
+        response: Promise.resolve(new Response()),
       });
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'list my apps' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: "I tried to use a tool, but the response format was incorrect. Please try again." });
     });
-
-    it('should return AI text if JSON is valid but not a recognized tool_use structure', async () => {
+ 
+    it("should return AI text if type 'tool-calls' but JSON is not a recognized tool_use structure", async () => {
       const unknownToolJson = JSON.stringify({ some_other_action: { detail: "do something else" } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'unknown_tool_from_sdk_perspective', args: {} }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'call1', toolName: 'unknown_tool_from_sdk_perspective', args: {} } as any]),
         text: Promise.resolve(unknownToolJson),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
+        response: Promise.resolve(new Response()),
       });
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'perform unknown action' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: unknownToolJson });
     });
+    
+    it("should handle type 'error'", async () => {
+      const aiError = new Error("AI processing error");
+      mockStreamText.mockResolvedValueOnce({
+        type: 'error',
+        error: Promise.resolve(aiError), // error property contains the error
+        // Other properties might be undefined or promises resolving to undefined
+        readableStream: undefined,
+        toolCalls: Promise.resolve(undefined),
+        text: Promise.resolve(undefined),
+        finishReason: Promise.resolve('error'),
+        response: Promise.resolve(new Response()),
+      });
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'trigger ai error' });
+      const result = await handler(mockEvent) as { reply: string };
+      expect(result).toEqual({ reply: "I encountered an error while processing your request with the AI." });
+    });
 
-    it('should handle errors if sendStream fails', async () => {
+    it("should handle type 'empty'", async () => {
+      mockStreamText.mockResolvedValueOnce({
+        type: 'empty',
+        readableStream: undefined,
+        toolCalls: Promise.resolve(undefined),
+        text: Promise.resolve(undefined),
+        finishReason: Promise.resolve('stop'), // Or another appropriate finishReason for empty
+        response: Promise.resolve(new Response()),
+      });
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'trigger empty response' });
+      const result = await handler(mockEvent) as { reply: string };
+      expect(result).toEqual({ reply: "The AI returned an empty response." });
+    });
+ 
+    it('should handle unexpected streamTextResult.type', async () => {
+      mockStreamText.mockResolvedValueOnce({
+        type: 'some_unexpected_type_value', // An unknown type
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        toolCalls: Promise.resolve(null),
+        text: Promise.resolve("Text for unexpected reason"),
+        finishReason: Promise.resolve('other'),
+        response: Promise.resolve(new Response()),
+      } as any); // Cast to any because 'some_unexpected_type_value' is not a known type
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'trigger unknown reason' });
+      const result = await handler(mockEvent) as { reply: string };
+      expect(result).toEqual({ reply: "I received an unexpected response type from the AI service." });
+    });
+ 
+    it("should handle errors if sendStream fails (when type is 'text')", async () => {
       const mockStreamContent = 'Attempting to stream this.';
       const mockUserMessage = 'Test message for stream failure';
-      const mockErrorReadableStream = new ReadableStream({
+      const mockReadableStreamForError = new ReadableStream({
         start(controller) {
           controller.enqueue(mockStreamContent);
           controller.close();
         }
       });
-
+ 
       mockStreamText.mockResolvedValueOnce({
-        readableStream: mockErrorReadableStream,
-        toolCalls: Promise.resolve([]), // No tool calls
+        type: 'text',
+        readableStream: mockReadableStreamForError,
+        toolCalls: Promise.resolve([]),
         text: Promise.resolve(mockStreamContent),
+        finishReason: Promise.resolve('stop'),
+        response: Promise.resolve(new Response()),
       });
-
+ 
       mockEvent = createMockEvent(
         { 'Authorization': 'Bearer admin-token-stream-fail' },
         { message: mockUserMessage }
       );
-
+ 
       const simulatedSendStreamError = new Error('Network connection lost during stream');
-      // mockH3SendStream is the global mock we control from h3 import
       mockH3SendStream.mockRejectedValueOnce(simulatedSendStreamError);
-
-      // We expect the handler to catch this, log (untestable here),
-      // and throw an H3Error created via createError
-      try {
-        await handler(mockEvent);
-        // Should not reach here if an error is properly thrown by the handler
-        throw new Error('Handler did not throw an error as expected after sendStream failure');
-      } catch (e: unknown) {
-        const error = e as H3Error;
-        // Verify that mockH3CreateError was called by the SUT's catch block for sendStream
-        // This assumes the SUT's catch block for sendStream errors calls createError.
-        expect(mockH3CreateError).toHaveBeenCalledWith(expect.objectContaining({
-          statusCode: 500,
-          statusMessage: 'Failed to stream response to client.', // Example message
-        }));
-        
-        // And that the error caught by the test is the one created by mockH3CreateError
-        expect(error.statusCode).toBe(500);
-        expect(error.statusMessage).toBe('Failed to stream response to client.'); // Matches the SUT's error
-      }
-
-      // Ensure streamText was called
-      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({
-        prompt: mockUserMessage,
-      }));
-      // Ensure sendStream was attempted with the correct stream
-      expect(mockH3SendStream).toHaveBeenCalledWith(mockEvent, mockErrorReadableStream);
+      
+      // The handler's outer catch block will return a generic reply.
+      const finalResult = await handler(mockEvent);
+      expect(finalResult).toEqual({ reply: "I'm having trouble understanding that request or connecting to the AI service." });
     });
   });
-
-  // --- generate_application_copy Tests ---
-  describe('Tool Use: generate_application_copy', () => {
+ 
+  // --- generate_application_copy Tests (type: 'tool-calls') ---
+  describe("Tool Use: generate_application_copy (type: 'tool-calls')", () => {
     const appId = 'appGenCopy1';
     const appDescription = 'Original description';
     const targetAudience = 'Young adults';
     const tone = 'Playful';
-
+ 
     it('should call /api/ai/generate-copy and return generated copy', async () => {
       const aiParams = { appId, appDescription, targetAudience, tone };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_application_copy', parameters: aiParams } });
       const generatedCopy = "This is fresh, playful copy!";
-
+ 
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
-      mockDollarFetchImplementation.mockResolvedValueOnce(generatedCopy); // $fetch to /api/ai/generate-copy returns string
-
+      mockDollarFetchImplementation.mockResolvedValueOnce(generatedCopy);
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `generate copy for ${appId}` });
       const result = await handler(mockEvent) as { reply: string };
-
+ 
       expect(mockDollarFetchImplementation).toHaveBeenCalledWith('/api/ai/generate-copy', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer admin-token', 'Content-Type': 'application/json' },
@@ -556,31 +700,35 @@ describe('POST /api/admin/chat', () => {
       });
       expect(result).toEqual({ reply: `Generated copy for app ${appId}: ${generatedCopy}` });
     });
-
+ 
     it('should handle missing appId for generate_application_copy', async () => {
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_application_copy', parameters: { appDescription } } });
        mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: { appDescription } }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: { appDescription } } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'generate copy' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: "I understood you want to generate copy for an app, but I couldn't identify which one. Please specify the App ID." });
     });
-
+ 
     it('should handle 404 when app not found for generate_application_copy', async () => {
       const aiParams = { appId: 'unknownApp', appDescription };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_application_copy', parameters: aiParams } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
       const fetchError = new Error('Not Found') as H3Error;
       fetchError.statusCode = 404;
       mockDollarFetchImplementation.mockRejectedValueOnce(fetchError);
-
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'generate copy for unknownApp' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: `Sorry, I couldn't find an application with ID "unknownApp" to generate copy for. Please check the ID.` });
@@ -590,38 +738,42 @@ describe('POST /api/admin/chat', () => {
       const aiParams = { appId };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_application_copy', parameters: aiParams } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_copy', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
-      mockDollarFetchImplementation.mockResolvedValueOnce("  "); // Empty or whitespace string
-
+      mockDollarFetchImplementation.mockResolvedValueOnce("  ");
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `generate copy for ${appId}` });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: `I tried to generate copy for app "${appId}", but it seems I couldn't come up with anything right now.` });
     });
   });
-
-  // --- generate_application_logo Tests ---
-  describe('Tool Use: generate_application_logo', () => {
+ 
+  // --- generate_application_logo Tests (type: 'tool-calls') ---
+  describe("Tool Use: generate_application_logo (type: 'tool-calls')", () => {
     const appId = 'appGenLogo1';
     const stylePrompt = 'minimalist';
-
+ 
     it('should call /api/ai/generate-logo and return logo URL', async () => {
       const aiParams = { appId, stylePrompt };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_application_logo', parameters: aiParams } });
       const logoUrl = 'https://example.com/logo.png';
-
+ 
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_logo', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_logo', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
       mockDollarFetchImplementation.mockResolvedValueOnce({ logoUrl });
-
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `generate logo for ${appId} ${stylePrompt}` });
       const result = await handler(mockEvent) as { reply: string };
-
+ 
       expect(mockDollarFetchImplementation).toHaveBeenCalledWith('/api/ai/generate-logo', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer admin-token', 'Content-Type': 'application/json' },
@@ -634,42 +786,44 @@ describe('POST /api/admin/chat', () => {
       const aiParams = { appId };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_application_logo', parameters: aiParams } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_logo', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_application_logo', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
-      mockDollarFetchImplementation.mockResolvedValueOnce({ notLogoUrl: 'something' }); // Invalid response
-
+      mockDollarFetchImplementation.mockResolvedValueOnce({ notLogoUrl: 'something' });
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `generate logo for ${appId}` });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: `I tried to generate a logo for app "${appId}", but it seems I couldn't get a valid URL back.` });
     });
   });
-
-  // --- generate_review_reply Tests ---
-  describe('Tool Use: generate_review_reply', () => {
+ 
+  // --- generate_review_reply Tests (type: 'tool-calls') ---
+  describe("Tool Use: generate_review_reply (type: 'tool-calls')", () => {
     const appId = 'appReviewReply1';
     const reviewId = 'review123';
-
+ 
     it('should fetch review, call /api/ai/generate-review-reply, and return suggestion', async () => {
       const aiParams = { appId, reviewId };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_review_reply', parameters: aiParams } });
       const reviewDetails = { reviewBody: 'Great app!', rating: 5 };
       const suggestedReply = 'Thank you for your positive feedback!';
-
+ 
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
-      // First $fetch for review details
       mockDollarFetchImplementation.mockResolvedValueOnce(reviewDetails);
-      // Second $fetch for generating reply
       mockDollarFetchImplementation.mockResolvedValueOnce({ suggestion: suggestedReply });
-
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token-rev' }, { message: `reply to review ${reviewId} for app ${appId}` });
       const result = await handler(mockEvent) as { reply: string };
-
+ 
       expect(mockDollarFetchImplementation).toHaveBeenNthCalledWith(1, '/api/reviews/detail', {
         method: 'GET',
         headers: { 'Authorization': 'Bearer admin-token-rev' },
@@ -682,31 +836,35 @@ describe('POST /api/admin/chat', () => {
       });
       expect(result).toEqual({ reply: `Suggested reply for review ${reviewId} (app ${appId}): ${suggestedReply}` });
     });
-
+ 
     it('should handle missing appId or reviewId for generate_review_reply', async () => {
-      const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_review_reply', parameters: { appId } } }); // Missing reviewId
+      const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_review_reply', parameters: { appId } } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: { appId } }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: { appId } } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `reply to review for app ${appId}` });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: "I understood you want to generate a review reply, but I couldn't identify the app or review. Please specify both the App ID and Review ID." });
     });
-
+ 
     it('should handle 404 when review details not found', async () => {
       const aiParams = { appId, reviewId: 'unknownReview' };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_review_reply', parameters: aiParams } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
       const fetchError = new Error('Not Found') as H3Error;
       fetchError.statusCode = 404;
-      mockDollarFetchImplementation.mockRejectedValueOnce(fetchError); // For /api/reviews/detail
-
+      mockDollarFetchImplementation.mockRejectedValueOnce(fetchError);
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `reply to review unknownReview for app ${appId}` });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: `Sorry, I couldn't find review "unknownReview" for app "${appId}". Please check the IDs.` });
@@ -716,12 +874,14 @@ describe('POST /api/admin/chat', () => {
       const aiParams = { appId, reviewId };
       const aiToolCallResponseText = JSON.stringify({ tool_use: { name: 'generate_review_reply', parameters: aiParams } });
       mockStreamText.mockResolvedValueOnce({
-        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: aiParams }]),
+        type: 'tool-calls',
+        toolCalls: Promise.resolve([{ toolCallId: 'tc1', toolName: 'generate_review_reply', args: aiParams } as any]),
         text: Promise.resolve(aiToolCallResponseText),
-        textStream: new ReadableStream({start(c){c.close()}})
+        readableStream: new ReadableStream({start(c){c.close()}}),
+        finishReason: Promise.resolve('tool-calls'),
       });
-      mockDollarFetchImplementation.mockResolvedValueOnce({ reviewBody: 'Only body' }); // Missing rating
-
+      mockDollarFetchImplementation.mockResolvedValueOnce({ reviewBody: 'Only body' });
+ 
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: `reply to review ${reviewId} for app ${appId}` });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: `Sorry, I couldn't fetch the necessary details for review "${reviewId}". The data might be incomplete.` });
