@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3';
 import { readBody } from 'h3';
-import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+import { getAdminAuth, getAdminDb } from '~/server/utils/firebaseAdmin';
 
 interface ReplyRequestBody {
   appId: string;
@@ -39,29 +39,35 @@ export default defineEventHandler(async (event: H3Event) => {
   console.log(`Received reply request for review ${reviewId} in store ${store} for app ${appId}`);
   console.log(`Reply text: ${text}`);
 
-  // 3. **Placeholder:** Interact with the specific store's API to post the reply.
-  // This requires store-specific API clients and credentials.
+  // 3. Interact with Firestore to save the reply
+  const db = getAdminDb();
+  const reviewDocRef = db.doc(`apps/${appId}/reviews/${reviewId}`);
+
   try {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const reviewDoc = await reviewDocRef.get();
 
-    // Example:
-    // if (store === 'googlePlay') {
-    //   // Use Google Play Developer API client
-    //   // await googlePlayClient.reviews.reply({ ... });
-    // } else if (store === 'appStore') {
-    //   // Use App Store Connect API client
-    //   // await appStoreClient.reviews.reply({ ... });
-    // } else {
-    //   throw createError({ statusCode: 400, statusMessage: 'Unsupported store type' });
-    // }
+    if (!reviewDoc.exists) {
+      throw createError({ statusCode: 404, statusMessage: 'Review not found' });
+    }
 
-    console.log(`Mock reply posted for review ${reviewId}`);
-    return { success: true, message: 'Reply posted successfully (mocked).' };
+    await reviewDocRef.update({
+      reply: {
+        body: text,
+        createdAt: new Date().toISOString(),
+      },
+      isReplied: true,
+    });
+
+    console.log(`Reply saved for review ${reviewId}`);
+    setResponseStatus(event, 200); // Or 201 if a new resource was created, but here we update
+    return { success: true, message: 'Reply saved successfully.' };
 
   } catch (error) {
-    console.error(`Error posting reply for review ${reviewId}:`, error);
-    // Handle specific API errors from stores if possible
-    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error posting reply' });
+    console.error(`Error saving reply for review ${reviewId}:`, error);
+    // Check if it's an error with a statusCode property (like our custom createError)
+    if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 404) {
+      throw error; // Re-throw 404 if it's our custom error
+    }
+    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error saving reply' });
   }
 });

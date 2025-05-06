@@ -156,6 +156,17 @@
       @click="closeSidebar"
       class="fixed inset-0 z-10 bg-black/50 lg:hidden"
     ></div>
+
+    <!-- Admin Chat Component -->
+    <ClientOnly>
+      <AdminChat />
+      <template #fallback>
+        <!-- Optional: A placeholder to show during SSR or if client-side rendering fails -->
+        <div class="admin-chat-placeholder fixed bottom-4 right-4 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-md">
+          Loading chat...
+        </div>
+      </template>
+    </ClientOnly>
   </div>
 </template>
 
@@ -164,6 +175,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '~/stores/user';
 import { useAdminNavigation } from '~/composables/useAdminNavigation'; // Import useAdminNavigation
+import AdminChat from '~/components/AdminChat.vue'; // Import the chat component
 
 const route = useRoute();
 const router = useRouter();

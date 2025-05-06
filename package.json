@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^1.3.21",
     "@firebase/app-types": "^0.9.3",
+    "@google-cloud/storage": "^7.16.0",
     "@milkdown/core": "^7.9.0",
     "@milkdown/plugin-clipboard": "^7.9.0",
     "@milkdown/plugin-listener": "^7.9.0",

@@ -97,8 +97,17 @@ export const useMediaStore = defineStore('media', () => {
   };
 
   // Publish content
-  const publishPost = async (content: MediaPostContent, platforms: string[]) => {
-    if (!platforms || platforms.length === 0 || !content.body || !userStore.isAdmin) return;
+  const publishPost = async (finalContent: Record<string, MediaPostContent>) => {
+    const platforms = Object.keys(finalContent);
+    if (!platforms || platforms.length === 0 || !userStore.isAdmin) {
+        toastStore.error('No platforms selected or content available for publishing.');
+        return;
+    }
+    // Basic check if any content body exists
+    if (!platforms.some(p => finalContent[p]?.body)) {
+        toastStore.error('Content body is missing for all selected platforms.');
+        return;
+    }
 
     publishing.value = true;
     error.value = null;
@@ -111,11 +120,10 @@ export const useMediaStore = defineStore('media', () => {
           'Content-Type': 'application/json',
         },
         body: {
-          content: content,
-          platforms: platforms,
+          finalContent: finalContent, // Send the new payload structure
         }
       });
-      toastStore.success(`Post submitted for publishing to ${platforms.join(', ')}!`);
+      toastStore.success('Post submitted for publishing!'); // Simplified message
     } catch (err: unknown) {
       error.value = getSafeErrorMessage(err);
       toastStore.error(`Publishing failed: ${error.value}`);

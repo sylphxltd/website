@@ -195,6 +195,7 @@ export const useReviewsStore = defineStore('reviews', () => {
                   'Content-Type': 'application/json',
               },
               body: {
+                  appId: review.appId, // Add this line
                   reviewBody: review.body,
                   rating: review.rating,
                   // Add other context if needed (app name, previous replies etc.)

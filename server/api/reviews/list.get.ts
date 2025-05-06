@@ -1,48 +1,8 @@
 import type { H3Event } from 'h3';
 import { getQuery } from 'h3';
-import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+import { getAdminDb, getAdminAuth } from '~/server/utils/firebaseAdmin'; // Use getAdminDb
 import type { Review } from '~/stores/reviews'; // Import type
-
-// Mock Data Generation
-const generateMockReviews = (appId: string, store: string, count: number, page: number): Review[] => {
-  const reviews: Review[] = [];
-  const baseId = `${appId}-${store}-p${page}-`;
-  const authors = ['User A', 'Reviewer B', 'Customer C', 'Tester D', 'Gamer E'];
-  // Use undefined instead of null for optional title
-  const titles = [undefined, 'Great App!', 'Needs Improvement', 'Bug Found', 'Feature Request'];
-  const bodies = [
-    'This app is fantastic, works perfectly!',
-    'Crashes frequently on my device.',
-    'Could you add a dark mode feature?',
-    'Easy to use and very helpful.',
-    'The latest update broke the login.',
-    'Love the new features, keep it up!',
-    'Interface is a bit confusing.',
-  ];
-
-  for (let i = 0; i < count; i++) {
-    const rating = Math.floor(Math.random() * 5) + 1;
-    const hasReply = Math.random() > 0.6;
-    const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(); // Random date in last 30 days
-
-    reviews.push({
-      id: baseId + i,
-      appId: appId,
-      store: store,
-      author: authors[Math.floor(Math.random() * authors.length)],
-      rating: rating,
-      title: titles[Math.floor(Math.random() * titles.length)],
-      body: bodies[Math.floor(Math.random() * bodies.length)],
-      createdAt: createdAt,
-      reply: hasReply ? {
-        body: 'Thank you for your feedback!',
-        createdAt: new Date(new Date(createdAt).getTime() + Math.random() * 1000 * 60 * 60 * 24).toISOString() // Reply within a day
-      } : null,
-    });
-  }
-  return reviews;
-};
-
+import type { Query } from 'firebase-admin/firestore'; // Import Query type for casting
 
 export default defineEventHandler(async (event: H3Event) => {
   // 1. Authorization Check (Admin Only)
@@ -64,49 +24,112 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   // 2. Get Query Parameters
-  const query = getQuery(event);
-  const appId = query.appId?.toString();
-  const store = query.store?.toString() || 'all'; // 'googlePlay', 'appStore', 'all'
-  const page = Number.parseInt(query.page?.toString() || '1', 10);
-  const limit = Number.parseInt(query.limit?.toString() || '10', 10);
-  // Add other filters like rating, dateFrom, dateTo, hasReply if needed
+  const queryParams = getQuery(event);
+  const appId = queryParams.appId?.toString();
+  const page = Number.parseInt(queryParams.page?.toString() || '1', 10);
+  const limit = Number.parseInt(queryParams.limit?.toString() || '10', 10);
+  const store = queryParams.store?.toString(); // e.g., 'googlePlay', 'appStore', or undefined for all
+  const rating = queryParams.rating ? Number.parseInt(queryParams.rating.toString(), 10) : undefined;
+  const dateFrom = queryParams.dateFrom?.toString();
+  const dateTo = queryParams.dateTo?.toString();
+  const hasReplyParam = queryParams.hasReply?.toString(); // 'true', 'false', or undefined
 
   if (!appId) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing appId query parameter' });
   }
 
-  console.log(`Fetching reviews for appId: ${appId}, store: ${store}, page: ${page}, limit: ${limit}`);
+  if (page <= 0) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Page number must be positive' });
+  }
+  if (limit <= 0) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Limit must be positive' });
+  }
 
-  // 3. **Placeholder:** Fetch reviews from actual store APIs or aggregation service
-  // This part needs real implementation based on chosen APIs/services.
-  // For now, return mock data.
+  // TODO: Ensure necessary Firestore indexes are created for these queries (e.g., on appId, store, rating, createdAt, isReplied).
 
   try {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 300));
+    const db = getAdminDb(); // Get Firestore instance
+    const reviewsCollectionRef = db.collection('apps').doc(appId).collection('reviews');
+    let firestoreQuery: Query = reviewsCollectionRef; // Base query
 
-    let mockReviews: Review[] = [];
-    const totalMockReviews = 55; // Simulate a total count
-
-    if (store === 'all' || store === 'googlePlay') {
-        mockReviews = mockReviews.concat(generateMockReviews(appId, 'googlePlay', Math.ceil(limit / (store === 'all' ? 2 : 1)), page));
+    // Apply filters
+    if (store && store !== 'all') {
+      firestoreQuery = firestoreQuery.where('store', '==', store);
     }
-     if (store === 'all' || store === 'appStore') {
-        mockReviews = mockReviews.concat(generateMockReviews(appId, 'appStore', Math.floor(limit / (store === 'all' ? 2 : 1)), page));
+    if (rating !== undefined && !Number.isNaN(rating)) {
+      firestoreQuery = firestoreQuery.where('rating', '>=', rating);
+    }
+    if (dateFrom) {
+      // Firestore expects ISO string or Timestamp. Ensure dateFrom is valid.
+      firestoreQuery = firestoreQuery.where('createdAt', '>=', dateFrom);
+    }
+    if (dateTo) {
+      // Firestore expects ISO string or Timestamp. Ensure dateTo is valid.
+      firestoreQuery = firestoreQuery.where('createdAt', '<=', dateTo);
+    }
+    if (hasReplyParam !== undefined) {
+      const hasReply = hasReplyParam === 'true';
+      // Assuming 'isReplied' is a boolean field in Firestore indicating if a reply exists.
+      // If 'reply' is an object, you might query for its existence differently,
+      // e.g., where('reply', '!=', null), but this can be tricky with Firestore.
+      // A dedicated 'isReplied' boolean field is generally more straightforward for querying.
+      firestoreQuery = firestoreQuery.where('isReplied', '==', hasReply);
     }
 
-    // Simulate pagination slicing (crude version)
-    const startIndex = (page - 1) * limit;
-    const paginatedReviews = mockReviews.slice(startIndex, startIndex + limit);
+    // Create a separate query for total count (without pagination and ordering for count)
+    const countQuery = firestoreQuery; // All filters applied
 
+    // Apply ordering for fetching data
+    firestoreQuery = firestoreQuery.orderBy('createdAt', 'desc');
+
+    // Apply pagination
+    // Note: offset() has performance implications for large datasets.
+    // Consider cursor-based pagination (startAfter()) for better performance at scale.
+    const offset = (page - 1) * limit;
+    firestoreQuery = firestoreQuery.limit(limit).offset(offset);
+
+    // Execute queries
+    const [snapshot, countSnapshot] = await Promise.all([
+      firestoreQuery.get(),
+      countQuery.count().get() // Get total count with filters
+    ]);
+
+    const reviews: Review[] = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        appId: data.appId,
+        store: data.store,
+        author: data.author,
+        rating: data.rating,
+        title: data.title,
+        body: data.body,
+        createdAt: data.createdAt, // Assuming createdAt is stored as ISO string or Timestamp
+        reply: data.reply || null, // Ensure reply is null if not present
+        isReplied: data.isReplied !== undefined ? data.isReplied : !!data.reply, // Derive if not present
+      } as Review;
+    });
+
+    const total = countSnapshot.data().count;
 
     return {
-      reviews: paginatedReviews,
-      total: totalMockReviews // Return simulated total
+      reviews,
+      total,
     };
 
   } catch (error) {
-    console.error(`Error fetching/simulating reviews for appId ${appId}:`, error);
-    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error fetching reviews' });
+    console.error(`Error fetching reviews from Firestore for appId ${appId}:`, error);
+    // Check for specific Firestore error codes if needed
+    // Using a type assertion for error properties if not using a more specific error type
+    const firebaseError = error as { code?: string; message?: string };
+
+    if (firebaseError.code === 'permission-denied') {
+        throw createError({ statusCode: 403, statusMessage: 'Forbidden: Permission denied to access reviews.' });
+    }
+    if (firebaseError.message?.includes('indexes')) {
+        console.warn("Potential Firestore indexing issue. Ensure all necessary composite indexes are created.");
+        // You might want to return a more specific error or a generic one
+    }
+    throw createError({ statusCode: 500, statusMessage: 'Internal Server Error fetching reviews from Firestore' });
   }
 });

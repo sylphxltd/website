@@ -1,11 +1,13 @@
 import type { H3Event } from 'h3'; // Use import type
 import { openai } from '@ai-sdk/openai'; // Import the 'openai' provider function/object
-import { streamText } from 'ai';
-import { getAdminAuth } from '~/server/utils/firebaseAdmin'; // For auth check
+import { streamText, generateText } from 'ai'; // Import generateText
+import { getAdminAuth, getStorageBucket } from '~/server/utils/firebaseAdmin'; // For auth check and storage
+import type { File } from '@google-cloud/storage'; // Import File type for typing
 
 // Define the expected request body structure
 interface GenerateCopyBody {
-  appName: string;
+  appId: string; // Added: Mandatory App ID for context
+  appName?: string; // Made optional
   appDescription?: string;
   targetAudience?: string; // Optional: Add more context fields
   tone?: string;         // Optional: e.g., 'professional', 'playful'
@@ -42,14 +44,122 @@ export default defineEventHandler(async (event: H3Event) => {
 
   // 3. Read and Validate Request Body
   const body = await readBody<GenerateCopyBody>(event);
-  if (!body || !body.appName) {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing appName in request body.' });
+
+  if (!body || !body.appId) { // appName is now optional, only appId is strictly required initially
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing appId in request body.' });
   }
+
+  let finalAppName = body.appName;
+
+  if (!finalAppName) {
+    // appName was not provided, try to fetch it using appId
+    console.log(`[AI Gen Copy] appName not provided for appId ${body.appId}, fetching...`);
+    try {
+      // Make an internal fetch call to get app details
+      // Assuming the app details endpoint returns an object like { id: string, name: string, ... }
+      const appDetails = await $fetch<{ name: string }>(`/api/apps/${body.appId}`, {
+        headers: {
+          Authorization: `Bearer ${idToken}`, // Pass the admin's token
+        },
+      });
+
+      if (appDetails?.name) { // Changed to optional chain
+        finalAppName = appDetails.name;
+        console.log(`[AI Gen Copy] Fetched appName: "${finalAppName}" for appId ${body.appId}`);
+      } else {
+        throw createError({ statusCode: 404, statusMessage: `App not found or name missing for appId ${body.appId}.` });
+      }
+    } catch (fetchError: unknown) { // Changed 'any' to 'unknown'
+      console.error(`[AI Gen Copy] Error fetching app details for appId ${body.appId}:`, fetchError);
+      // Type guard for fetchError to access statusCode
+      if (typeof fetchError === 'object' && fetchError !== null && 'statusCode' in fetchError && fetchError.statusCode === 404) {
+        throw createError({ statusCode: 404, statusMessage: `App not found for the given appId: ${body.appId}.` });
+      }
+      throw createError({ statusCode: 500, statusMessage: `Failed to fetch app details for appId ${body.appId}.` });
+    }
+  }
+
+  // At this point, finalAppName should be set, either from input or fetched.
+  // If it's still not set (e.g. fetch failed and didn't throw an error that was caught above, which shouldn't happen with current logic)
+  // this would be an internal error, but the checks above should prevent this.
+  // For robustness, one might add a check here, but the current logic aims to throw before this point if appName cannot be determined.
+
+
+  // --- Start: Fetch and Summarize App Resources from Storage ---
+  let resourceSummary: string | null = null;
+  const MAX_TEXT_FILES = 3; // Limit the number of text files to process
+  const MAX_CHARS_PER_FILE = 2000; // Limit characters read per file
+  const TEXT_FILE_EXTENSIONS = ['.txt', '.md', '.json'];
+
+  try {
+    const bucket = getStorageBucket();
+    const prefix = `resources/${body.appId}/`;
+    const [allFiles] = await bucket.getFiles({ prefix });
+
+    // 1. Identify relevant text files
+    const textFiles = allFiles
+      .filter((file: File) => {
+        const fileName = file.name.toLowerCase();
+        // Basic check for text-based extensions
+        return TEXT_FILE_EXTENSIONS.some(ext => fileName.endsWith(ext));
+        // TODO: Could potentially check file.metadata.contentType if available and reliable
+      })
+      .slice(0, MAX_TEXT_FILES); // Limit the number of files
+
+    if (textFiles.length > 0) {
+      console.log(`[AI Gen Copy] Found ${textFiles.length} potential text resources for appId ${body.appId}:`, textFiles.map(f => f.name).join(', '));
+
+      // 2. Read content from identified files
+      let combinedContent = '';
+      for (const file of textFiles) {
+        try {
+          const [contentBuffer] = await file.download();
+          const fileContent = contentBuffer.toString('utf-8', 0, MAX_CHARS_PER_FILE); // Read limited content
+          combinedContent += `\n\n--- Content from ${file.name.split('/').pop()} ---\n${fileContent}`;
+          console.log(`[AI Gen Copy] Read ${fileContent.length} chars from ${file.name}`);
+        } catch (downloadError) {
+          console.error(`[AI Gen Copy] Error downloading content for ${file.name}:`, downloadError);
+          // Skip this file and continue
+        }
+      }
+      combinedContent = combinedContent.trim();
+
+      // 3. Generate Summary (Internal AI Call)
+      if (combinedContent) {
+        try {
+          console.log(`[AI Gen Copy] Generating summary for ${combinedContent.length} chars of combined content...`);
+          const summaryPrompt = `Summarize the following text, focusing on key aspects relevant for describing a software application. Be concise (1-2 sentences):\n\n${combinedContent}\n\nSummary:`;
+          const { text: summary } = await generateText({
+            model: openai('gpt-4o'), // Using the same model as main generation for now
+            prompt: summaryPrompt,
+            maxTokens: 100, // Limit summary length
+          });
+          resourceSummary = summary.trim();
+          console.log(`[AI Gen Copy] Generated resource summary: "${resourceSummary}"`);
+        } catch (summaryError) {
+          console.error('[AI Gen Copy] Error generating resource summary:', summaryError);
+          // Proceed without summary if internal call fails
+        }
+      } else {
+         console.log(`[AI Gen Copy] No text content could be read from identified files for appId ${body.appId}.`);
+      }
+
+    } else {
+       console.log(`[AI Gen Copy] No relevant text resources found for appId ${body.appId} under prefix ${prefix}`);
+    }
+
+  } catch (error) {
+    console.error(`[AI Gen Copy] Error processing resources for appId ${body.appId}:`, error);
+    // Allow generation to proceed without resource context if fetching/processing fails
+  }
+  // --- End: Fetch and Summarize App Resources ---
+
 
   // 4. Construct Prompt
   // Simple prompt, can be made more sophisticated
   const prompt = `Generate a short, engaging marketing description (around 2-3 sentences) for a mobile application.
-App Name: ${body.appName}
+App Name: ${finalAppName}
+${resourceSummary ? `Based on provided resources:\n${resourceSummary}` : ''}
 ${body.appDescription ? `Current Description: ${body.appDescription}` : ''}
 ${body.targetAudience ? `Target Audience: ${body.targetAudience}` : ''}
 ${body.tone ? `Desired Tone: ${body.tone}` : ''}

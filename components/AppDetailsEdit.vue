@@ -290,7 +290,7 @@ const handleSaveApp = async () => {
 };
 
 const generateAppCopy = async () => {
-  if (!editableApp.name || isGeneratingCopy.value) return;
+  if (!props.app?.id || !editableApp.name || isGeneratingCopy.value) return;
   isGeneratingCopy.value = true;
   generationError.value = null;
   const originalDescription = editableApp.description;
@@ -303,7 +303,7 @@ const generateAppCopy = async () => {
     const response = await fetch('/api/ai/generate-copy', { /* ... API call ... */
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({ appName: editableApp.name, appDescription: originalDescription })
+        body: JSON.stringify({ appId: props.app.id, appName: editableApp.name, appDescription: originalDescription })
     });
     if (!response.ok || !response.body) throw new Error('Failed to fetch AI description.');
 
@@ -333,7 +333,7 @@ const generateAppCopy = async () => {
 };
 
 const generateAppLogo = async () => {
-  if (!editableApp.name || isGeneratingLogo.value) return;
+  if (!props.app?.id || !editableApp.name || isGeneratingLogo.value) return;
   isGeneratingLogo.value = true;
   logoGenerationError.value = null;
   const originalLogoUrl = editableApp.logoUrl;
@@ -346,7 +346,7 @@ const generateAppLogo = async () => {
     const response = await fetch('/api/ai/generate-logo', { /* ... API call ... */
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({ appName: editableApp.name })
+        body: JSON.stringify({ appId: props.app.id, appName: editableApp.name })
     });
      if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));

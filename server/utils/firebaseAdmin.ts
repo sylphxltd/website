@@ -1,123 +1,146 @@
-import { initializeApp, cert, type ServiceAccount } from 'firebase-admin/app';
+import { initializeApp, cert, type ServiceAccount, getApps, getApp as getFirebaseDefaultAppInstance, type App as AdminApp } from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
+import type { Bucket } from '@google-cloud/storage';
 import { useRuntimeConfig } from '#imports';
 import { readFileSync, existsSync } from 'node:fs';
 
-// 單例實例
-let adminAuthInstance: Auth | null = null;
-let adminDbInstance: Firestore | null = null;
-let appInitialized = false;
+let adminApp: AdminApp | null = null;
+let adminAuth: Auth | null = null;
+let adminDb: Firestore | null = null;
+let adminBucket: Bucket | null = null;
 
-/**
- * 初始化 Firebase Admin SDK
- */
-function initializeAdminApp() {
-  // 如果已經初始化過，直接返回
-  if (appInitialized) {
-    return;
+function _ensureFirebaseAdminApp(): AdminApp {
+  if (adminApp) {
+    return adminApp;
   }
-  
-  console.log('Initializing Firebase Admin SDK...');
-  
+
+  console.log('Attempting to get or initialize Firebase Admin App (defensive)...');
+
+  if (getApps().length > 0) {
+    console.log('SDK reports existing apps. Attempting to retrieve default app.');
+    try {
+      adminApp = getFirebaseDefaultAppInstance();
+      console.log('Successfully retrieved existing default Firebase Admin App.');
+      return adminApp;
+    } catch (error) {
+      console.warn(`Inconsistent State: SDK reports apps exist, but cannot retrieve the default app. Error: ${error instanceof Error ? error.message : String(error)}. Proceeding to initialize.`);
+      // Do not return, proceed to initialization block
+    }
+  }
+
+  // If getApps().length === 0 OR if the inconsistent state above occurred
+  console.log('Attempting to initialize a new default Firebase Admin App...');
   try {
-    // 獲取 Nuxt 運行時配置
     const config = useRuntimeConfig();
-    
-    // 從 runtime config 獲取 GOOGLE_APPLICATION_CREDENTIALS 
     const googleAppCreds = config.googleApplicationCredentials;
-    
+
     if (!googleAppCreds) {
       throw new Error('GOOGLE_APPLICATION_CREDENTIALS not set in runtimeConfig');
     }
-    
+
     let serviceAccount: ServiceAccount;
-    
-    // 透過檢查首個字符是否為 '{' 來判斷是否為 JSON 字符串
     if (googleAppCreds.toString().trim().startsWith('{')) {
-      // 看起來是 JSON 字符串
       try {
         serviceAccount = JSON.parse(googleAppCreds.toString()) as ServiceAccount;
-        console.log('Using service account JSON from GOOGLE_APPLICATION_CREDENTIALS');
+        console.log('Using service account JSON from GOOGLE_APPLICATION_CREDENTIALS for new app.');
       } catch (parseError) {
         throw new Error(`Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
       }
     } else {
-      // 看起來是文件路徑
       const credPath = googleAppCreds.toString();
-      console.log(`Checking service account file at path: ${credPath}`);
-      
+      console.log(`Checking service account file at path for new app: ${credPath}`);
       if (!existsSync(credPath)) {
         throw new Error(`Service account file not found at path: ${credPath}`);
       }
-      
       try {
-        // 讀取文件內容
         const fileContent = readFileSync(credPath, 'utf8');
         serviceAccount = JSON.parse(fileContent) as ServiceAccount;
-        console.log('Using service account from file content');
+        console.log('Using service account from file content for new app.');
       } catch (fileError) {
         throw new Error(`Failed to read or parse service account file: ${fileError instanceof Error ? fileError.message : String(fileError)}`);
       }
     }
-    
-    // 使用服務帳戶初始化 app
-    // 注意: 這裡我們直接初始化而不先檢查現有的 apps
-    const app = initializeApp({
+    adminApp = initializeApp({
       credential: cert(serviceAccount)
     });
-    
-    // 初始化 auth 和 firestore 實例
-    adminAuthInstance = getAuth(app);
-    adminDbInstance = getFirestore(app);
-    appInitialized = true;
-    
-    console.log('Firebase Admin SDK initialized successfully');
-  } catch (error) {
-    console.error('Error initializing Firebase Admin:', error);
-    
-    const errorMessage = `Firebase Admin SDK initialization failed: ${error instanceof Error ? error.message : String(error)}
-    
-    Please make sure GOOGLE_APPLICATION_CREDENTIALS is set correctly:
-    
-    1. For a service account file path:
-       GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
-       
-    2. For a JSON string (ensure it's properly quoted):
-       GOOGLE_APPLICATION_CREDENTIALS='{"type":"service_account","project_id":"...",...}'
-    
-    Note for JSON string: Make sure the entire JSON is properly escaped and quoted in your environment variable.`;
-    
-    throw new Error(errorMessage);
+    console.log('New Firebase Admin SDK default app initialized successfully.');
+    return adminApp;
+  } catch (e: unknown) {
+    const error = e as { code?: string; message?: string }; // Type assertion for cleaner access
+    if (error.code === 'app/duplicate-app' || (error.message?.includes('duplicate'))) {
+      console.warn('Initialization failed due to duplicate app. Attempting to retrieve default app again.');
+      try {
+        adminApp = getFirebaseDefaultAppInstance();
+        console.log('Successfully retrieved default app after duplicate error.');
+        return adminApp;
+      } catch (finalGetError) {
+        const criticalMsg = `CRITICAL FAILURE: Cannot initialize or retrieve default app after duplicate error. Initial error: ${error?.message}. Final get error: ${finalGetError instanceof Error ? finalGetError.message : String(finalGetError)}`;
+        console.error(criticalMsg);
+        throw new Error(criticalMsg);
+      }
+    }
+    const detailedErrorMsg = `Firebase Admin App initialization failed: ${error?.message}`;
+    console.error(detailedErrorMsg, error);
+    adminApp = null; // Ensure instance is not partially set
+    throw new Error(detailedErrorMsg);
   }
 }
 
 /**
- * 獲取 Firebase Admin Auth 實例
+ * Gets the Firebase Admin Auth instance.
  */
 export function getAdminAuth(): Auth {
-  if (!appInitialized || !adminAuthInstance) {
-    initializeAdminApp();
+  if (!adminAuth) {
+    const app = _ensureFirebaseAdminApp();
+    try {
+      adminAuth = getAuth(app);
+      console.log('Firebase Admin Auth service retrieved/initialized successfully.');
+    } catch (serviceError) {
+      const errorMessage = `Failed to retrieve Firebase Admin Auth service: ${serviceError instanceof Error ? serviceError.message : String(serviceError)}`;
+      console.error(errorMessage, serviceError);
+      adminAuth = null; // Ensure not partially set
+      throw new Error(errorMessage);
+    }
   }
-  
-  if (!adminAuthInstance) {
-    throw new Error("Failed to get adminAuth instance after initialization attempt");
-  }
-  
-  return adminAuthInstance;
+  return adminAuth;
 }
 
 /**
- * 獲取 Firebase Admin Firestore 實例
+ * Gets the Firebase Admin Firestore instance.
  */
 export function getAdminDb(): Firestore {
-  if (!appInitialized || !adminDbInstance) {
-    initializeAdminApp();
+  if (!adminDb) {
+    const app = _ensureFirebaseAdminApp();
+    try {
+      adminDb = getFirestore(app);
+      console.log('Firebase Admin Firestore service retrieved/initialized successfully.');
+    } catch (serviceError) {
+      const errorMessage = `Failed to retrieve Firebase Admin Firestore service: ${serviceError instanceof Error ? serviceError.message : String(serviceError)}`;
+      console.error(errorMessage, serviceError);
+      adminDb = null; // Ensure not partially set
+      throw new Error(errorMessage);
+    }
   }
-  
-  if (!adminDbInstance) {
-    throw new Error("Failed to get adminDb instance after initialization attempt");
+  return adminDb;
+}
+
+/**
+ * Gets the Firebase Admin Storage Bucket instance.
+ */
+export function getStorageBucket(): Bucket {
+  if (!adminBucket) {
+    const app = _ensureFirebaseAdminApp();
+    try {
+      adminBucket = getStorage(app).bucket(); // Assumes default bucket
+      console.log('Firebase Admin Storage Bucket service retrieved/initialized successfully.');
+    } catch (serviceError) {
+      const errorMessage = `Failed to retrieve Firebase Admin Storage Bucket service: ${serviceError instanceof Error ? serviceError.message : String(serviceError)}`;
+      console.error(errorMessage, serviceError);
+      adminBucket = null; // Ensure not partially set
+      throw new Error(errorMessage);
+    }
   }
-  
-  return adminDbInstance;
+  return adminBucket;
 }

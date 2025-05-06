@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3';
-import { getAdminAuth } from '~/server/utils/firebaseAdmin';
+import { getAdminAuth, getAdminDb } from '~/server/utils/firebaseAdmin';
 import type { MediaAccount } from '~/stores/media';
 
 export default defineEventHandler(async (event: H3Event) => {
@@ -12,33 +12,50 @@ export default defineEventHandler(async (event: H3Event) => {
 
   try {
     const adminAuth = getAdminAuth();
+    const db = getAdminDb(); // Get Firestore instance
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     if (!decodedToken.admin) {
       throw createError({ statusCode: 403, statusMessage: 'Forbidden: User is not an admin' });
     }
-    // TODO: In a real app, likely fetch connected accounts associated with this user/org from Firestore or a secure backend.
-    const userId = decodedToken.uid; // Use this to fetch user-specific connections
 
-  } catch (error) {
-     console.error("Error verifying admin token:", error);
-     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
-  }
+    const adminUid = decodedToken.uid;
+    const connectedAccounts: MediaAccount[] = [];
 
-  // 2. **Placeholder:** Return mock connected accounts
-  try {
-    // Simulate fetching data
-    await new Promise(resolve => setTimeout(resolve, 150));
+    const docRef = db.collection('media_connections').doc(adminUid);
+    const docSnap = await docRef.get();
 
-    const mockAccounts: MediaAccount[] = [
-      { id: '12345_medium', platform: 'medium', name: 'SylphX Blog' },
-      { id: '67890_x', platform: 'x', name: '@SylphX_Devs' },
-      // { id: '11223_facebook', platform: 'facebook', name: 'SylphX Official Page' },
-    ];
+    if (docSnap.exists) {
+      const docData = docSnap.data();
+      if (docData) {
+        // Check for Medium connection
+        if (docData.medium?.userId) {
+          connectedAccounts.push({
+            id: docData.medium.userId,
+            platform: 'medium',
+            name: `Medium (${docData.medium.username || docData.medium.userId})`, // Use username if available
+          });
+        }
+        // Add similar checks for other platforms like 'x', 'facebook' here
+        // Example for 'x' (if structure is similar):
+        // if (docData.x?.userId) {
+        //   connectedAccounts.push({
+        //     id: docData.x.userId,
+        //     platform: 'x',
+        //     name: `X (${docData.x.username || docData.x.userId})`,
+        //   });
+        // }
+      }
+    }
+    return { accounts: connectedAccounts };
 
-    return { accounts: mockAccounts };
-
-  } catch (error) {
-    console.error("Error fetching media accounts:", error);
+  } catch (error: unknown) {
+    // Check if it's an auth error
+    if (typeof error === 'object' && error !== null && 'code' in error && typeof (error as {code: unknown}).code === 'string' && (error as {code: string}).code.startsWith('auth/')) {
+      console.error("Error verifying admin token:", error);
+      throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid token' });
+    }
+    // General error
+    console.error("Error fetching media accounts from Firestore:", error);
     throw createError({ statusCode: 500, statusMessage: 'Internal Server Error fetching accounts' });
   }
 });

@@ -293,128 +293,12 @@
       </div>
     </div>
 
-    <!-- User details modal -->
-    <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4 sm:p-6">
-      <!-- Consider adding backdrop-blur-sm class here -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full shadow-xl transform transition-all">
-        <!-- Modal Header -->
-        <div class="px-6 pt-6 pb-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">User Details</h3>
-            <button @click="showModal = false" class="text-gray-400 hover:text-gray-500 focus:outline-none">
-              <span class="i-carbon-close text-xl"></span>
-            </button>
-          </div>
-        </div>
-        
-        <!-- Modal Body -->
-        <div class="px-6 py-6">
-          <div v-if="selectedUser" class="space-y-6">
-            <div class="flex justify-center">
-              <div class="relative">
-                <div v-if="!selectedUser.photoURL" class="h-20 w-20 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-2xl font-medium">
-                  {{ getInitials(selectedUser.displayName || selectedUser.email || 'User') }}
-                </div>
-                <img v-else :src="selectedUser.photoURL" :alt="`${selectedUser.displayName}'s avatar`" class="h-20 w-20 rounded-full">
-                <span 
-                  :class="[
-                    selectedUser.customClaims?.admin ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-                    'absolute bottom-0 right-0 px-2 py-1 text-xs leading-5 font-semibold rounded-full'
-                  ]"
-                >
-                  {{ selectedUser.customClaims?.admin ? 'Admin' : 'User' }}
-                </span>
-              </div>
-            </div>
-            
-            <div class="text-center">
-              <h4 class="text-lg font-medium text-gray-900 dark:text-white">{{ selectedUser.displayName || 'Unnamed User' }}</h4>
-              <p class="text-sm text-gray-500 dark:text-gray-400">{{ selectedUser.email }}</p>
-            </div>
-            
-            <!-- Details Section -->
-            <div class="pt-2">
-              <dl class="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-                <div class="sm:col-span-1">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">User ID</dt>
-                  <dd class="mt-1 text-sm text-gray-900 dark:text-white break-all">{{ selectedUser.uid }}</dd> <!-- Use uid -->
-                </div>
-                <div class="sm:col-span-1">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Auth Method</dt>
-                  <dd class="mt-1 text-sm text-gray-900 dark:text-white">
-                     <span
-                       v-for="provider in selectedUser.providerData"
-                       :key="provider.providerId"
-                       class="mr-1"
-                     >
-                       {{ formatProviderId(provider.providerId) }}
-                     </span>
-                     <span v-if="!selectedUser.providerData || selectedUser.providerData.length === 0">
-                       Email/Password
-                     </span>
-                  </dd>
-                </div>
-                <div class="sm:col-span-1">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
-                  <dd class="mt-1 text-sm text-gray-900 dark:text-white">
-                    <span 
-                      :class="[
-                        !selectedUser.disabled ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-                        'px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full'
-                      ]"
-                    >
-                      {{ !selectedUser.disabled ? 'Active' : 'Inactive' }} <!-- Use disabled flag -->
-                    </span>
-                  </dd>
-                </div>
-                <div class="sm:col-span-1">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Last Login</dt>
-                  <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ formatDate(selectedUser.metadata?.lastSignInTime) }}</dd> <!-- Access via metadata -->
-                </div>
-                <div class="sm:col-span-2">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email Verified</dt>
-                  <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ selectedUser.emailVerified ? 'Yes' : 'No' }}</dd>
-                </div>
-                <div class="sm:col-span-2">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created At</dt>
-                  <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ formatDate(selectedUser.metadata?.creationTime) }}</dd> <!-- Access via metadata -->
-                </div>
-              </dl>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal Footer -->
-        <div class="px-6 py-5 bg-gray-50 dark:bg-gray-850 rounded-b-xl flex justify-between items-center">
-          <button
-            @click="showModal = false"
-            class="px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Close
-          </button>
-          <button
-            v-if="selectedUser"
-            @click="toggleAdminRole(selectedUser)"
-            :class="[
-              selectedUser?.customClaims?.admin
-                ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                : 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
-              'inline-flex items-center justify-center px-5 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2',
-              adminUsersStore.settingRoleUid === selectedUser?.uid ? 'opacity-50 cursor-not-allowed' : ''
-            ]"
-            :disabled="adminUsersStore.settingRoleUid === selectedUser?.uid"
-          >
-            <span v-if="adminUsersStore.settingRoleUid === selectedUser?.uid" class="i-carbon-circle-dash w-4 h-4 animate-spin mr-2"></span>
-            {{ selectedUser?.customClaims?.admin ? 'Remove Admin Role' : 'Make Admin' }}
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useCurrentUser } from 'vuefire'; // Import useCurrentUser
 import { useAdminUsersStore, type ApiUser as AdminUser } from '~/stores/adminUsers';
 import { useUserStore } from '~/stores/user';
@@ -430,14 +314,13 @@ definePageMeta({
 const adminUsersStore = useAdminUsersStore();
 const userStore = useUserStore(); // Keep for isAdmin check etc.
 const toastStore = useToastStore();
+const router = useRouter();
 const currentAuthUser = useCurrentUser(); // Get the currently authenticated user
 
 // --- Local state ---
 const searchQuery = ref<string>('');
 const roleFilter = ref<'admin' | 'user' | ''>('');
 const statusFilter = ref<'active' | 'inactive' | ''>(''); // UI state, maps to 'disabled'
-const showModal = ref<boolean>(false);
-const selectedUser = ref<AdminUser | null>(null);
 
 // --- Store state refs ---
 const loading = computed<boolean>(() => adminUsersStore.loading);
@@ -542,8 +425,7 @@ const clearFilters = () => {
 };
 
 const showUserDetails = (user: AdminUser) => {
-  selectedUser.value = user;
-  showModal.value = true;
+  router.push(`/admin/user-detail?id=${user.uid}`);
 };
 
 const toggleAdminRole = async (user: AdminUser | null) => {
@@ -570,18 +452,6 @@ const toggleAdminRole = async (user: AdminUser | null) => {
     // Toast success is likely handled within toggleAdminRole now
     // toastStore.success(`Successfully ${newRole === 'admin' ? 'granted' : 'removed'} admin role for ${user.email}.`);
     
-    // Update user in modal if open
-    if (showModal.value && selectedUser.value?.uid === user.uid) { // Check uid
-      // Find the updated user data from the store list
-      const updatedUser = adminUsersStore.users.find(u => u.uid === user.uid); // Check uid
-      if (updatedUser) {
-          selectedUser.value = { ...updatedUser };
-      } else {
-          // If user somehow disappeared from list, close modal
-          showModal.value = false;
-          selectedUser.value = null;
-      }
-    }
   } catch (err: unknown) { // Use unknown type for catch block
     console.error('Error updating user role:', err);
     // Use the store's error formatting and display
