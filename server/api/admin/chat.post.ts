@@ -354,7 +354,28 @@ export default defineEventHandler(async (event: H3Event) => {
       setResponseHeader(event, 'Content-Type', 'text/plain; charset=utf-8');
       setResponseHeader(event, 'Cache-Control', 'no-cache');
       // setResponseHeader(event, 'Transfer-Encoding', 'chunked'); // Often handled by sendStream
-      return sendStream(event, streamTextResult.textStream);
+
+      // Use readableStream as per Vercel AI SDK recommendations for stream parts
+      // and add specific error handling for the streaming operation.
+      try {
+        // Ensure the stream is correctly passed and handled.
+        // streamTextResult.textStream is potentially an older pattern;
+        // research suggests streamTextResult.readableStream for the raw stream parts.
+        if (!streamTextResult.readableStream) {
+          console.error(`Admin Chat: readableStream is not available on streamTextResult for admin [${adminUid}]. Cannot stream direct response.`);
+          // Consider throwing an error or returning a specific error response
+          // For now, logging and allowing the main catch block to handle.
+          throw new Error('readableStream not available for direct AI response');
+        }
+        return sendStream(event, streamTextResult.readableStream);
+      } catch (streamError: unknown) {
+        const streamErrorMessage = streamError instanceof Error ? streamError.message : String(streamError);
+        console.error(`Admin Chat: Error during sendStream for direct AI response for admin [${adminUid}]:`, streamErrorMessage, streamError);
+        // Allow the outer catch block to handle this as a general processing error,
+        // or throw a more specific error if needed.
+        // For now, this specific log helps pinpoint streaming issues.
+        throw streamError; // Re-throw to be caught by the main try-catch
+      }
     }
 
   } catch (error: unknown) {

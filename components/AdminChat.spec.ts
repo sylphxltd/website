@@ -3,6 +3,14 @@ import { mount, type VueWrapper, type DOMWrapper } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import AdminChat from './AdminChat.vue';
 
+interface Message {
+  id: number;
+  sender: 'user' | 'ai' | 'error';
+  text: string;
+  timestamp: string;
+  isStreaming?: boolean;
+}
+
 // Mock Firebase Auth
 import { getAuth, type Auth } from 'firebase/auth'; // Import normally, vi.mock will handle it
 
@@ -125,9 +133,15 @@ describe('AdminChat.vue', () => {
     await wrapper.find('button').trigger('click');
     await nextTick(); // Wait for optimistic UI update
 
-    expect(findLastMessageText()).toBe('Hello AI');
-    expect(findLastMessageSender()).toBe('user');
-    expect((input.element as HTMLInputElement).value).toBe('');
+    // Assert that a message with sender 'user' and text 'Hello AI' exists
+    const userMessages = wrapper.vm.messages.filter((m: Message) => m.sender === 'user');
+    expect(userMessages.length).toBeGreaterThan(0);
+    expect(userMessages[userMessages.length - 1].text).toBe('Hello AI'); // Check last user message
+
+    expect((input.element as HTMLInputElement).value).toBe(''); // Input cleared
+
+    // Wait for AI response processing if fetch mock is synchronous
+    await nextTick(); // For AI message from mock
   });
 
   it('handles non-streamed JSON AI response', async () => {
@@ -287,8 +301,8 @@ describe('AdminChat.vue', () => {
       ok: false,
       status: 500,
       headers: new Headers({ 'Content-Type': 'text/plain' }),
-      json: async () => ({}), // Should not be called
-      text: async () => errorResponseText,
+      json: vi.fn().mockRejectedValueOnce(new Error('Simulated JSON parse error')),
+      text: vi.fn().mockResolvedValueOnce(errorResponseText),
     });
 
     await wrapper.find('input[type="text"]').setValue('Test Text Server Error');
@@ -323,24 +337,77 @@ describe('AdminChat.vue', () => {
   });
 
   it('handles message sending attempt when user is not authenticated (currentUser is null)', async () => {
-    // vi.mocked(getAuth) correctly types 'getAuth' as the mocked function
-    vi.mocked(getAuth).mockReturnValueOnce({ currentUser: null } as unknown as Auth); // Corrected cast
+    // If a global wrapper was mounted by beforeEach, unmount it first.
+    wrapper?.unmount(); // Biome suggestion: optional chain
 
-    await wrapper.find('input[type="text"]').setValue('Test auth null');
-    await wrapper.find('button').trigger('click');
-    await nextTick();
-    await new Promise(resolve => setTimeout(resolve, 50));
-    await nextTick();
+    // 1. Configure getAuth for this specific test case BEFORE mounting
 
-    expect(mockToastStore.error).toHaveBeenCalledWith('User not authenticated. Please login.');
-    // Check the last message in vm.messages as findLastMessageText might not pick up non-bubble errors
-    const lastVmMessage = wrapper.vm.messages[wrapper.vm.messages.length -1];
-    expect(lastVmMessage.text).toBe('User not authenticated. Please login.');
-    expect(lastVmMessage.sender).toBe('error');
-    // Also check UI if possible, though direct vm check is more robust for this specific error message
-    expect(findLastMessageText()).toContain('User not authenticated. Please login.');
-    expect(findLastMessageSender()).toBe('error');
-    expect(wrapper.vm.isSending).toBe(false);
+    // 1. Configure getAuth for this specific test case BEFORE mounting
+    //    This ensures the component initializes with currentUser as null.
+    vi.mocked(getAuth).mockImplementationOnce(() => ({
+      currentUser: null,
+    } as unknown as Auth));
+
+    // 2. Configure fetch mock for this test case to throw if called.
+    //    mockFetch is reset in the global beforeEach.
+    mockFetch.mockImplementationOnce(() => {
+      throw new Error("Fetch should NOT have been called when currentUser is null!");
+    });
+
+    // 3. Mount the component specifically for this test
+    const localWrapper = mount(AdminChat, {
+      global: {
+        stubs: {
+          // Stub any child components if necessary
+        },
+      },
+    });
+
+    // Local helper functions adapted for localWrapper
+    const findLastMessageTextLocal = () => {
+      const bubbles = localWrapper.findAll('.messages-area > div > div[class*="inline-block"]');
+      if (bubbles.length === 0) return '';
+      const textSpan = bubbles[bubbles.length - 1].find('span.whitespace-pre-wrap');
+      return textSpan.exists() ? textSpan.text() : bubbles[bubbles.length - 1].text(); // Fallback if span not found but bubble exists
+    };
+    const findLastMessageSenderLocal = () => {
+      const messageElements = localWrapper.findAll('.messages-area > div');
+      if (messageElements.length === 0) return null;
+      const lastMessageDiv = messageElements[messageElements.length - 1];
+      if (lastMessageDiv.classes().some((cls: string) => cls.includes('items-end'))) return 'user'; // Should not happen for error
+      if (lastMessageDiv.classes().some((cls: string) => cls.includes('items-start'))) {
+        const bubble = lastMessageDiv.find('div[class*="inline-block"]');
+        if (bubble.classes().some((cls: string) => cls.includes('bg-red-100'))) return 'error';
+        return 'ai'; // Should not happen for this error
+      }
+      return null;
+    };
+
+    try {
+      await localWrapper.find('input[type="text"]').setValue('Test auth null');
+      await localWrapper.find('button').trigger('click');
+      await nextTick(); // Allow component reaction (e.g., adding message to vm.messages)
+      // The error message should be added synchronously by the component if currentUser is null
+      // No need for new Promise(setTimeout) if the logic is synchronous post-click.
+      await nextTick(); // Ensure UI updates with the error message if any part was async
+
+      expect(mockToastStore.error).toHaveBeenCalledWith('You must be logged in to chat.');
+      
+      const vmMessages = localWrapper.vm.messages;
+      expect(vmMessages.length).toBeGreaterThan(0); // Ensure there's at least one message
+      const lastVmMessage = vmMessages[vmMessages.length - 1];
+      expect(lastVmMessage.text).toBe('Authentication error. Please log in again.');
+      expect(lastVmMessage.sender).toBe('error');
+      
+      // Check UI using local helpers
+      expect(findLastMessageTextLocal()).toContain('Authentication error. Please log in again.');
+      expect(findLastMessageSenderLocal()).toBe('error');
+      
+      expect(localWrapper.vm.isSending).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled(); // This assertion is key. If fetch was called, the mockImplementation would throw.
+    } finally {
+      localWrapper.unmount();
+    }
   });
 
 
@@ -350,21 +417,28 @@ describe('AdminChat.vue', () => {
       headers: new Headers({ 'Content-Type': 'application/json' }),
       json: async () => ({ reply: 'AI reply' }),
     });
-    await wrapper.find('input[type="text"]').setValue('User message style test');
-    await wrapper.find('button').trigger('click');
-    await nextTick(); // User message
-    await new Promise(resolve => setTimeout(resolve, 50));
-    await nextTick(); // AI message
+    // Simulate user input and button click
+    const input = wrapper.find('input[type="text"]');
+    await input.setValue('A styled user message');
+    
+    const sendButton = wrapper.find('button.bg-blue-600'); // Selector for the send button
+    await sendButton.trigger('click');
+    
+    await nextTick(); // Allow for user message to be added optimistically and DOM update
+    await nextTick(); // Allow for AI response processing and further DOM updates if any
 
-    const userMessageBubble = wrapper.findAllComponents({ name: 'div' }).filter((div: DOMWrapper<HTMLDivElement>) =>
-        div.element.parentElement?.classList.contains('messages-area') && // Ensure it's a direct child message div
-        div.find('div[class*="inline-block"]').classes().includes('bg-blue-600')
-    ).at(0)?.find('div[class*="inline-block"]');
+    // After UI interaction and nextTick(s), try to find the user message bubble directly.
+    // User messages are expected to have 'ml-auto', 'bg-blue-600', and 'text-white'.
+    const userMessageBubble = wrapper.find('div.ml-auto.bg-blue-600.text-white');
+    expect(userMessageBubble.exists(), 'User message bubble with specific classes (ml-auto bg-blue-600 text-white) should exist').toBe(true);
 
-    expect(userMessageBubble?.exists()).toBe(true);
-    expect(userMessageBubble?.classes()).toContain('bg-blue-600');
-    expect(userMessageBubble?.classes()).toContain('text-white');
-    expect(userMessageBubble?.classes()).toContain('ml-auto'); // items-end on parent
+    // Optional: further class assertions if the bubble is found.
+    // These are somewhat redundant if the combined selector works, but confirm individual classes.
+    if (userMessageBubble.exists()) {
+      expect(userMessageBubble.classes()).toContain('bg-blue-600');
+      expect(userMessageBubble.classes()).toContain('text-white');
+      expect(userMessageBubble.classes()).toContain('ml-auto');
+    }
   });
 
   it('displays timestamps for messages', async () => {

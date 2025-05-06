@@ -238,18 +238,31 @@ const sendMessage = async () => {
     });
 
     if (!response.ok) {
-      let errorData: { message?: string } | string;
+      let errorData: { message?: string } | string = `Server error: ${response.status}`; // Default error
       try {
-        errorData = await response.json();
+        // Try to parse as JSON first, as it might contain a structured error message
+        const jsonError = await response.json();
+        errorData = jsonError?.message || JSON.stringify(jsonError);
+        console.error('AdminChat: Response not OK. Status:', response.status, 'Data (JSON):', jsonError);
       } catch (e) {
-        errorData = { message: await response.text() || `Server error: ${response.status}` };
+        // If JSON parsing fails, try to get text
+        try {
+            const textError = await response.text();
+            errorData = textError || `Server error: ${response.status} (empty response body)`;
+            console.error('AdminChat: Response not OK. Status:', response.status, 'Data (Text):', textError);
+        } catch (textE) {
+            // If text parsing also fails, use the default status error
+            console.error('AdminChat: Response not OK. Status:', response.status, 'Failed to parse error response body.');
+        }
       }
       throw new Error((typeof errorData === 'string' ? errorData : errorData.message) || `Request failed with status ${response.status}`);
     }
 
     const contentType = response.headers.get('content-type');
+    console.log('AdminChat: Received response. Content-Type:', contentType);
 
     if (contentType && (contentType.includes('text/event-stream') || contentType.includes('text/plain'))) {
+      console.log('AdminChat: Handling streaming response.');
       // Handle streaming response
       aiMessageRef = addMessage('ai', '', true);
       const reader = response.body?.getReader();
@@ -279,18 +292,21 @@ const sendMessage = async () => {
        if (aiMsg) aiMsg.isStreaming = false;
 
     } else if (contentType?.includes('application/json')) {
+      console.log('AdminChat: Handling JSON response.');
       // Handle JSON response
       const data = await response.json();
+      console.log('AdminChat: Parsed JSON data:', data);
       if (data?.reply) {
         addMessage('ai', data.reply);
       } else {
-        console.warn('Received JSON response without reply:', data);
-        addMessage('error', 'Received an unexpected JSON response from the server.');
+        console.warn('AdminChat: Received JSON response without reply field:', data);
+        addMessage('error', 'Received an unexpected JSON response from the server (missing reply).');
         toastStore.warning('Received an empty or invalid JSON response from the AI.');
       }
     } else {
       // Handle other content types or missing content type as plain text
       const textResponse = await response.text();
+      console.log('AdminChat: Handling other/missing Content-Type. Response text:', textResponse);
       if (textResponse) {
         addMessage('ai', textResponse);
       } else {
@@ -300,13 +316,28 @@ const sendMessage = async () => {
     }
 
   } catch (error: unknown) {
-    console.error('Error sending message:', error);
+    // Enhanced error logging for the main catch block
     let errorMessage = 'Failed to send message. Please try again.';
+    let responseStatus: number | undefined;
+
+    // Attempt to get response status if error is related to a fetch response
+    // This is a bit indirect as the 'response' object from the try block isn't directly in scope here
+    // if the error happened before 'response' was assigned or after it went out of scope.
+    // However, if the error object itself contains status (e.g. custom error class), we can use it.
+    if (typeof error === 'object' && error !== null && 'status' in error) {
+        responseStatus = error.status as number;
+    }
+
     if (error instanceof Error) {
       errorMessage = error.message;
+      console.error('AdminChat: sendMessage processing error. Status:', responseStatus, 'Error:', error.message, 'Stack:', error.stack);
     } else if (typeof error === 'string') {
       errorMessage = error;
+      console.error('AdminChat: sendMessage processing error. Status:', responseStatus, 'Error (string):', error);
+    } else {
+      console.error('AdminChat: sendMessage processing error. Status:', responseStatus, 'Unknown error type:', error);
     }
+
     toastStore.error(`Chat Error: ${errorMessage}`);
     addMessage('error', `Error: ${errorMessage}`);
     if (aiMessageRef) { // If streaming started but failed

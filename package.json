@@ -40,6 +40,7 @@
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.8",
     "@iconify/json": "^2.2.334",
+    "@nuxt/test-utils": "^3.18.0",
     "@types/node": "^22.15.3",
     "@unocss/nuxt": "^66.1.0-beta.13",
     "@unocss/preset-attributify": "^66.1.0-beta.13",
@@ -47,13 +48,17 @@
     "@unocss/preset-typography": "^66.1.0-beta.13",
     "@unocss/preset-uno": "^66.1.0-beta.13",
     "@unocss/preset-web-fonts": "^66.1.0-beta.13",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "@vue/test-utils": "^2.4.6",
     "@vueuse/core": "^13.1.0",
     "@vueuse/nuxt": "^13.1.0",
     "animate.css": "^4.1.1",
     "dotenv": "^16.5.0",
     "gsap": "^3.13.0",
+    "jsdom": "^26.1.0",
     "motion": "^12.9.4",
     "sass": "^1.87.0",
-    "vitest": "^3.1.3"
+    "vitest": "^3.1.3",
+    "vitest-environment-nuxt": "^1.0.1"
   }
 }

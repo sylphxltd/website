@@ -3,32 +3,16 @@ import type { H3Event, H3Error } from 'h3';
 import { ReadableStream } from 'node:stream/web'; // For mocking ReadableStream
 import type { Mock } from 'vitest';
 
-// Import the handler
-import handler from './chat.post';
-
-// Mocked modules
-// Firebase Admin
-const mockVerifyIdToken = vi.fn();
+// ALL MOCK CONSTANTS DEFINED FIRST
+const mockDecodedIdToken = { uid: 'admin123', admin: true };
+const mockVerifyIdToken = vi.fn().mockResolvedValue(mockDecodedIdToken);
 const mockGetAdminAuth = vi.fn(() => ({
-  verifyIdToken: mockVerifyIdToken,
+  auth: () => ({ // This is what admin.auth() returns
+    verifyIdToken: mockVerifyIdToken,
+  }),
 }));
-vi.mock('~/server/utils/firebaseAdmin', () => ({
-  getAdminAuth: mockGetAdminAuth,
-}));
-
-// AI SDK - OpenAI model
 const mockOpenaiChat = vi.fn();
-vi.mock('@ai-sdk/openai', () => ({
-  openai: { chat: mockOpenaiChat },
-}));
-
-// AI SDK - streamText
 const mockStreamText = vi.fn();
-vi.mock('ai', () => ({
-  streamText: mockStreamText,
-}));
-
-// H3 utilities
 const mockH3GetHeader = vi.fn();
 const mockH3ReadBody = vi.fn();
 const mockH3SendStream = vi.fn();
@@ -40,26 +24,46 @@ const mockH3CreateError = vi.fn().mockImplementation((options: H3Error) => {
     error.data = options.data;
     return error;
 });
+const mockDollarFetchImplementation = vi.fn();
+const mockDefineEventHandler = vi.fn(handler => handler); // Pass-through mock
 
-vi.mock('h3', async (importOriginal: () => Promise<typeof import('h3')>) => {
-  const original = await importOriginal();
-  return {
-    ...original, // Spread original exports
-    getHeader: mockH3GetHeader,
-    readBody: mockH3ReadBody,
-    sendStream: mockH3SendStream,
-    setResponseHeader: mockH3SetResponseHeader,
-    createError: mockH3CreateError,
-  };
-});
+// ALL vi.mock CALLS NEXT
+vi.mock('~/server/utils/firebaseAdmin', () => ({
+  getAdminAuth: mockGetAdminAuth,
+}));
+vi.mock('@ai-sdk/openai', () => ({
+  openai: { chat: mockOpenaiChat },
+}));
+vi.mock('ai', () => ({
+  streamText: mockStreamText,
+}));
+vi.mock('h3', () => ({ // Corrected
+  getHeader: mockH3GetHeader,
+  readBody: mockH3ReadBody,
+  sendStream: mockH3SendStream,
+  setResponseHeader: mockH3SetResponseHeader,
+  createError: mockH3CreateError,
+}));
+
+(vi.mock as any)('#imports', () => ({
+  defineEventHandler: mockDefineEventHandler,
+  // Add other auto-imports here if the SUT uses them and they need mocking
+}), { virtual: true });
+
+// DIAGNOSTIC ATTEMPT: Use 2-argument form vi.mock(path, factory)
+// This omits { virtual: true } to try and satisfy the TS "Expected 1-2 arguments" error.
+// This might cause runtime issues if #imports isn't treated as virtual.
+// Corrected to include { virtual: true } as per SubTask13.1
 
 // Global $fetch
-// global.$fetch will be assigned vi.fn() directly later.
 // The `declare global` for $fetch has been removed to avoid conflict with Nuxt's global type.
 // We will cast the mock specifically during assignment.
-const mockDollarFetchImplementation = vi.fn();
 // biome-ignore lint/suspicious/noExplicitAny: Mocking a complex global like $fetch often requires this type of casting.
 global.$fetch = mockDollarFetchImplementation as any; // Cast to 'any' for the global assignment to bypass strict type checking for $fetch's complex type. The mockDollarFetchImplementation variable itself is still a Vitest mock.
+
+// THEN THE IMPORTS FOR THE SYSTEM UNDER TEST
+// This import MUST come AFTER all vi.mock calls that affect its dependencies.
+const handler = (await import('./chat.post')).default;
 
 
 // Define an interface for our augmented mock event if we add custom properties for spying
@@ -140,7 +144,7 @@ describe('POST /api/admin/chat', () => {
     mockVerifyIdToken.mockResolvedValue({ uid: 'admin123', admin: true });
     mockOpenaiChat.mockReturnValue({});
     mockStreamText.mockResolvedValue({
-      textStream: new ReadableStream({
+      readableStream: new ReadableStream({ // Changed textStream to readableStream
         start(controller) {
           controller.enqueue('Hello from AI');
           controller.close();
@@ -303,7 +307,7 @@ describe('POST /api/admin/chat', () => {
         }
       });
       mockStreamText.mockResolvedValueOnce({
-        textStream: mockTextStream,
+        readableStream: mockTextStream, // Changed textStream to readableStream
         toolCalls: Promise.resolve(null),
         text: Promise.resolve('This is a streamed AI reply.'),
       });
@@ -467,6 +471,59 @@ describe('POST /api/admin/chat', () => {
       mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'perform unknown action' });
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: unknownToolJson });
+    });
+
+    it('should handle errors if sendStream fails', async () => {
+      const mockStreamContent = 'Attempting to stream this.';
+      const mockUserMessage = 'Test message for stream failure';
+      const mockErrorReadableStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(mockStreamContent);
+          controller.close();
+        }
+      });
+
+      mockStreamText.mockResolvedValueOnce({
+        readableStream: mockErrorReadableStream,
+        toolCalls: Promise.resolve([]), // No tool calls
+        text: Promise.resolve(mockStreamContent),
+      });
+
+      mockEvent = createMockEvent(
+        { 'Authorization': 'Bearer admin-token-stream-fail' },
+        { message: mockUserMessage }
+      );
+
+      const simulatedSendStreamError = new Error('Network connection lost during stream');
+      // mockH3SendStream is the global mock we control from h3 import
+      mockH3SendStream.mockRejectedValueOnce(simulatedSendStreamError);
+
+      // We expect the handler to catch this, log (untestable here),
+      // and throw an H3Error created via createError
+      try {
+        await handler(mockEvent);
+        // Should not reach here if an error is properly thrown by the handler
+        throw new Error('Handler did not throw an error as expected after sendStream failure');
+      } catch (e: unknown) {
+        const error = e as H3Error;
+        // Verify that mockH3CreateError was called by the SUT's catch block for sendStream
+        // This assumes the SUT's catch block for sendStream errors calls createError.
+        expect(mockH3CreateError).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 500,
+          statusMessage: 'Failed to stream response to client.', // Example message
+        }));
+        
+        // And that the error caught by the test is the one created by mockH3CreateError
+        expect(error.statusCode).toBe(500);
+        expect(error.statusMessage).toBe('Failed to stream response to client.'); // Matches the SUT's error
+      }
+
+      // Ensure streamText was called
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({
+        prompt: mockUserMessage,
+      }));
+      // Ensure sendStream was attempted with the correct stream
+      expect(mockH3SendStream).toHaveBeenCalledWith(mockEvent, mockErrorReadableStream);
     });
   });
 
