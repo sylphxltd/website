@@ -1,8 +1,9 @@
 import type { H3Event } from 'h3';
+import { sendStream, setResponseHeader } from 'h3'; // Added for streaming
 import { getAdminAuth } from '~/server/utils/firebaseAdmin'; // Assuming firebaseAdmin utility exists
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { H3Error } from 'h3';
-import { generateText } from 'ai';
+import { streamText } from 'ai'; // Changed from generateText
 import { openai } from '@ai-sdk/openai'; // Corrected import
 
 interface ChatRequestBody {
@@ -99,258 +100,261 @@ export default defineEventHandler(async (event: H3Event) => {
   try {
     console.log(`Admin Chat: Received message from admin [${adminUid}]: "${userMessage}"`);
 
-    const { text: aiResponseText } = await generateText({
-      model: openai.chat('gpt-4-turbo'), // Or your preferred model
+    const streamTextResult = await streamText({
+      model: openai.chat('gpt-4-turbo'),
       system: SYSTEM_PROMPT,
       prompt: userMessage,
     });
 
-    console.log(`Admin Chat: AI response for admin [${adminUid}]: "${aiResponseText}"`);
+    const toolCalls = await streamTextResult.toolCalls;
 
-    try {
-      const parsedAiResponse = JSON.parse(aiResponseText) as ToolUse;
+    if (toolCalls && toolCalls.length > 0) {
+      const aiResponseText = await streamTextResult.text;
+      console.log(`Admin Chat: AI response for admin [${adminUid}] (tool use detected, full text): "${aiResponseText}"`);
 
-      if (parsedAiResponse?.tool_use?.name === "list_applications") {
-        try {
-          interface AppBasicInfo {
-            id: string;
-            name: string;
-          }
-          interface ListAppsResponse {
-            apps: AppBasicInfo[];
-          }
+      try {
+        const parsedAiResponse = JSON.parse(aiResponseText) as ToolUse;
 
-          const response = await $fetch<ListAppsResponse>('/api/apps/list', {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${idToken}`
+        if (parsedAiResponse?.tool_use?.name === "list_applications") {
+          try {
+            interface AppBasicInfo {
+              id: string;
+              name: string;
             }
-          });
-
-          if (response.apps && response.apps.length > 0) {
-            const appNames = response.apps.map(app => `${app.name} (ID: ${app.id})`).join(', ');
-            return { reply: `Found ${response.apps.length} apps: ${appNames}.` };
-          }
-          return { reply: "No applications found." };
-        } catch (fetchError: unknown) {
-          const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-          console.error(`Admin Chat: Error fetching app list for admin [${adminUid}] after AI intent:`, errorMessage, fetchError);
-          return { reply: "Sorry, I understood you want to list apps, but I couldn't fetch them at the moment." };
-        }
-      } else if (parsedAiResponse?.tool_use?.name === "get_application_details") {
-        const appId = parsedAiResponse.tool_use.parameters?.appId as string | undefined;
-
-        if (!appId || typeof appId !== 'string' || appId.trim() === '') {
-          console.warn(`Admin Chat: AI identified 'get_application_details' but appId was missing or invalid for admin [${adminUid}]:`, parsedAiResponse.tool_use.parameters);
-          return { reply: "I understood you want details for an app, but I couldn't identify which one. Please specify the App ID." };
-        }
-
-        try {
-          // Define a more specific type for the app details if known, otherwise use a generic one
-          interface AppDetails {
-            id: string;
-            name: string;
-            description?: string;
-            createdAt: string; // Assuming ISO string date
-            // Add other relevant fields
-          }
-
-          const appDetails = await $fetch<AppDetails>(`/api/apps/${appId.trim()}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${idToken}`
+            interface ListAppsResponse {
+              apps: AppBasicInfo[];
             }
-          });
 
-          // Format the app details into a user-friendly string
-          let detailsString = `Details for App ${appDetails.name} (ID: ${appDetails.id}):`;
-          if (appDetails.description) {
-            detailsString += `\nDescription: ${appDetails.description}`;
+            const response = await $fetch<ListAppsResponse>('/api/apps/list', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${idToken}`
+              }
+            });
+
+            if (response.apps && response.apps.length > 0) {
+              const appNames = response.apps.map(app => `${app.name} (ID: ${app.id})`).join(', ');
+              return { reply: `Found ${response.apps.length} apps: ${appNames}.` };
+            }
+            return { reply: "No applications found." };
+          } catch (fetchError: unknown) {
+            const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            console.error(`Admin Chat: Error fetching app list for admin [${adminUid}] after AI intent:`, errorMessage, fetchError);
+            return { reply: "Sorry, I understood you want to list apps, but I couldn't fetch them at the moment." };
           }
-          detailsString += `\nCreated At: ${new Date(appDetails.createdAt).toLocaleString()}`;
-          // Add more fields as needed
+        } else if (parsedAiResponse?.tool_use?.name === "get_application_details") {
+          const appId = parsedAiResponse.tool_use.parameters?.appId as string | undefined;
 
-          return { reply: detailsString };
-
-        } catch (fetchError: unknown) {
-          const h3Error = fetchError as H3Error; // Type assertion
-          if (h3Error.statusCode === 404) {
-            console.warn(`Admin Chat: App with ID [${appId}] not found for admin [${adminUid}].`);
-            return { reply: `Sorry, I couldn't find an application with ID "${appId}". Please check the ID and try again.` };
+          if (!appId || typeof appId !== 'string' || appId.trim() === '') {
+            console.warn(`Admin Chat: AI identified 'get_application_details' but appId was missing or invalid for admin [${adminUid}]:`, parsedAiResponse.tool_use.parameters);
+            return { reply: "I understood you want details for an app, but I couldn't identify which one. Please specify the App ID." };
           }
-          const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-          console.error(`Admin Chat: Error fetching app details for ID [${appId}] for admin [${adminUid}]:`, errorMessage, fetchError);
-          return { reply: `Sorry, I understood you want details for app "${appId}", but I couldn't fetch them right now.` };
+
+          try {
+            interface AppDetails {
+              id: string;
+              name: string;
+              description?: string;
+              createdAt: string;
+            }
+
+            const appDetails = await $fetch<AppDetails>(`/api/apps/${appId.trim()}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${idToken}`
+              }
+            });
+
+            let detailsString = `Details for App ${appDetails.name} (ID: ${appDetails.id}):`;
+            if (appDetails.description) {
+              detailsString += `\nDescription: ${appDetails.description}`;
+            }
+            detailsString += `\nCreated At: ${new Date(appDetails.createdAt).toLocaleString()}`;
+            
+            return { reply: detailsString };
+
+          } catch (fetchError: unknown) {
+            const h3Error = fetchError as H3Error;
+            if (h3Error.statusCode === 404) {
+              console.warn(`Admin Chat: App with ID [${appId}] not found for admin [${adminUid}].`);
+              return { reply: `Sorry, I couldn't find an application with ID "${appId}". Please check the ID and try again.` };
+            }
+            const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            console.error(`Admin Chat: Error fetching app details for ID [${appId}] for admin [${adminUid}]:`, errorMessage, fetchError);
+            return { reply: `Sorry, I understood you want details for app "${appId}", but I couldn't fetch them right now.` };
+          }
+        } else if (parsedAiResponse?.tool_use?.name === "generate_application_copy") {
+          const params = parsedAiResponse.tool_use.parameters;
+          const appId = params?.appId as string | undefined;
+          const appDescription = params?.appDescription as string | undefined;
+          const targetAudience = params?.targetAudience as string | undefined;
+          const tone = params?.tone as string | undefined;
+
+          if (!appId || typeof appId !== 'string' || appId.trim() === '') {
+            console.warn(`Admin Chat: AI identified 'generate_application_copy' but appId was missing or invalid for admin [${adminUid}]:`, params);
+            return { reply: "I understood you want to generate copy for an app, but I couldn't identify which one. Please specify the App ID." };
+          }
+
+          try {
+            console.log(`Admin Chat: Calling /api/ai/generate-copy for app [${appId}] by admin [${adminUid}] with params:`, { appDescription, targetAudience, tone });
+            
+            const generatedCopyText = await $fetch<string>('/api/ai/generate-copy', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: {
+                appId: appId.trim(),
+                ...(appDescription && { appDescription }),
+                ...(targetAudience && { targetAudience }),
+                ...(tone && { tone }),
+              },
+            });
+
+            if (!generatedCopyText || generatedCopyText.trim() === '') {
+              console.warn(`Admin Chat: /api/ai/generate-copy returned empty response for app [${appId}] by admin [${adminUid}]`);
+              return { reply: `I tried to generate copy for app "${appId}", but it seems I couldn't come up with anything right now.` };
+            }
+
+            return { reply: `Generated copy for app ${appId.trim()}: ${generatedCopyText}` };
+
+          } catch (fetchError: unknown) {
+            const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            console.error(`Admin Chat: Error calling /api/ai/generate-copy for app [${appId}] by admin [${adminUid}]:`, errorMessage, fetchError);
+            const h3Error = fetchError as H3Error;
+            if (h3Error.statusCode === 404) {
+               return { reply: `Sorry, I couldn't find an application with ID "${appId}" to generate copy for. Please check the ID.` };
+            }
+            return { reply: `Sorry, I couldn't generate copy for app "${appId}" at the moment. There was an issue with the generation service.` };
+          }
+        } else if (parsedAiResponse?.tool_use?.name === "generate_application_logo") {
+          const params = parsedAiResponse.tool_use.parameters;
+          const appId = params?.appId as string | undefined;
+          const stylePrompt = params?.stylePrompt as string | undefined;
+
+          if (!appId || typeof appId !== 'string' || appId.trim() === '') {
+            console.warn(`Admin Chat: AI identified 'generate_application_logo' but appId was missing or invalid for admin [${adminUid}]:`, params);
+            return { reply: "I understood you want to generate a logo for an app, but I couldn't identify which one. Please specify the App ID." };
+          }
+
+          try {
+            console.log(`Admin Chat: Calling /api/ai/generate-logo for app [${appId}] by admin [${adminUid}] with stylePrompt:`, stylePrompt);
+
+            interface GenerateLogoResponse {
+              logoUrl: string;
+            }
+
+            const response = await $fetch<GenerateLogoResponse>('/api/ai/generate-logo', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: {
+                appId: appId.trim(),
+                ...(stylePrompt && { stylePrompt }),
+              },
+            });
+
+            if (!response || !response.logoUrl) {
+              console.warn(`Admin Chat: /api/ai/generate-logo returned invalid response for app [${appId}] by admin [${adminUid}]`);
+              return { reply: `I tried to generate a logo for app "${appId}", but it seems I couldn't get a valid URL back.` };
+            }
+
+            return { reply: `Generated logo for app ${appId.trim()}: ${response.logoUrl}` };
+
+          } catch (fetchError: unknown) {
+            const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            console.error(`Admin Chat: Error calling /api/ai/generate-logo for app [${appId}] by admin [${adminUid}]:`, errorMessage, fetchError);
+            const h3Error = fetchError as H3Error;
+            if (h3Error.statusCode === 404) {
+               return { reply: `Sorry, I couldn't find an application with ID "${appId}" to generate a logo for. Please check the ID.` };
+            }
+            return { reply: `Sorry, I couldn't generate a logo for app "${appId}" at the moment. There was an issue with the generation service.` };
+          }
+        } else if (parsedAiResponse?.tool_use?.name === "generate_review_reply") {
+          const params = parsedAiResponse.tool_use.parameters;
+          const appId = params?.appId as string | undefined;
+          const reviewId = params?.reviewId as string | undefined;
+
+          if (!appId || typeof appId !== 'string' || appId.trim() === '' || !reviewId || typeof reviewId !== 'string' || reviewId.trim() === '') {
+            console.warn(`Admin Chat: AI identified 'generate_review_reply' but appId or reviewId was missing or invalid for admin [${adminUid}]:`, params);
+            return { reply: "I understood you want to generate a review reply, but I couldn't identify the app or review. Please specify both the App ID and Review ID." };
+          }
+
+          try {
+            interface ReviewDetails {
+              reviewBody: string;
+              rating: number;
+            }
+            console.log(`Admin Chat: Fetching review details for review [${reviewId}] of app [${appId}] by admin [${adminUid}]`);
+            const reviewDetails = await $fetch<ReviewDetails>('/api/reviews/detail', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${idToken}`
+              },
+              query: { appId: appId.trim(), reviewId: reviewId.trim() }
+            });
+
+            if (!reviewDetails || typeof reviewDetails.reviewBody !== 'string' || typeof reviewDetails.rating !== 'number') {
+              console.error(`Admin Chat: Invalid or incomplete review details received for review [${reviewId}], app [${appId}] by admin [${adminUid}]:`, reviewDetails);
+              return { reply: `Sorry, I couldn't fetch the necessary details for review "${reviewId}". The data might be incomplete.` };
+            }
+
+            console.log(`Admin Chat: Calling /api/ai/generate-review-reply for review [${reviewId}] of app [${appId}] by admin [${adminUid}]`);
+
+            interface GenerateReviewReplyResponse {
+              suggestion: string;
+            }
+
+            const replyResponse = await $fetch<GenerateReviewReplyResponse>('/api/ai/generate-review-reply', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: {
+                appId: appId.trim(),
+                reviewBody: reviewDetails.reviewBody,
+                rating: reviewDetails.rating,
+              },
+            });
+
+            if (!replyResponse || !replyResponse.suggestion) {
+              console.warn(`Admin Chat: /api/ai/generate-review-reply returned invalid response for review [${reviewId}], app [${appId}] by admin [${adminUid}]`);
+              return { reply: `I tried to generate a reply for review "${reviewId}", but it seems I couldn't get a valid suggestion back.` };
+            }
+
+            return { reply: `Suggested reply for review ${reviewId.trim()} (app ${appId.trim()}): ${replyResponse.suggestion}` };
+
+          } catch (fetchError: unknown) {
+            const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            const h3Error = fetchError as H3Error;
+            if (h3Error.statusCode === 404) {
+               console.warn(`Admin Chat: Could not find review [${reviewId}] for app [${appId}] or the app itself, for admin [${adminUid}]. Error:`, errorMessage);
+               return { reply: `Sorry, I couldn't find review "${reviewId}" for app "${appId}". Please check the IDs.` };
+            }
+            console.error(`Admin Chat: Error in 'generate_review_reply' flow for review [${reviewId}], app [${appId}] by admin [${adminUid}]:`, errorMessage, fetchError);
+            return { reply: `Sorry, I couldn't generate a reply for review "${reviewId}" at the moment. There was an issue with the process.` };
+          }
+        } else {
+          // If JSON is valid but not a recognized tool_use structure
+          console.warn(`Admin Chat: AI returned valid JSON but not a recognized tool use for admin [${adminUid}]:`, parsedAiResponse);
+          return { reply: aiResponseText };
         }
-      } else if (parsedAiResponse?.tool_use?.name === "generate_application_copy") {
-        const params = parsedAiResponse.tool_use.parameters;
-        const appId = params?.appId as string | undefined;
-        const appDescription = params?.appDescription as string | undefined;
-        const targetAudience = params?.targetAudience as string | undefined;
-        const tone = params?.tone as string | undefined;
-
-        if (!appId || typeof appId !== 'string' || appId.trim() === '') {
-          console.warn(`Admin Chat: AI identified 'generate_application_copy' but appId was missing or invalid for admin [${adminUid}]:`, params);
-          return { reply: "I understood you want to generate copy for an app, but I couldn't identify which one. Please specify the App ID." };
-        }
-
-        try {
-          console.log(`Admin Chat: Calling /api/ai/generate-copy for app [${appId}] by admin [${adminUid}] with params:`, { appDescription, targetAudience, tone });
-
-          // The /api/ai/generate-copy.post.ts endpoint is expected to stream text.
-          // $fetch should handle this and return the complete string once the stream ends.
-          const generatedCopyText = await $fetch<string>('/api/ai/generate-copy', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${idToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: {
-              appId: appId.trim(),
-              ...(appDescription && { appDescription }),
-              ...(targetAudience && { targetAudience }),
-              ...(tone && { tone }),
-            },
-          });
-
-          if (!generatedCopyText || generatedCopyText.trim() === '') {
-            console.warn(`Admin Chat: /api/ai/generate-copy returned empty response for app [${appId}] by admin [${adminUid}]`);
-            return { reply: `I tried to generate copy for app "${appId}", but it seems I couldn't come up with anything right now.` };
-          }
-
-          return { reply: `Generated copy for app ${appId.trim()}: ${generatedCopyText}` };
-
-        } catch (fetchError: unknown) {
-          const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-          console.error(`Admin Chat: Error calling /api/ai/generate-copy for app [${appId}] by admin [${adminUid}]:`, errorMessage, fetchError);
-          const h3Error = fetchError as H3Error;
-          if (h3Error.statusCode === 404) { // Assuming generate-copy might 404 if app itself not found by its internal logic
-             return { reply: `Sorry, I couldn't find an application with ID "${appId}" to generate copy for. Please check the ID.` };
-          }
-          return { reply: `Sorry, I couldn't generate copy for app "${appId}" at the moment. There was an issue with the generation service.` };
-        }
-      } else if (parsedAiResponse?.tool_use?.name === "generate_application_logo") {
-        const params = parsedAiResponse.tool_use.parameters;
-        const appId = params?.appId as string | undefined;
-        const stylePrompt = params?.stylePrompt as string | undefined;
-
-        if (!appId || typeof appId !== 'string' || appId.trim() === '') {
-          console.warn(`Admin Chat: AI identified 'generate_application_logo' but appId was missing or invalid for admin [${adminUid}]:`, params);
-          return { reply: "I understood you want to generate a logo for an app, but I couldn't identify which one. Please specify the App ID." };
-        }
-
-        try {
-          console.log(`Admin Chat: Calling /api/ai/generate-logo for app [${appId}] by admin [${adminUid}] with stylePrompt:`, stylePrompt);
-
-          interface GenerateLogoResponse {
-            logoUrl: string;
-          }
-
-          const response = await $fetch<GenerateLogoResponse>('/api/ai/generate-logo', { // Or /api/ai/generate-logo.post
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${idToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: {
-              appId: appId.trim(),
-              ...(stylePrompt && { stylePrompt }),
-            },
-          });
-
-          if (!response || !response.logoUrl) {
-            console.warn(`Admin Chat: /api/ai/generate-logo returned invalid response for app [${appId}] by admin [${adminUid}]`);
-            return { reply: `I tried to generate a logo for app "${appId}", but it seems I couldn't get a valid URL back.` };
-          }
-
-          return { reply: `Generated logo for app ${appId.trim()}: ${response.logoUrl}` };
-
-        } catch (fetchError: unknown) {
-          const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-          console.error(`Admin Chat: Error calling /api/ai/generate-logo for app [${appId}] by admin [${adminUid}]:`, errorMessage, fetchError);
-          const h3Error = fetchError as H3Error;
-          if (h3Error.statusCode === 404) {
-             return { reply: `Sorry, I couldn't find an application with ID "${appId}" to generate a logo for. Please check the ID.` };
-          }
-          return { reply: `Sorry, I couldn't generate a logo for app "${appId}" at the moment. There was an issue with the generation service.` };
-        }
-      } else if (parsedAiResponse?.tool_use?.name === "generate_review_reply") {
-        const params = parsedAiResponse.tool_use.parameters;
-        const appId = params?.appId as string | undefined;
-        const reviewId = params?.reviewId as string | undefined;
-
-        if (!appId || typeof appId !== 'string' || appId.trim() === '' || !reviewId || typeof reviewId !== 'string' || reviewId.trim() === '') {
-          console.warn(`Admin Chat: AI identified 'generate_review_reply' but appId or reviewId was missing or invalid for admin [${adminUid}]:`, params);
-          return { reply: "I understood you want to generate a review reply, but I couldn't identify the app or review. Please specify both the App ID and Review ID." };
-        }
-
-        try {
-          // Fetch Review Details
-          interface ReviewDetails {
-            reviewBody: string;
-            rating: number;
-            // Add other fields if necessary, though only reviewBody and rating are used below
-          }
-          console.log(`Admin Chat: Fetching review details for review [${reviewId}] of app [${appId}] by admin [${adminUid}]`);
-          const reviewDetails = await $fetch<ReviewDetails>('/api/reviews/detail', { // Assuming query params are handled by $fetch
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${idToken}`
-            },
-            query: { appId: appId.trim(), reviewId: reviewId.trim() }
-          });
-
-          if (!reviewDetails || typeof reviewDetails.reviewBody !== 'string' || typeof reviewDetails.rating !== 'number') {
-            console.error(`Admin Chat: Invalid or incomplete review details received for review [${reviewId}], app [${appId}] by admin [${adminUid}]:`, reviewDetails);
-            return { reply: `Sorry, I couldn't fetch the necessary details for review "${reviewId}". The data might be incomplete.` };
-          }
-
-          console.log(`Admin Chat: Calling /api/ai/generate-review-reply for review [${reviewId}] of app [${appId}] by admin [${adminUid}]`);
-
-          interface GenerateReviewReplyResponse {
-            suggestion: string;
-          }
-
-          const replyResponse = await $fetch<GenerateReviewReplyResponse>('/api/ai/generate-review-reply', { // Or /api/ai/generate-review-reply.post
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${idToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: {
-              appId: appId.trim(),
-              reviewBody: reviewDetails.reviewBody,
-              rating: reviewDetails.rating,
-            },
-          });
-
-          if (!replyResponse || !replyResponse.suggestion) {
-            console.warn(`Admin Chat: /api/ai/generate-review-reply returned invalid response for review [${reviewId}], app [${appId}] by admin [${adminUid}]`);
-            return { reply: `I tried to generate a reply for review "${reviewId}", but it seems I couldn't get a valid suggestion back.` };
-          }
-
-          return { reply: `Suggested reply for review ${reviewId.trim()} (app ${appId.trim()}): ${replyResponse.suggestion}` };
-
-        } catch (fetchError: unknown) {
-          const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-          const h3Error = fetchError as H3Error;
-          if (h3Error.statusCode === 404) {
-             console.warn(`Admin Chat: Could not find review [${reviewId}] for app [${appId}] or the app itself, for admin [${adminUid}]. Error:`, errorMessage);
-             return { reply: `Sorry, I couldn't find review "${reviewId}" for app "${appId}". Please check the IDs.` };
-          }
-          console.error(`Admin Chat: Error in 'generate_review_reply' flow for review [${reviewId}], app [${appId}] by admin [${adminUid}]:`, errorMessage, fetchError);
-          return { reply: `Sorry, I couldn't generate a reply for review "${reviewId}" at the moment. There was an issue with the process.` };
-        }
+      } catch (jsonError) {
+        // AI response was intended for tool use (toolCalls detected by SDK) but was not valid JSON.
+        console.error(`Admin Chat: AI response for admin [${adminUid}] (tool use indicated by SDK) was not valid JSON: "${aiResponseText}"`, jsonError);
+        return { reply: "I tried to use a tool, but the response format was incorrect. Please try again." };
       }
-      else {
-        // If JSON is valid but not a recognized tool_use structure
-        console.warn(`Admin Chat: AI returned valid JSON but not a recognized tool use for admin [${adminUid}]:`, parsedAiResponse);
-        return { reply: aiResponseText }; // Return the AI's natural language response
-      }
-    } catch (jsonError) {
-      // AI response was not valid JSON, assume it's a natural language reply
-      console.log(`Admin Chat: AI response for admin [${adminUid}] was not JSON, treating as natural language: "${aiResponseText}"`);
-      return { reply: aiResponseText };
+    } else {
+      // No tool calls detected by the SDK. Stream the text response.
+      console.log(`Admin Chat: Streaming direct AI response for admin [${adminUid}]`);
+      setResponseHeader(event, 'Content-Type', 'text/plain; charset=utf-8');
+      setResponseHeader(event, 'Cache-Control', 'no-cache');
+      // setResponseHeader(event, 'Transfer-Encoding', 'chunked'); // Often handled by sendStream
+      return sendStream(event, streamTextResult.textStream);
     }
 
   } catch (error: unknown) {
