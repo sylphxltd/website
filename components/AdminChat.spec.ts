@@ -4,20 +4,21 @@ import { nextTick } from 'vue';
 import AdminChat from './AdminChat.vue';
 
 // Mock Firebase Auth
-import { getAuth as actualGetAuth } from 'firebase/auth';
+import { getAuth, type Auth } from 'firebase/auth'; // Import normally, vi.mock will handle it
+
+const mockGetIdToken = vi.fn(); // Define a persistent mock for getIdToken
 
 vi.mock('firebase/auth', async (importOriginal) => {
   const actual = await importOriginal<typeof import('firebase/auth')>();
   return {
     ...actual,
-    getAuth: vi.fn(() => ({
+    getAuth: vi.fn(() => ({ // This is the mock for the getAuth EXPORT
       currentUser: {
-        getIdToken: vi.fn().mockResolvedValue('mock-firebase-token'),
+        getIdToken: mockGetIdToken, // Use the persistent mock instance
       },
     })),
   };
 });
-const getAuth = actualGetAuth as Mock;
 
 // Mock Toast Store
 const mockToastStore = {
@@ -63,7 +64,13 @@ describe('AdminChat.vue', () => {
     mockFetch.mockReset();
     mockToastStore.error.mockReset();
     mockToastStore.warning.mockReset();
-    (getAuth().currentUser?.getIdToken as Mock).mockClear();
+    mockGetIdToken.mockClear().mockResolvedValue('mock-firebase-token'); // Reset the shared mock
+    // Reset the main getAuth mock to its default behavior for most tests
+    vi.mocked(getAuth).mockImplementation(() => ({
+        currentUser: {
+            getIdToken: mockGetIdToken,
+        },
+    } as unknown as Auth));
 
 
     wrapper = mount(AdminChat, {
@@ -160,6 +167,10 @@ describe('AdminChat.vue', () => {
     await wrapper.find('input[type="text"]').setValue('Test Stream');
     await wrapper.find('button').trigger('click');
     await nextTick(); // User message added
+    
+    // Check isStreaming during streaming
+    expect(wrapper.vm.messages[wrapper.vm.messages.length - 1].isStreaming).toBe(true);
+
 
     // Wait for all stream chunks to be processed
     // This needs to be long enough for the simulated stream delays
@@ -173,6 +184,8 @@ describe('AdminChat.vue', () => {
     expect(aiBubble.classes()).toContain('bg-gray-200');
     expect(wrapper.vm.isSending).toBe(false);
     expect(aiBubble.find('.animate-pulse').exists()).toBe(false); // Streaming indicator should be gone
+    // Check isStreaming after streaming
+    expect(wrapper.vm.messages[wrapper.vm.messages.length - 1].isStreaming).toBe(false);
   });
 
    it('handles streamed text AI response (text/event-stream)', async () => {
@@ -214,12 +227,17 @@ describe('AdminChat.vue', () => {
 
     let aiBubble = findMessageBubbles()[findMessageBubbles().length -1];
     expect(aiBubble.find('.animate-pulse').exists()).toBe(true);
+    // Check isStreaming during streaming
+    expect(wrapper.vm.messages[wrapper.vm.messages.length - 1].isStreaming).toBe(true);
+
 
     await new Promise(resolve => setTimeout(resolve, streamChunks.length * 20 + 50));
     await nextTick();
     
     aiBubble = findMessageBubbles()[findMessageBubbles().length -1]; // Re-fetch bubble
     expect(aiBubble.find('.animate-pulse').exists()).toBe(false);
+    // Check isStreaming after streaming
+    expect(wrapper.vm.messages[wrapper.vm.messages.length - 1].isStreaming).toBe(false);
   });
 
 
@@ -286,15 +304,15 @@ describe('AdminChat.vue', () => {
   });
 
 
-  it('displays an error if user is not authenticated', async () => {
-    (getAuth().currentUser?.getIdToken as Mock).mockRejectedValueOnce(new Error('Auth failed'));
-    // Or alternatively, mock getAuth() to return currentUser as null
-    // vi.mocked(getAuth).mockReturnValueOnce({ currentUser: null } as any);
-    // For this test, let's assume getIdToken fails
+  it('displays an error if user is not authenticated (getIdToken fails)', async () => {
+    // Ensure currentUser exists but getIdToken is the one failing
+    mockGetIdToken.mockRejectedValueOnce(new Error('Auth failed'));
+    // The global getAuth mock by default returns a currentUser object with mockGetIdToken.
+    // We only need to change the behavior of mockGetIdToken for this test.
 
     await wrapper.find('input[type="text"]').setValue('Test Auth Error');
     await wrapper.find('button').trigger('click');
-    await nextTick(); // User message might not even be added if auth fails early
+    await nextTick(); 
     await new Promise(resolve => setTimeout(resolve, 50));
     await nextTick();
 
@@ -303,6 +321,28 @@ describe('AdminChat.vue', () => {
     expect(findLastMessageSender()).toBe('error');
     expect(wrapper.vm.isSending).toBe(false);
   });
+
+  it('handles message sending attempt when user is not authenticated (currentUser is null)', async () => {
+    // vi.mocked(getAuth) correctly types 'getAuth' as the mocked function
+    vi.mocked(getAuth).mockReturnValueOnce({ currentUser: null } as unknown as Auth); // Corrected cast
+
+    await wrapper.find('input[type="text"]').setValue('Test auth null');
+    await wrapper.find('button').trigger('click');
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    await nextTick();
+
+    expect(mockToastStore.error).toHaveBeenCalledWith('User not authenticated. Please login.');
+    // Check the last message in vm.messages as findLastMessageText might not pick up non-bubble errors
+    const lastVmMessage = wrapper.vm.messages[wrapper.vm.messages.length -1];
+    expect(lastVmMessage.text).toBe('User not authenticated. Please login.');
+    expect(lastVmMessage.sender).toBe('error');
+    // Also check UI if possible, though direct vm check is more robust for this specific error message
+    expect(findLastMessageText()).toContain('User not authenticated. Please login.');
+    expect(findLastMessageSender()).toBe('error');
+    expect(wrapper.vm.isSending).toBe(false);
+  });
+
 
   it('styles user messages correctly', async () => {
     mockFetch.mockResolvedValueOnce({
