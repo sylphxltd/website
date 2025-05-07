@@ -1,34 +1,19 @@
 import type { H3Event } from 'h3';
-import { sendStream, setResponseHeader } from 'h3'; // Added for streaming
-import { getAdminAuth } from '~/server/utils/firebaseAdmin'; // Assuming firebaseAdmin utility exists
+import { sendStream, setResponseHeader } from 'h3'; 
+import { getAdminAuth } from '~/server/utils/firebaseAdmin';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { H3Error } from 'h3';
-import { streamText, type StreamTextResult, type ToolCall } from 'ai'; // Added ToolCall for more specific typing
-import { openai } from '@ai-sdk/openai'; // Corrected import
-
-// Define a more specific type for the tools used in this handler
-interface AdminChatToolParameters {
-  appId?: string;
-  appDescription?: string;
-  targetAudience?: string;
-  tone?: string;
-  stylePrompt?: string;
-  reviewId?: string;
-  [key: string]: unknown; // Allow other parameters
-}
-
-// The AdminChatTool interface was an attempt to strongly type tools,
-// but the current logic parses a custom 'ToolUse' structure from streamTextResult.text.
-// We'll keep AdminChatToolParameters for now if it's useful for the SDK's generics.
+import { streamText, type StreamTextResult } from 'ai';
+import { openai } from '@ai-sdk/openai';
 
 interface ChatRequestBody {
   message: string;
 }
 
-interface ToolUse {
+interface ToolUseIntent {
   tool_use: {
     name: string;
-    parameters?: Record<string, unknown>; // Changed 'any' to 'unknown'
+    parameters?: Record<string, unknown>; 
   };
 }
 
@@ -59,21 +44,32 @@ If the user asks to generate a reply, e.g., "generate reply for review reviewXYZ
 extract the review ID and app ID. Respond with:
 { "tool_use": { "name": "generate_review_reply", "parameters": { "appId": "the_app_id", "reviewId": "the_review_id" } } }
 
+You can also list users.
+If the user asks to see all users, for example "show me all users" or "list users",
+you should respond with:
+{ "tool_use": { "name": "list_users" } }
+
 For any other general conversation or questions not related to a specific tool, respond naturally.`;
 
+interface UserBasicInfo { id: string; email?: string; displayName?: string; }
+interface ListUsersResponse { users: UserBasicInfo[]; }
+interface AppBasicInfo { id: string; name: string; }
+interface ListAppsResponse { apps: AppBasicInfo[]; }
+interface AppDetails { id: string; name: string; description?: string; createdAt: string; }
+interface GenerateLogoResponse { logoUrl: string; }
+interface ReviewDetails { reviewBody: string; rating: number; }
+interface GenerateReviewReplyResponse { suggestion: string; }
+
 export default defineEventHandler(async (event: H3Event) => {
-  // 1. Authorization Check (Admin Only)
   const authorization = getHeader(event, 'Authorization');
   if (!authorization || !authorization.startsWith('Bearer ')) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Missing Bearer token' });
   }
   const idToken = authorization.split('Bearer ')[1];
-
   let decodedToken: DecodedIdToken;
   try {
     const adminAuth = getAdminAuth();
     decodedToken = await adminAuth.verifyIdToken(idToken);
-    // Check for custom admin claim
     if (!decodedToken.admin) {
       console.warn(`Forbidden attempt by user: ${decodedToken.uid}`);
       throw createError({ statusCode: 403, statusMessage: 'Forbidden: User is not an admin' });
@@ -81,17 +77,12 @@ export default defineEventHandler(async (event: H3Event) => {
   } catch (error: unknown) {
      const message = error instanceof Error ? error.message : String(error);
      console.error("Error verifying admin token:", message);
-     // Distinguish between verification errors and forbidden access
-     // Check if it's an H3Error with the specific status code we threw
      if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 403) {
-        throw error; // Re-throw the specific forbidden error
+        throw error; 
      }
      throw createError({ statusCode: 401, statusMessage: 'Unauthorized: Invalid or expired token' });
   }
-
-  const adminUid = decodedToken.uid; // Get admin UID for logging
-
-  // 2. Read and Validate Request Body
+  const adminUid = decodedToken.uid;
   let body: ChatRequestBody;
   try {
       body = await readBody<ChatRequestBody>(event);
@@ -101,273 +92,189 @@ export default defineEventHandler(async (event: H3Event) => {
   } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("Error reading or validating request body:", message);
-      // Handle JSON parsing errors or validation errors
-      // Check if it's an H3Error with the specific status code we threw
       if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 400) {
-          throw error; // Re-throw validation error
+          throw error; 
       }
       throw createError({ statusCode: 400, statusMessage: 'Bad Request: Could not process request body' });
   }
-
   const userMessage = body.message.trim();
 
-  // 3. Process with AI
   try {
     console.log(`Admin Chat: Received message from admin [${adminUid}]: "${userMessage}"`);
 
-    const streamTextResultUntyped = await streamText({
+    const streamTextResult = await streamText({
       model: openai.chat('gpt-4-turbo'),
       system: SYSTEM_PROMPT,
       prompt: userMessage,
     });
-    
-    // Cast to any to bypass TS errors about property existence, as a workaround.
-    const streamTextResult = streamTextResultUntyped as any;
- 
-    // New logic based on streamTextResult.type
-    if (streamTextResult.type === 'text') {
-      console.log(`Admin Chat: Streaming direct AI response (type: 'text') for admin [${adminUid}]`);
-      setResponseHeader(event, 'Content-Type', 'text/plain; charset=utf-8');
-      setResponseHeader(event, 'Cache-Control', 'no-cache');
-      try {
-        if (!streamTextResult.readableStream) {
-          console.error(`Admin Chat: readableStream is not available on streamTextResult (type: 'text') for admin [${adminUid}]. Cannot stream direct response.`);
-          // Attempt to get full text if stream is not available
-          const textContent = await streamTextResult.text;
-          if (textContent) {
-             console.warn(`Admin Chat: Fallback to sending full text content as non-streamed response for admin [${adminUid}] because readableStream was unavailable.`);
-             return { reply: textContent };
-          }
-          throw new Error('readableStream not available for direct AI response (type: text) and no fallback text content.');
-        }
-        return sendStream(event, streamTextResult.readableStream);
-      } catch (streamError: unknown) {
-        const streamErrorMessage = streamError instanceof Error ? streamError.message : String(streamError);
-        console.error(`Admin Chat: Error during sendStream for direct AI response (type: 'text') for admin [${adminUid}]:`, streamErrorMessage, streamError);
-        throw streamError; // Re-throw to be caught by the outer try-catch
-      }
-    } else if (streamTextResult.type === 'tool-calls') {
-      console.log(`Admin Chat: AI response for admin [${adminUid}] (type: 'tool-calls') - processing tool calls...`);
-      
-      // When type is 'tool-calls', toolCalls should be available.
-      // The Vercel SDK's StreamTextResult type for 'tool-calls' should guarantee .toolCalls
-      const toolCallsResult = await streamTextResult.toolCalls;
-      const aiResponseText = await streamTextResult.text; // This is the JSON string for tool calls
- 
-      const actualToolCalls: any[] = Array.isArray(toolCallsResult) ? toolCallsResult : [];
 
-      if (actualToolCalls.length > 0) {
-        console.log(`Admin Chat: AI response for admin [${adminUid}] (tool use detected via type: 'tool-calls', full text for tools): "${aiResponseText}"`);
-        try {
-          // The aiResponseText is expected to be a JSON string that might represent one of the tools.
-          // The system prompt guides the AI to return a specific JSON structure like { "tool_use": { "name": "...", "parameters": {...} } }
-          // This structure is slightly different from the direct `ToolCall[]` from `streamTextResult.toolCalls`.
-          // The existing logic parses `aiResponseText`. We should ensure this is the intended behavior.
-          // If `toolCalls` from the SDK is already structured, we might use that directly.
-          // For now, sticking to parsing `aiResponseText` as per existing logic.
-          const parsedAiResponse = JSON.parse(aiResponseText) as ToolUse;
-          
-          // Example of how you might use the structured `actualToolCalls` from the SDK if needed:
-          // const firstSdkTool = actualToolCalls[0];
-          // if (firstSdkTool.toolName === 'list_applications') { /* ... */ }
+    // Set headers for streaming
+    setResponseHeader(event, 'Content-Type', 'text/plain; charset=utf-8');
+    setResponseHeader(event, 'Cache-Control', 'no-cache');
+    setResponseHeader(event, 'Connection', 'keep-alive'); // Optional, but good for streaming
 
-          if (parsedAiResponse?.tool_use?.name === "list_applications") {
-            try {
-              interface AppBasicInfo { id: string; name: string; }
-              interface ListAppsResponse { apps: AppBasicInfo[]; }
- 
-              const response = await $fetch<ListAppsResponse>('/api/apps/list', {
-                method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` }
-              });
- 
-              if (response.apps && response.apps.length > 0) {
-                const appNames = response.apps.map(app => `${app.name} (ID: ${app.id})`).join(', ');
-                return { reply: `Found ${response.apps.length} apps: ${appNames}.` };
-              }
-              return { reply: "No applications found." };
-            } catch (fetchError: unknown) {
-              const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-              console.error(`Admin Chat: Error fetching app list for admin [${adminUid}] after AI intent (type: 'tool-calls'):`, errorMessage, fetchError);
-              return { reply: "Sorry, I understood you want to list apps, but I couldn't fetch them at the moment." };
-            }
-          } else if (parsedAiResponse?.tool_use?.name === "get_application_details") {
-            const appId = parsedAiResponse.tool_use.parameters?.appId as string | undefined;
-            if (!appId || typeof appId !== 'string' || appId.trim() === '') {
-              console.warn(`Admin Chat: AI identified 'get_application_details' (type: 'tool-calls') but appId was missing or invalid for admin [${adminUid}]:`, parsedAiResponse.tool_use.parameters);
-              return { reply: "I understood you want details for an app, but I couldn't identify which one. Please specify the App ID." };
-            }
-            try {
-              interface AppDetails { id: string; name: string; description?: string; createdAt: string; }
-              const appDetails = await $fetch<AppDetails>(`/api/apps/${appId.trim()}`, {
-                method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` }
-              });
-              let detailsString = `Details for App ${appDetails.name} (ID: ${appDetails.id}):`;
-              if (appDetails.description) { detailsString += `\nDescription: ${appDetails.description}`; }
-              detailsString += `\nCreated At: ${new Date(appDetails.createdAt).toLocaleString()}`;
-              return { reply: detailsString };
-            } catch (fetchError: unknown) {
-              const h3Error = fetchError as H3Error;
-              if (h3Error.statusCode === 404) {
-                console.warn(`Admin Chat: App with ID [${appId}] not found for admin [${adminUid}] (type: 'tool-calls').`);
-                return { reply: `Sorry, I couldn't find an application with ID "${appId}". Please check the ID and try again.` };
-              }
-              const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-              console.error(`Admin Chat: Error fetching app details for ID [${appId}] for admin [${adminUid}] (type: 'tool-calls'):`, errorMessage, fetchError);
-              return { reply: `Sorry, I understood you want details for app "${appId}", but I couldn't fetch them right now.` };
-            }
-          } else if (parsedAiResponse?.tool_use?.name === "generate_application_copy") {
-            const params = parsedAiResponse.tool_use.parameters;
-            const appId = params?.appId as string | undefined;
-            const appDescription = params?.appDescription as string | undefined;
-            const targetAudience = params?.targetAudience as string | undefined;
-            const tone = params?.tone as string | undefined;
-            if (!appId || typeof appId !== 'string' || appId.trim() === '') {
-              console.warn(`Admin Chat: AI identified 'generate_application_copy' (type: 'tool-calls') but appId was missing or invalid for admin [${adminUid}]:`, params);
-              return { reply: "I understood you want to generate copy for an app, but I couldn't identify which one. Please specify the App ID." };
-            }
-            try {
-              console.log(`Admin Chat: Calling /api/ai/generate-copy for app [${appId}] by admin [${adminUid}] (type: 'tool-calls') with params:`, { appDescription, targetAudience, tone });
-              const generatedCopyText = await $fetch<string>('/api/ai/generate-copy', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', },
-                body: { appId: appId.trim(), ...(appDescription && { appDescription }), ...(targetAudience && { targetAudience }), ...(tone && { tone }), },
-              });
-              if (!generatedCopyText || generatedCopyText.trim() === '') {
-                console.warn(`Admin Chat: /api/ai/generate-copy returned empty response for app [${appId}] by admin [${adminUid}] (type: 'tool-calls')`);
-                return { reply: `I tried to generate copy for app "${appId}", but it seems I couldn't come up with anything right now.` };
-              }
-              return { reply: `Generated copy for app ${appId.trim()}: ${generatedCopyText}` };
-            } catch (fetchError: unknown) {
-              const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-              console.error(`Admin Chat: Error calling /api/ai/generate-copy for app [${appId}] by admin [${adminUid}] (type: 'tool-calls'):`, errorMessage, fetchError);
-              const h3Error = fetchError as H3Error;
-              if (h3Error.statusCode === 404) {
-                 return { reply: `Sorry, I couldn't find an application with ID "${appId}" to generate copy for. Please check the ID.` };
-              }
-              return { reply: `Sorry, I couldn't generate copy for app "${appId}" at the moment. There was an issue with the generation service.` };
-            }
-          } else if (parsedAiResponse?.tool_use?.name === "generate_application_logo") {
-            const params = parsedAiResponse.tool_use.parameters;
-            const appId = params?.appId as string | undefined;
-            const stylePrompt = params?.stylePrompt as string | undefined;
-            if (!appId || typeof appId !== 'string' || appId.trim() === '') {
-              console.warn(`Admin Chat: AI identified 'generate_application_logo' (type: 'tool-calls') but appId was missing or invalid for admin [${adminUid}]:`, params);
-              return { reply: "I understood you want to generate a logo for an app, but I couldn't identify which one. Please specify the App ID." };
-            }
-            try {
-              console.log(`Admin Chat: Calling /api/ai/generate-logo for app [${appId}] by admin [${adminUid}] (type: 'tool-calls') with stylePrompt:`, stylePrompt);
-              interface GenerateLogoResponse { logoUrl: string; }
-              const response = await $fetch<GenerateLogoResponse>('/api/ai/generate-logo', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', },
-                body: { appId: appId.trim(), ...(stylePrompt && { stylePrompt }), },
-              });
-              if (!response || !response.logoUrl) {
-                console.warn(`Admin Chat: /api/ai/generate-logo returned invalid response for app [${appId}] by admin [${adminUid}] (type: 'tool-calls')`);
-                return { reply: `I tried to generate a logo for app "${appId}", but it seems I couldn't get a valid URL back.` };
-              }
-              return { reply: `Generated logo for app ${appId.trim()}: ${response.logoUrl}` };
-            } catch (fetchError: unknown) {
-              const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-              console.error(`Admin Chat: Error calling /api/ai/generate-logo for app [${appId}] by admin [${adminUid}] (type: 'tool-calls'):`, errorMessage, fetchError);
-              const h3Error = fetchError as H3Error;
-              if (h3Error.statusCode === 404) {
-                 return { reply: `Sorry, I couldn't find an application with ID "${appId}" to generate a logo for. Please check the ID.` };
-              }
-              return { reply: `Sorry, I couldn't generate a logo for app "${appId}" at the moment. There was an issue with the generation service.` };
-            }
-          } else if (parsedAiResponse?.tool_use?.name === "generate_review_reply") {
-            const params = parsedAiResponse.tool_use.parameters;
-            const appId = params?.appId as string | undefined;
-            const reviewId = params?.reviewId as string | undefined;
-            if (!appId || typeof appId !== 'string' || appId.trim() === '' || !reviewId || typeof reviewId !== 'string' || reviewId.trim() === '') {
-              console.warn(`Admin Chat: AI identified 'generate_review_reply' (type: 'tool-calls') but appId or reviewId was missing or invalid for admin [${adminUid}]:`, params);
-              return { reply: "I understood you want to generate a review reply, but I couldn't identify the app or review. Please specify both the App ID and Review ID." };
-            }
-            try {
-              interface ReviewDetails { reviewBody: string; rating: number; }
-              console.log(`Admin Chat: Fetching review details for review [${reviewId}] of app [${appId}] by admin [${adminUid}] (type: 'tool-calls')`);
-              const reviewDetails = await $fetch<ReviewDetails>('/api/reviews/detail', {
-                method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` }, query: { appId: appId.trim(), reviewId: reviewId.trim() }
-              });
-              if (!reviewDetails || typeof reviewDetails.reviewBody !== 'string' || typeof reviewDetails.rating !== 'number') {
-                console.error(`Admin Chat: Invalid or incomplete review details received for review [${reviewId}], app [${appId}] by admin [${adminUid}] (type: 'tool-calls'):`, reviewDetails);
-                return { reply: `Sorry, I couldn't fetch the necessary details for review "${reviewId}". The data might be incomplete.` };
-              }
-              console.log(`Admin Chat: Calling /api/ai/generate-review-reply for review [${reviewId}] of app [${appId}] by admin [${adminUid}] (type: 'tool-calls')`);
-              interface GenerateReviewReplyResponse { suggestion: string; }
-              const replyResponse = await $fetch<GenerateReviewReplyResponse>('/api/ai/generate-review-reply', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', },
-                body: { appId: appId.trim(), reviewBody: reviewDetails.reviewBody, rating: reviewDetails.rating, },
-              });
-              if (!replyResponse || !replyResponse.suggestion) {
-                console.warn(`Admin Chat: /api/ai/generate-review-reply returned invalid response for review [${reviewId}], app [${appId}] by admin [${adminUid}] (type: 'tool-calls')`);
-                return { reply: `I tried to generate a reply for review "${reviewId}", but it seems I couldn't get a valid suggestion back.` };
-              }
-              return { reply: `Suggested reply for review ${reviewId.trim()} (app ${appId.trim()}): ${replyResponse.suggestion}` };
-            } catch (fetchError: unknown) {
-              const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-              const h3Error = fetchError as H3Error;
-              if (h3Error.statusCode === 404) {
-                 console.warn(`Admin Chat: Could not find review [${reviewId}] for app [${appId}] or the app itself, for admin [${adminUid}] (type: 'tool-calls'). Error:`, errorMessage);
-                 return { reply: `Sorry, I couldn't find review "${reviewId}" for app "${appId}". Please check the IDs.` };
-              }
-              console.error(`Admin Chat: Error in 'generate_review_reply' flow for review [${reviewId}], app [${appId}] by admin [${adminUid}] (type: 'tool-calls'):`, errorMessage, fetchError);
-              return { reply: `Sorry, I couldn't generate a reply for review "${reviewId}" at the moment. There was an issue with the process.` };
-            }
-          } else {
-            console.warn(`Admin Chat: AI returned valid JSON but not a recognized tool use for admin [${adminUid}] (type: 'tool-calls'):`, parsedAiResponse);
-            return { reply: aiResponseText }; // Return the JSON text as a string reply
-          }
-        } catch (jsonError) {
-          console.error(`Admin Chat: AI response for admin [${adminUid}] (type: 'tool-calls', indicated by SDK) was not valid JSON: "${aiResponseText}"`, jsonError);
-          return { reply: "I tried to use a tool, but the response format was incorrect. Please try again." };
+    let fullResponseText = "";
+    let streamError: unknown | undefined;
+
+    for await (const part of streamTextResult.fullStream) {
+      if (part.type === 'text-delta') {
+        if (part.textDelta) {
+          event.node.res.write(part.textDelta); // Send chunk immediately
+          fullResponseText += part.textDelta;
         }
-      } else {
-        // This case: type is 'tool-calls' but toolCalls array is empty or null.
-        console.warn(`Admin Chat: AI response type was 'tool-calls' but no toolCalls array found or it's empty for admin [${adminUid}]. Attempting to stream text part if available via readableStream.`);
-        if (streamTextResult.readableStream) {
-            console.log(`Admin Chat: Streaming direct AI response (type: 'tool-calls' with empty/no toolCalls, fallback to readableStream) for admin [${adminUid}]`);
-            setResponseHeader(event, 'Content-Type', 'text/plain; charset=utf-8');
-            setResponseHeader(event, 'Cache-Control', 'no-cache');
-            try {
-                return sendStream(event, streamTextResult.readableStream);
-            } catch (streamError: unknown) {
-                const streamErrorMessage = streamError instanceof Error ? streamError.message : String(streamError);
-                console.error(`Admin Chat: Error during sendStream fallback for 'tool-calls' with empty toolCalls for admin [${adminUid}]:`, streamErrorMessage, streamError);
-                throw streamError; // Re-throw
-            }
-        } else {
-            const fullResponseForError = await streamTextResult.response; // Await the raw response for logging
-            console.error(`Admin Chat: type was 'tool-calls' but no toolCalls and no readableStream for admin [${adminUid}]. Full response object:`, fullResponseForError);
-            return { reply: "I received an unusual tool response from the AI that I couldn't process as a tool action or direct text." };
+      } else if (part.type === 'error') {
+        console.error(`Admin Chat: Error part in stream for admin [${adminUid}]:`, part.error);
+        streamError = part.error;
+        // End the response prematurely if an error part is encountered in the stream
+        if (!event.node.res.writableEnded) {
+          event.node.res.end();
         }
+        break; // Stop processing further parts
       }
-    } else if (streamTextResult.type === 'empty') {
-        console.warn(`Admin Chat: AI response for admin [${adminUid}] (type: 'empty'). No content to process.`);
-        return { reply: "The AI returned an empty response." };
-    } else if (streamTextResult.type === 'error') {
-        const errorContent = await streamTextResult.error; // error is a promise
-        console.error(`Admin Chat: AI processing resulted in an error (type: 'error') for admin [${adminUid}]. Error:`, errorContent);
-        return { reply: "I encountered an error while processing your request with the AI." };
-    } else {
-      const unknownType = streamTextResult.type; // No 'as any' needed if type is on StreamTextResult
-      console.error(`Admin Chat: Unknown or unhandled streamTextResult.type: "${String(unknownType)}" for admin [${adminUid}].`);
-      try {
-        const finishReason = await streamTextResult.finishReason; // Log finishReason for debugging unknown types
-        const rawResponse = await streamTextResult.response;
-        console.error(`Admin Chat: Corresponding finishReason: "${finishReason}". Raw response:`, rawResponse, 'Full streamTextResult object:', streamTextResult);
-      } catch (frError) {
-        console.error('Admin Chat: Error getting finishReason/response for unknown type. Full streamTextResult:', streamTextResult, 'Error:', frError);
-      }
-      return { reply: "I received an unexpected response type from the AI service." };
+      // 'tool-call' and 'tool-result' parts are not explicitly handled here yet,
+      // as we are first focusing on text streaming and then parsing fullResponseText for tool intents.
+      // Proper handling will come with Phase 2 (SDK tools).
     }
+
+    if (!event.node.res.writableEnded) {
+      event.node.res.end(); // Ensure stream is closed if not already by an error
+    }
+    
+    // After streaming all text parts (or erroring out):
+    if (streamError) {
+        // The error was already logged, and response stream ended.
+        // No further action needed here as we can't send a JSON error if stream already started.
+        return; 
+    }
+
+    const finishReason = await streamTextResult.finishReason;
+    console.log(`Admin Chat: Stream finished for admin [${adminUid}]. Reason: ${finishReason}. Full text accumulated: "${fullResponseText}"`);
+
+    // Now, attempt to parse the accumulated fullResponseText for our custom tool call JSON.
+    // This happens *after* the text (which might be the JSON itself) has been streamed to the client.
+    if (fullResponseText.trim().startsWith('{"tool_use":')) {
+      console.log(`Admin Chat: Detected potential tool call in accumulated text for admin [${adminUid}].`);
+      try {
+        const parsedAiResponse = JSON.parse(fullResponseText.trim()) as ToolUseIntent;
+        
+        // IMPORTANT: At this point, the client has already received the raw JSON as a stream.
+        // The following tool execution will happen, but the server cannot send a *new* separate response
+        // for the tool result in this same HTTP request if it was already a streaming response.
+        // This part of the logic needs to be re-thought for proper tool result handling.
+        // For now, it will execute the tool, but the result won't be sent back in this request.
+        // This is a known limitation of this interim step. Phase 2 will fix this.
+
+        let toolExecutionResultReply: string | undefined;
+
+        if (parsedAiResponse?.tool_use?.name === "list_applications") {
+          try {
+            const response = await $fetch<ListAppsResponse>('/api/apps/list', { method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` }});
+            if (response.apps && response.apps.length > 0) {
+              const appNames = response.apps.map(app => `${app.name} (ID: ${app.id})`).join(', ');
+              toolExecutionResultReply = `Found ${response.apps.length} apps: ${appNames}.`;
+            } else { toolExecutionResultReply = "No applications found."; }
+          } catch (e) { const m = e instanceof Error ? e.message : String(e); console.error(`Err list_applications: ${m}`); toolExecutionResultReply = `Error listing applications: ${m}`;}
+        
+        } else if (parsedAiResponse?.tool_use?.name === "get_application_details") {
+          const appId = parsedAiResponse.tool_use.parameters?.appId as string | undefined;
+          if (!appId) { toolExecutionResultReply = "App ID missing for get_application_details."; }
+          else {
+            try {
+              const appDetails = await $fetch<AppDetails>(`/api/apps/${appId.trim()}`, { method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` }});
+              let r = `Details for App ${appDetails.name} (ID: ${appDetails.id}):`;
+              if (appDetails.description) r += `\nDesc: ${appDetails.description}`;
+              r += `\nCreated: ${new Date(appDetails.createdAt).toLocaleString()}`; toolExecutionResultReply = r;
+            } catch (e) { const m = e instanceof Error ? e.message : String(e); console.error(`Err get_app_details: ${m}`); toolExecutionResultReply = `Error getting app details for ${appId}: ${m}`;}
+          }
+        } else if (parsedAiResponse?.tool_use?.name === "generate_application_copy") {
+          const p = parsedAiResponse.tool_use.parameters; const appId = p?.appId as string | undefined;
+          if (!appId) { toolExecutionResultReply = "App ID missing for generate_application_copy."; }
+          else {
+            try {
+              const b: Record<string, unknown> = { appId: appId.trim() };
+              if (p?.appDescription) b.appDescription = p.appDescription as string;
+              if (p?.targetAudience) b.targetAudience = p.targetAudience as string;
+              if (p?.tone) b.tone = p.tone as string;
+              const copy = await $fetch<string>('/api/ai/generate-copy', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json'}, body: b });
+              if (!copy) { toolExecutionResultReply = `Generated empty copy for ${appId}.`;}
+              else { toolExecutionResultReply = `Generated copy for app ${appId.trim()}: ${copy}`; }
+            } catch (e) { const m = e instanceof Error ? e.message : String(e); console.error(`Err gen_copy: ${m}`); toolExecutionResultReply = `Error generating copy for ${appId}: ${m}`;}
+          }
+        } else if (parsedAiResponse?.tool_use?.name === "generate_application_logo") {
+          const p = parsedAiResponse.tool_use.parameters; const appId = p?.appId as string | undefined;
+          if (!appId) { toolExecutionResultReply = "App ID missing for generate_application_logo."; }
+          else {
+            try {
+              const b: Record<string, unknown> = { appId: appId.trim() };
+              if (p?.stylePrompt) b.stylePrompt = p.stylePrompt as string;
+              const resp = await $fetch<GenerateLogoResponse>('/api/ai/generate-logo', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json'}, body: b });
+              if (!resp?.logoUrl) { toolExecutionResultReply = `Failed to get logo URL for ${appId}.`;}
+              else { toolExecutionResultReply = `Generated logo for app ${appId.trim()}: ${resp.logoUrl}`; }
+            } catch (e) { const m = e instanceof Error ? e.message : String(e); console.error(`Err gen_logo: ${m}`); toolExecutionResultReply = `Error generating logo for ${appId}: ${m}`;}
+          }
+        } else if (parsedAiResponse?.tool_use?.name === "generate_review_reply") {
+          const p = parsedAiResponse.tool_use.parameters; const appId = p?.appId as string | undefined; const reviewId = p?.reviewId as string | undefined;
+          if (!appId || !reviewId) { toolExecutionResultReply = "App/Review ID missing for generate_review_reply."; }
+          else {
+            try {
+              const details = await $fetch<ReviewDetails>('/api/reviews/detail', { method: 'GET', headers: { 'Authorization': `Bearer ${idToken}`}, query: { appId: appId.trim(), reviewId: reviewId.trim() }});
+              if (!details?.reviewBody) { toolExecutionResultReply = `Could not get details for review ${reviewId}.`;}
+              else {
+                const b = { appId: appId.trim(), reviewBody: details.reviewBody, rating: details.rating };
+                const sugg = await $fetch<GenerateReviewReplyResponse>('/api/ai/generate-review-reply', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json'}, body: b });
+                if (!sugg?.suggestion) { toolExecutionResultReply = `Failed to generate suggestion for review ${reviewId}.`;}
+                else { toolExecutionResultReply = `Suggested reply for review ${reviewId.trim()}: ${sugg.suggestion}`; }
+              }
+            } catch (e) { const m = e instanceof Error ? e.message : String(e); console.error(`Err gen_review_reply: ${m}`); toolExecutionResultReply = `Error generating review reply for ${reviewId}: ${m}`;}
+          }
+        } else if (parsedAiResponse?.tool_use?.name === "list_users") {
+          try {
+            const response = await $fetch<ListUsersResponse>('/api/users/list', { method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` }});
+            if (response.users && response.users.length > 0) {
+              const userDescriptions = response.users.map(user => { let d = `ID: ${user.id}`; if (user.email) d+=`, Email: ${user.email}`; if (user.displayName) d+=`, Name: ${user.displayName}`; return d; }).join('\n- ');
+              toolExecutionResultReply = `Found ${response.users.length} users:\n- ${userDescriptions}`;
+            } else { toolExecutionResultReply = "No users found."; }
+          } catch (e) { const m = e instanceof Error ? e.message : String(e); console.error(`Err list_users: ${m}`); toolExecutionResultReply = `Error listing users: ${m}`;}
+        } else {
+          console.warn(`Admin Chat: AI returned tool JSON but not a recognized tool use for admin [${adminUid}]:`, parsedAiResponse);
+          // No specific action if tool name is not recognized after streaming.
+        }
+        
+        if (toolExecutionResultReply) {
+            console.log(`Admin Chat: Tool [${parsedAiResponse?.tool_use?.name}] executed. Result (not sent in this stream): ${toolExecutionResultReply}`);
+            // How to send this back to the client is the next challenge.
+            // For now, it's just logged. Client would need to make a new request or use WebSockets.
+        }
+
+      } catch (jsonError) {
+        console.error(`Admin Chat: Accumulated text for admin [${adminUid}] looked like a tool call but was not valid JSON: "${fullResponseText.trim()}"`, jsonError);
+        // No action, as text was already streamed.
+      }
+    } else if (finishReason === 'error') {
+        // Error already handled during stream iteration if streamError was set.
+        // If streamError was not set, log the full text which might contain error.
+        if(!streamError) {
+             console.error(`Admin Chat: AI processing finished with error (finishReason: 'error') for admin [${adminUid}]. Full text: "${fullResponseText}"`);
+        }
+    } else if (finishReason !== 'stop' && finishReason !== 'tool-calls') { // length, content-filter, other
+         console.warn(`Admin Chat: AI response finished due to '${finishReason}' for admin [${adminUid}]. Full text streamed: "${fullResponseText}"`);
+    }
+    // The response stream to the client has already been ended by this point.
+    return; 
+
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Admin Chat: Error processing message with AI for admin [${adminUid}]:`, message, error);
-    // Check if it's an error from the AI SDK or a general processing error
-    // You might want more specific error handling for AI SDK errors if they have unique properties
-    return { reply: "I'm having trouble understanding that request or connecting to the AI service." };
+    console.error(`Admin Chat: Outer error processing message with AI for admin [${adminUid}]:`, message, error);
+    // If stream hasn't started or headers not sent, can send a JSON error
+    if (!event.node.res.headersSent) {
+      return createError({ statusCode: 500, statusMessage: "I'm having trouble understanding that request or connecting to the AI service." });
+    }
+    // If headers were sent but stream not ended (e.g. outer catch after stream started but before normal end)
+    if (!event.node.res.writableEnded) {
+      // Try to write an error message if stream is still open, then end it.
+      event.node.res.write("\n[Error processing your request]");
+      event.node.res.end();
+    }
+    // Otherwise, error is logged, stream might have ended abruptly.
   }
 });

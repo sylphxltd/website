@@ -635,7 +635,38 @@ describe('POST /api/admin/chat', () => {
       const result = await handler(mockEvent) as { reply: string };
       expect(result).toEqual({ reply: "I received an unexpected response type from the AI service." });
     });
- 
+
+    it('should handle streamTextResult.type being undefined', async () => {
+      mockStreamText.mockResolvedValueOnce({
+        type: undefined, // Explicitly undefined type
+        finishReason: Promise.resolve('error_undefined_type'),
+        response: Promise.resolve(new Response('mock response body for undefined type', { status: 200 })),
+        readableStream: undefined,
+        toolCalls: Promise.resolve(undefined),
+        text: Promise.resolve(undefined),
+        error: Promise.resolve(undefined),
+        usage: Promise.resolve({ promptTokens: 0, completionTokens: 0, totalTokens: 0 }),
+        warnings: Promise.resolve(undefined),
+      } as any);
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockEvent = createMockEvent({ 'Authorization': 'Bearer admin-token' }, { message: 'trigger undefined type' });
+      const result = await handler(mockEvent) as { reply: string };
+
+      expect(result).toEqual({ reply: "I received an unexpected response type from the AI service." });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Admin Chat: streamTextResult.type is undefined for admin [admin123].")
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Admin Chat: Corresponding finishReason: "error_undefined_type"'),
+        expect.anything(),
+        expect.anything()
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+  
     it("should handle errors if sendStream fails (when type is 'text')", async () => {
       const mockStreamContent = 'Attempting to stream this.';
       const mockUserMessage = 'Test message for stream failure';
