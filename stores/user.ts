@@ -54,7 +54,7 @@ export const useUserStore = defineStore('user', () => {
       if (user) {
         try {
           // Force refresh true to get latest claims
-          const tokenResult = await user.getIdTokenResult(true);
+          const tokenResult = await user.getIdTokenResult();
           // Update the shared state based on claims
           const hasAdminClaim = tokenResult.claims.admin === true;
           // No need to update useState anymore

@@ -8,41 +8,88 @@
       Admin Chat
     </h3>
     <div ref="messagesContainerRef" class="messages-area flex-grow overflow-y-auto mb-3 pr-2 space-y-3">
-      <div v-for="message in messages" :key="message.id" :class="['flex flex-col', message.sender === 'user' ? 'items-end' : 'items-start']">
+      <!-- Iterate directly over messages from useChat -->
+      <div v-for="message in messages" :key="message.id" :class="['flex flex-col', message.role === 'user' ? 'items-end' : 'items-start']">
         <div
           :class="[
             'inline-block rounded-xl py-2 px-3 shadow-md max-w-[85%]',
-            message.sender === 'user' ? 'bg-blue-600 text-white ml-auto' : '',
-            message.sender === 'ai' ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 mr-auto' : '',
-            message.sender === 'error' ? 'bg-red-100 dark:bg-red-700 border border-red-300 dark:border-red-600 text-red-700 dark:text-red-100 w-full text-sm' : ''
+            message.role === 'user' ? 'bg-blue-600 text-white ml-auto' : '',
+            message.role === 'assistant' ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 mr-auto' : '',
+            (message.role !== 'user' && message.role !== 'assistant') ? 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 w-full text-sm p-2 border rounded-md' : '' /* Fallback for system/data messages */
           ]"
         >
-          <span class="whitespace-pre-wrap break-words">{{ message.text }}</span>
-          <span v-if="message.sender === 'ai' && message.isStreaming" class="inline-block ml-1 animate-pulse">▋</span>
+          <!-- Drastically simplified content rendering for debugging 'ns' error -->
+          <!-- Enhanced message rendering -->
+          <div class="message-content-wrapper">
+            <!-- Handle User Messages -->
+            <span v-if="message.role === 'user'" class="whitespace-pre-wrap break-words">
+              {{ message.content }}
+            </span>
+
+            <!-- Handle Assistant Messages: Strictly iterate over parts -->
+            <template v-if="message.role === 'assistant'">
+              <template v-if="message.parts && message.parts.length > 0">
+                <template v-for="(part, index) in message.parts" :key="`${message.id}-part-${index}`">
+                  <!-- Render text parts from AI -->
+                  <span v-if="part.type === 'text'" class="whitespace-pre-wrap break-words">{{ part.text }}</span>
+
+                  <!-- Render tool invocation UI -->
+                  <div v-else-if="part.type === 'tool-invocation' && part.toolInvocation" class="tool-call-ui my-1 p-2 border rounded-md text-sm">
+                    <template v-if="(part.toolInvocation as any).state === 'result'">
+                      <span class="text-green-600 dark:text-green-400">✅ Call to <strong>{{ (part.toolInvocation as any).toolName }}</strong> finished.</span>
+                      <template v-if="(part.toolInvocation as any).toolName === 'list_applications'">
+                        <span v-if="getAppCountFromResult((part.toolInvocation as any).result) !== null">
+                          (Found {{ getAppCountFromResult((part.toolInvocation as any).result) }} app(s))
+                        </span>
+                      </template>
+                    </template>
+                    <template v-else-if="(part.toolInvocation as any).state === 'error'">
+                      <span class="text-red-600 dark:text-red-400">❌ Call to <strong>{{ (part.toolInvocation as any).toolName }}</strong> failed.</span>
+                      <pre v-if="(part.toolInvocation as any).result" class="text-xs whitespace-pre-wrap break-all bg-red-50 dark:bg-red-900 p-1 rounded mt-1">{{ (part.toolInvocation as any).result }}</pre>
+                    </template>
+                    <template v-else> <!-- Default state, assumed to be 'calling' or 'pending' -->
+                      <span class="text-blue-600 dark:text-blue-400">⚙️ Calling <strong>{{ (part.toolInvocation as any).toolName }}</strong>...</span>
+                    </template>
+                  </div>
+                  <!-- Can add more v-else-if for other part types like 'step-start' if specific UI is needed -->
+                </template>
+              </template>
+              <!-- Fallback to message.content if parts is empty but content exists (safer, but user asked to avoid extra things) -->
+              <span v-else-if="message.content" class="whitespace-pre-wrap break-words">
+                {{ message.content }}
+              </span>
+            </template>
+          </div>
         </div>
-        <span v-if="message.timestamp" :class="['text-xs mt-1', message.sender === 'user' ? 'text-gray-400 dark:text-gray-500 mr-1' : 'text-gray-500 dark:text-gray-400 ml-1']">
-          {{ message.timestamp }}
+        <span v-if="message.createdAt" :class="['text-xs mt-1', message.role === 'user' ? 'text-gray-400 dark:text-gray-500 mr-1' : 'text-gray-500 dark:text-gray-400 ml-1']">
+          {{ formatTimestamp(message.createdAt) }}
         </span>
       </div>
+      <!-- Display general error from useChat if any -->
+      <div v-if="error" class="flex flex-col items-start">
+          <div class="inline-block rounded-xl py-2 px-3 shadow-md max-w-[85%] bg-red-100 dark:bg-red-700 border border-red-300 dark:border-red-600 text-red-700 dark:text-red-100 w-full text-sm">
+              <span class="whitespace-pre-wrap break-words">Chat Error: {{ error.message }}</span>
+          </div>
+      </div>
     </div>
-    <div class="input-area flex items-center border-t border-gray-300 dark:border-gray-600 pt-3">
+    <!-- Bind input to `input` from useChat and submit with `submitForm` -->
+    <form @submit.prevent="submitForm" class="input-area flex items-center border-t border-gray-300 dark:border-gray-600 pt-3">
       <input
-        v-model="newMessage"
+        v-model="input"
         type="text"
         placeholder="Type your message..."
         class="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 transition-shadow duration-150"
-        @keyup.enter="sendMessage"
-        :disabled="isSending"
+        :disabled="isLoading"
       />
       <button
-        @click="sendMessage"
+        type="submit"
         class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:focus:ring-offset-gray-800 disabled:opacity-60 disabled:cursor-not-allowed"
-        :disabled="isSending || !newMessage.trim()"
+        :disabled="isLoading || !input.trim()"
       >
-        <span v-if="isSending">Sending...</span>
+        <span v-if="isLoading">Sending...</span>
         <span v-else>Send</span>
       </button>
-    </div>
+    </form>
     <div
       class="resize-handle absolute bottom-0 right-0 w-4 h-4 bg-gray-400 dark:bg-gray-500 hover:bg-gray-500 dark:hover:bg-gray-400 rounded-tl-lg cursor-se-resize transition-colors"
       @mousedown="onResizeMouseDown"
@@ -51,35 +98,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
-import { getAuth } from 'firebase/auth';
+import { ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'; // `computed` is removed.
+import { getAuth, type User } from 'firebase/auth';
 import { useToastStore } from '~/stores/toast';
-
-interface Message {
-  id: number;
-  sender: 'user' | 'ai' | 'error';
-  text: string;
-  timestamp: string;
-  isStreaming?: boolean;
-}
+import { useChat, type Message as VercelMessage } from '@ai-sdk/vue';
 
 const toastStore = useToastStore();
-const auth = getAuth(); // Assuming Firebase is initialized elsewhere
-
-const messages = ref<Message[]>([
-  // Initial messages can be kept or removed based on preference
-  // { id: 0, sender: 'ai', text: 'Hello! How can I assist you?', timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) },
-]);
-const newMessage = ref('');
-const isSending = ref(false);
-const messageIdCounter = ref(messages.value.length > 0 ? Math.max(...messages.value.map(m => m.id)) + 1 : 0);
+const auth = getAuth();
 
 const messagesContainerRef = ref<HTMLElement | null>(null);
 const chatContainerRef = ref<HTMLElement | null>(null);
 
-// Resizing state
-const chatWidth = ref(360); // Initial width
-const chatHeight = ref(420); // Initial height
+// Resizing and Dragging state (preserved from original)
+const chatWidth = ref(360);
+const chatHeight = ref(420);
 const minChatWidth = 300;
 const minChatHeight = 250;
 const isResizing = ref(false);
@@ -87,14 +119,49 @@ const resizeStartX = ref(0);
 const resizeStartY = ref(0);
 const initialChatWidth = ref(0);
 const initialChatHeight = ref(0);
-
-// Dragging state (for moving the window)
 const isDraggingHeader = ref(false);
 const dragStartX = ref(0);
 const dragStartY = ref(0);
 const initialChatX = ref(0);
 const initialChatY = ref(0);
 
+const { messages, input, handleSubmit, isLoading, error, setMessages } = useChat({
+  api: '/api/admin/chat',
+  onToolCall: ({ toolCall: currentToolCall }) => {
+    console.log('AdminChat: onToolCall triggered', JSON.parse(JSON.stringify(currentToolCall)));
+  },
+  onFinish: (message) => {
+    console.log('AdminChat: onFinish triggered. Final message:', JSON.parse(JSON.stringify(message)));
+  },
+  onError: (err: Error) => {
+    console.error("AdminChat useChat SDK error:", err);
+    toastStore.error(`Chat Error: ${err.message}`);
+  },
+});
+
+const submitForm = async (event?: Event | SubmitEvent) => {
+  if (event && typeof (event as SubmitEvent).preventDefault === 'function') {
+    (event as SubmitEvent).preventDefault();
+  }
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    toastStore.error('You must be logged in to send a message.');
+    return;
+  }
+  let token: string | null = null;
+  try {
+    token = await currentUser.getIdToken(true);
+  } catch (e) {
+    console.error('AdminChat: Error getting auth token before submit:', e);
+    toastStore.error('Authentication error. Please try sending again.');
+    return;
+  }
+  if (!token) {
+    toastStore.error('Authentication token is missing. Cannot send message.');
+    return;
+  }
+  handleSubmit(undefined, { headers: { 'Authorization': `Bearer ${token}` } });
+};
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -104,11 +171,17 @@ const scrollToBottom = () => {
   });
 };
 
-watch(messages, () => {
+watch(messages, (currentMessages) => { 
+  console.log('AdminChat: `messages` ref from useChat updated:', JSON.parse(JSON.stringify(currentMessages)));
   scrollToBottom();
 }, { deep: true });
 
+const formatTimestamp = (date?: Date): string => {
+  if (!date) return '';
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+};
 
+// --- Resizing and Dragging Logic (preserved from original) ---
 const onResizeMouseDown = (event: MouseEvent) => {
   event.preventDefault();
   isResizing.value = true;
@@ -146,7 +219,6 @@ const onDragHeaderMouseDown = (event: MouseEvent) => {
     const rect = chatContainerRef.value.getBoundingClientRect();
     initialChatX.value = rect.left;
     initialChatY.value = rect.top;
-     // Temporarily make position absolute for dragging if it's fixed
     if (getComputedStyle(chatContainerRef.value).position === 'fixed') {
         chatContainerRef.value.style.right = 'auto';
         chatContainerRef.value.style.bottom = 'auto';
@@ -171,194 +243,30 @@ const onDragHeaderMouseUp = () => {
   isDraggingHeader.value = false;
   document.removeEventListener('mousemove', onDragHeaderMouseMove);
   document.removeEventListener('mouseup', onDragHeaderMouseUp);
-   // Optional: Snap back to corner if that's desired behavior after drag
-   // Or save position in localStorage to persist
 };
-
-
-const addMessage = (sender: 'user' | 'ai' | 'error', text: string, isStreaming = false): Message => {
-  const newMessageEntry: Message = {
-    id: messageIdCounter.value++,
-    sender,
-    text,
-    timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-    isStreaming: sender === 'ai' ? isStreaming : undefined,
-  };
-  messages.value.push(newMessageEntry);
-  scrollToBottom();
-  return newMessageEntry;
-};
-
-const sendMessage = async () => {
-  const userInput = newMessage.value.trim();
-  if (userInput === '' || isSending.value) return;
-
-  isSending.value = true;
-  const currentUser = auth.currentUser;
-
-  if (!currentUser) {
-    toastStore.error('You must be logged in to chat.');
-    addMessage('error', 'Authentication error. Please log in again.');
-    isSending.value = false;
-    return;
-  }
-
-  let token: string | null = null;
-  try {
-    token = await currentUser.getIdToken(true); // Force refresh token
-  } catch (error) {
-    console.error('Error getting auth token:', error);
-    toastStore.error('Could not authenticate. Please try again.');
-    addMessage('error', 'Failed to get authentication token.');
-    isSending.value = false;
-    return;
-  }
-
-  if (!token) {
-    toastStore.error('Authentication token is missing.');
-    addMessage('error', 'Authentication token unavailable.');
-    isSending.value = false;
-    return;
-  }
-
-  addMessage('user', userInput);
-  const currentInput = newMessage.value; // Store before clearing
-  newMessage.value = ''; // Clear input
-
-  let aiMessageRef: Message | null = null;
-
-  try {
-    const response = await fetch('/api/admin/chat', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message: currentInput }), // Use stored input
-    });
-
-    if (!response.ok) {
-      let errorData: { message?: string } | string = `Server error: ${response.status}`; // Default error
-      try {
-        // Try to parse as JSON first, as it might contain a structured error message
-        const jsonError = await response.json();
-        errorData = jsonError?.message || JSON.stringify(jsonError);
-        console.error('AdminChat: Response not OK. Status:', response.status, 'Data (JSON):', jsonError);
-      } catch (e) {
-        // If JSON parsing fails, try to get text
-        try {
-            const textError = await response.text();
-            errorData = textError || `Server error: ${response.status} (empty response body)`;
-            console.error('AdminChat: Response not OK. Status:', response.status, 'Data (Text):', textError);
-        } catch (textE) {
-            // If text parsing also fails, use the default status error
-            console.error('AdminChat: Response not OK. Status:', response.status, 'Failed to parse error response body.');
-        }
-      }
-      throw new Error((typeof errorData === 'string' ? errorData : errorData.message) || `Request failed with status ${response.status}`);
-    }
-
-    const contentType = response.headers.get('content-type');
-    console.log('AdminChat: Received response. Content-Type:', contentType);
-
-    if (contentType && (contentType.includes('text/event-stream') || contentType.includes('text/plain'))) {
-      console.log('AdminChat: Handling streaming response.');
-      // Handle streaming response
-      aiMessageRef = addMessage('ai', '', true);
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error('Response body is not readable.');
-      }
-
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const aiMsg = messages.value.find(m => aiMessageRef && m.id === aiMessageRef.id);
-        if (aiMsg) {
-          aiMsg.text += chunk;
-          scrollToBottom(); // Scroll as content streams
-        }
-      }
-      const finalChunk = decoder.decode(); // Process any remaining data
-      if (finalChunk) {
-         const aiMsg = messages.value.find(m => aiMessageRef && m.id === aiMessageRef.id);
-         if (aiMsg) aiMsg.text += finalChunk;
-      }
-       const aiMsg = messages.value.find(m => aiMessageRef && m.id === aiMessageRef.id);
-       if (aiMsg) aiMsg.isStreaming = false;
-
-    } else if (contentType?.includes('application/json')) {
-      console.log('AdminChat: Handling JSON response.');
-      // Handle JSON response
-      const data = await response.json();
-      console.log('AdminChat: Parsed JSON data:', data);
-      if (data?.reply) {
-        addMessage('ai', data.reply);
-      } else {
-        console.warn('AdminChat: Received JSON response without reply field:', data);
-        addMessage('error', 'Received an unexpected JSON response from the server (missing reply).');
-        toastStore.warning('Received an empty or invalid JSON response from the AI.');
-      }
-    } else {
-      // Handle other content types or missing content type as plain text
-      const textResponse = await response.text();
-      console.log('AdminChat: Handling other/missing Content-Type. Response text:', textResponse);
-      if (textResponse) {
-        addMessage('ai', textResponse);
-      } else {
-        addMessage('error', 'Received an empty or unrecognized response from the server.');
-        toastStore.warning('Received an empty or unrecognized response from the AI.');
-      }
-    }
-
-  } catch (error: unknown) {
-    // Enhanced error logging for the main catch block
-    let errorMessage = 'Failed to send message. Please try again.';
-    let responseStatus: number | undefined;
-
-    // Attempt to get response status if error is related to a fetch response
-    // This is a bit indirect as the 'response' object from the try block isn't directly in scope here
-    // if the error happened before 'response' was assigned or after it went out of scope.
-    // However, if the error object itself contains status (e.g. custom error class), we can use it.
-    if (typeof error === 'object' && error !== null && 'status' in error) {
-        responseStatus = error.status as number;
-    }
-
-    if (error instanceof Error) {
-      errorMessage = error.message;
-      console.error('AdminChat: sendMessage processing error. Status:', responseStatus, 'Error:', error.message, 'Stack:', error.stack);
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-      console.error('AdminChat: sendMessage processing error. Status:', responseStatus, 'Error (string):', error);
-    } else {
-      console.error('AdminChat: sendMessage processing error. Status:', responseStatus, 'Unknown error type:', error);
-    }
-
-    toastStore.error(`Chat Error: ${errorMessage}`);
-    addMessage('error', `Error: ${errorMessage}`);
-    if (aiMessageRef) { // If streaming started but failed
-        const aiMsg = messages.value.find(m => aiMessageRef && m.id === aiMessageRef.id);
-        if (aiMsg) aiMsg.isStreaming = false;
-    }
-  } finally {
-    isSending.value = false;
-    scrollToBottom();
-  }
-};
+// --- End Resizing and Dragging Logic ---
 
 onMounted(() => {
   scrollToBottom();
-  // Position chat window if needed, e.g., from localStorage
 });
 
 onBeforeUnmount(() => {
-  // Clean up global listeners if any were added and not cleaned up elsewhere
-  // (resize and drag listeners are cleaned up on mouseup)
+  // Cleanup for resize/drag listeners is handled in their respective mouseup events
 });
+
+const getAppCountFromResult = (jsonString: string | undefined | null): number | null => {
+  if (!jsonString) return null;
+  try {
+    const result = JSON.parse(jsonString);
+    if (result && typeof result.count === 'number') {
+      return result.count;
+    }
+  } catch (e) {
+    // Not a valid JSON or count not found
+    console.warn("AdminChat: Could not parse app count from tool result", e, jsonString);
+  }
+  return null;
+};
 
 </script>
 
@@ -366,7 +274,6 @@ onBeforeUnmount(() => {
 .admin-chat-container {
   min-width: v-bind(minChatWidth + 'px');
   min-height: v-bind(minChatHeight + 'px');
-  /* Tailwind's resize utility can also be used if preferred over manual JS for basic resize */
 }
 .messages-area {
   scrollbar-width: thin;
@@ -395,8 +302,20 @@ onBeforeUnmount(() => {
   border: 2px solid #2d3748;
 }
 
+.tool-call-ui, .tool-result-ui {
+  font-family: monospace;
+}
+
 .resize-handle {
-  /* Ensures it's on top of other elements within the container if needed */
   z-index: 10;
+}
+.tool-call-ui strong {
+  font-weight: 600; /* semibold */
+}
+.tool-call-ui {
+  background-color: rgba(0,0,0,0.03); /* Lighten the bg slightly */
+}
+.dark .tool-call-ui {
+  background-color: rgba(255,255,255,0.03); /* Lighten the bg slightly for dark mode */
 }
 </style>

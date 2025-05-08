@@ -14,10 +14,10 @@ export const useToastStore = defineStore('toast', () => {
   // State
   const toasts = ref<Toast[]>([])
   let lastId = 0
-  let timer = ref<number | null>(null)
+  const timer = ref<number | null>(null)
   
   // Actions
-  function add(message: string, type: ToastType = 'info', timeout: number = 5000) {
+  function add(message: string, type: ToastType = 'info', timeout = 5000) {
     const id = ++lastId
     const nowTime = Date.now()
     
@@ -80,16 +80,18 @@ export const useToastStore = defineStore('toast', () => {
     const now = Date.now()
     const toastsToRemove: number[] = []
     
-    toasts.value.forEach(toast => {
+    for (const toast of toasts.value) {
       const elapsed = now - toast.startTime
       toast.timeLeft = Math.max(0, toast.timeout - elapsed)
       
       if (toast.timeLeft <= 0 && toast.timeout > 0) {
         toastsToRemove.push(toast.id)
       }
-    })
+    }
     
-    toastsToRemove.forEach(id => remove(id))
+    for (const id of toastsToRemove) {
+      remove(id)
+    }
   }
   
   // Calculate percentage of time left
@@ -105,13 +107,7 @@ export const useToastStore = defineStore('toast', () => {
     }
   }
   
-  // Clean up on page leave
-  onUnmounted(() => {
-    if (timer.value !== null) {
-      window.clearInterval(timer.value)
-      timer.value = null
-    }
-  })
+  // Timer cleanup is handled in remove() and clear() methods
   
   return {
     // State
