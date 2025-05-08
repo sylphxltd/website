@@ -4,11 +4,13 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import { streamText, tool, type CoreMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore'; // Added for session validation
 
 interface UseChatRequestBody {
-  messages: CoreMessage[]; // CoreMessage is already imported from 'ai'
-  // id?: string; // useChat might also send an id for the conversation
-  // data?: Record<string, string>; // for additional data passed via useChat's body
+  messages: CoreMessage[];
+  sessionId: string; // Added sessionId
+  // id?: string;
+  // data?: Record<string, string>;
 }
 
 const SYSTEM_PROMPT = `You are an expert admin assistant for a software management platform.
@@ -58,17 +60,33 @@ export default defineEventHandler(async (event: H3Event) => {
   const adminUid = decodedToken.uid;
 
   let receivedMessages: CoreMessage[];
-  let userMessageContentForLog: string; // For logging the latest user input
+  let userMessageContentForLog: string;
+  let sessionId: string;
 
   try {
       const requestBody = await readBody<UseChatRequestBody>(event);
-      if (!requestBody || !Array.isArray(requestBody.messages) || requestBody.messages.length === 0) {
-        throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing or empty "messages" array in request body' });
+      if (!requestBody || !Array.isArray(requestBody.messages) || requestBody.messages.length === 0 || !requestBody.sessionId) {
+        throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing or empty "messages" array, or missing "sessionId" in request body' });
       }
       
-      receivedMessages = requestBody.messages; // Store the full history
+      receivedMessages = requestBody.messages;
+      sessionId = requestBody.sessionId;
 
-      // Find the last message from the user to use for logging and initial validation.
+      // Validate session ownership
+      const firestore: Firestore = getFirestore();
+      const sessionDocRef = firestore.collection('adminChatSessions').doc(sessionId);
+      const sessionDoc = await sessionDocRef.get();
+
+      if (!sessionDoc.exists) {
+        throw createError({ statusCode: 404, statusMessage: `Not Found: Session ${sessionId} does not exist.` });
+      }
+      const sessionData = sessionDoc.data();
+      if (sessionData?.adminUid !== adminUid) {
+        console.warn(`Forbidden attempt by admin ${adminUid} to use session ${sessionId} owned by ${sessionData?.adminUid}`);
+        throw createError({ statusCode: 403, statusMessage: `Forbidden: You do not own session ${sessionId}.` });
+      }
+
+      // Find the last message from the user to use for logging.
       // The Vercel AI SDK typically ensures the last message is the user's current input.
       const lastMessage = receivedMessages[receivedMessages.length - 1];
       
@@ -240,7 +258,7 @@ export default defineEventHandler(async (event: H3Event) => {
   // --- End Tool Definitions ---
 
   try {
-    console.log(`Admin Chat: Received message from admin [${adminUid}]: "${userMessageContentForLog}"`);
+    console.log(`Admin Chat: Received message for session [${sessionId}] from admin [${adminUid}]: "${userMessageContentForLog}"`);
 
     // The `receivedMessages` variable now holds the full message history from the client,
     // which is what `streamText` expects.

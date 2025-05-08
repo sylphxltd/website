@@ -1,13 +1,48 @@
 <template>
   <div
     ref="chatContainerRef"
-    class="admin-chat-container bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl p-4 flex flex-col fixed bottom-4 right-4 z-50 overflow-hidden resize"
+    class="admin-chat-container bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl flex fixed bottom-4 right-4 z-50 overflow-hidden resize"
     :style="{ width: chatWidth + 'px', height: chatHeight + 'px' }"
   >
-    <h3 class="text-xl font-semibold mb-3 text-gray-800 dark:text-gray-200 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-move" @mousedown="onDragHeaderMouseDown">
-      Admin Chat
-    </h3>
-    <div ref="messagesContainerRef" class="messages-area flex-grow overflow-y-auto mb-3 pr-2 space-y-3">
+    <!-- Session List Panel -->
+    <div class="session-list-panel w-1/3 max-w-[200px] bg-gray-50 dark:bg-gray-750 p-3 flex flex-col border-r border-gray-300 dark:border-gray-600">
+      <button
+        @click="handleCreateNewSession"
+        class="new-chat-button w-full mb-3 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors"
+      >
+        + New Chat
+      </button>
+      <div class="session-list flex-grow overflow-y-auto space-y-1 pr-1">
+        <div
+          v-for="session in adminChatStore.sessions"
+          :key="session.sessionId"
+          @click="handleSelectSession(session.sessionId)"
+          :class="[
+            'session-item p-2 rounded-md cursor-pointer text-sm truncate',
+            adminChatStore.currentSessionId === session.sessionId ? 'bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 font-semibold' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+          ]"
+          :title="session.title || session.firstUserMessageSnippet"
+        >
+          {{ session.title || session.firstUserMessageSnippet }}
+        </div>
+        <div v-if="adminChatStore.isLoadingSessions && !adminChatStore.sessions.length" class="text-center text-xs text-gray-500 dark:text-gray-400 py-4">
+          Loading sessions...
+        </div>
+        <div v-if="!adminChatStore.isLoadingSessions && !adminChatStore.sessions.length" class="text-center text-xs text-gray-500 dark:text-gray-400 py-4">
+          No chat sessions yet.
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="main-chat-area flex-grow flex flex-col overflow-hidden p-4 pl-3">
+      <h3 class="text-xl font-semibold mb-3 text-gray-800 dark:text-gray-200 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-move" @mousedown="onDragHeaderMouseDown">
+        {{ adminChatStore.activeSessionTitle }}
+      </h3>
+      <div v-if="!adminChatStore.currentSessionId && !isLoading" class="flex-grow flex items-center justify-center text-gray-500 dark:text-gray-400">
+        Select a session or start a new chat.
+      </div>
+      <div v-else ref="messagesContainerRef" class="messages-area flex-grow overflow-y-auto mb-3 pr-2 space-y-3">
       <!-- Iterate directly over messages from useChat -->
       <div v-for="message in messages" :key="message.id" :class="['flex flex-col', message.role === 'user' ? 'items-end' : 'items-start']">
         <div
@@ -90,19 +125,22 @@
         <span v-else>Send</span>
       </button>
     </form>
+    </div> <!-- Closing main-chat-area -->
     <div
       class="resize-handle absolute bottom-0 right-0 w-4 h-4 bg-gray-400 dark:bg-gray-500 hover:bg-gray-500 dark:hover:bg-gray-400 rounded-tl-lg cursor-se-resize transition-colors"
       @mousedown="onResizeMouseDown"
     ></div>
-  </div>
+  </div> <!-- Closing admin-chat-container -->
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'; // `computed` is removed.
+import { ref, nextTick, onMounted, onBeforeUnmount, watch, computed } from 'vue'; // Added computed
 import { getAuth, type User } from 'firebase/auth';
 import { useToastStore } from '~/stores/toast';
 import { useChat, type Message as VercelMessage } from '@ai-sdk/vue';
+import { useAdminChatStore } from '~/stores/adminChat'; // Import the new store
 
+const adminChatStore = useAdminChatStore();
 const toastStore = useToastStore();
 const auth = getAuth();
 
@@ -130,8 +168,29 @@ const { messages, input, handleSubmit, isLoading, error, setMessages } = useChat
   onToolCall: ({ toolCall: currentToolCall }) => {
     console.log('AdminChat: onToolCall triggered', JSON.parse(JSON.stringify(currentToolCall)));
   },
-  onFinish: (message) => {
-    console.log('AdminChat: onFinish triggered. Final message:', JSON.parse(JSON.stringify(message)));
+  onFinish: async (message) => { // Make onFinish async
+    console.log('AdminChat: onFinish triggered. Final AI message:', JSON.parse(JSON.stringify(message)));
+    if (adminChatStore.currentSessionId && message.role === 'assistant') {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          toastStore.error('Authentication error: Cannot save AI message.');
+          return;
+        }
+        const token = await currentUser.getIdToken(); // No force refresh needed here
+        await $fetch(`/api/admin/chat/sessions/${adminChatStore.currentSessionId}/messages`, {
+          method: 'POST',
+          body: message, // Send the complete Message object from AI
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        console.log('AdminChat: AI message saved to session', adminChatStore.currentSessionId);
+        // Optionally, refresh session list if messageCount or lastUpdatedAt is displayed and needs update
+        // adminChatStore.fetchSessions();
+      } catch (saveError) {
+        console.error('AdminChat: Failed to save AI message to session:', saveError);
+        toastStore.error('Failed to save AI response.');
+      }
+    }
   },
   onError: (err: Error) => {
     console.error("AdminChat useChat SDK error:", err);
@@ -143,6 +202,10 @@ const submitForm = async (event?: Event | SubmitEvent) => {
   if (event && typeof (event as SubmitEvent).preventDefault === 'function') {
     (event as SubmitEvent).preventDefault();
   }
+
+  const userInput = input.value.trim();
+  if (!userInput) return;
+
   const currentUser = auth.currentUser;
   if (!currentUser) {
     toastStore.error('You must be logged in to send a message.');
@@ -150,7 +213,8 @@ const submitForm = async (event?: Event | SubmitEvent) => {
   }
   let token: string | null = null;
   try {
-    token = await currentUser.getIdToken(true);
+    // Get token without force refresh for regular operations
+    token = await currentUser.getIdToken();
   } catch (e) {
     console.error('AdminChat: Error getting auth token before submit:', e);
     toastStore.error('Authentication error. Please try sending again.');
@@ -160,7 +224,67 @@ const submitForm = async (event?: Event | SubmitEvent) => {
     toastStore.error('Authentication token is missing. Cannot send message.');
     return;
   }
-  handleSubmit(undefined, { headers: { 'Authorization': `Bearer ${token}` } });
+
+  let currentSessionIdForThisSubmit = adminChatStore.currentSessionId;
+  let isNewSessionFlow = false;
+
+  if (!currentSessionIdForThisSubmit) { // New session flow
+    const newSessionData = await adminChatStore.createNewSession(userInput);
+    if (newSessionData?.sessionId && newSessionData.initialMessage) {
+      currentSessionIdForThisSubmit = newSessionData.sessionId;
+      adminChatStore.setCurrentSessionId(currentSessionIdForThisSubmit); // Triggers watcher to load/set messages
+      // Ensure the UI reflects the initial message immediately for AI context
+      setMessages([newSessionData.initialMessage]);
+      isNewSessionFlow = true;
+      // input.value was used for createNewSession, clear it now before handleSubmit
+      // so handleSubmit doesn't re-process it from the input field.
+      // The `messages` ref now contains the initial user message.
+      input.value = '';
+    } else {
+      toastStore.error('Could not create a new chat session. Please try again.');
+      return;
+    }
+  } else { // Existing session flow
+    // The userInput is from input.value.trim()
+    const userMessageForExistingSession: VercelMessage = {
+      id: `local-${Date.now().toString()}`,
+      role: 'user',
+      content: userInput,
+      createdAt: new Date(),
+      parts: [{ type: 'text', text: userInput }],
+    };
+    try {
+      await $fetch(`/api/admin/chat/sessions/${currentSessionIdForThisSubmit}/messages`, {
+        method: 'POST',
+        body: userMessageForExistingSession,
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      console.log('AdminChat: User message saved to existing session', currentSessionIdForThisSubmit);
+      // For existing sessions, we rely on handleSubmit to take the current input.value
+      // and append it to the messages for the AI call.
+      // No need to manually call setMessages here if useChat's handleSubmit handles input.
+    } catch (saveError) {
+      console.error('AdminChat: Failed to save user message to existing session:', saveError);
+      toastStore.error('Failed to save your message.');
+      return;
+    }
+  }
+  
+  if (!currentSessionIdForThisSubmit) {
+    toastStore.error('Session ID is missing after attempting creation/retrieval. Cannot proceed.');
+    return;
+  }
+
+  // Call AI.
+  // If new session: input.value is now empty, messages = [initialUserMsg]. handleSubmit uses these.
+  // If existing session: input.value has current user input, messages = [history...]. handleSubmit uses these.
+  handleSubmit(event, {
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: { sessionId: currentSessionIdForThisSubmit }
+  });
+  
+  // Clear input after handleSubmit has been called (it would have used the input.value if it was an existing session flow)
+  input.value = '';
 };
 
 const scrollToBottom = () => {
@@ -171,14 +295,40 @@ const scrollToBottom = () => {
   });
 };
 
-watch(messages, (currentMessages) => { 
+watch(messages, (currentMessages) => {
   console.log('AdminChat: `messages` ref from useChat updated:', JSON.parse(JSON.stringify(currentMessages)));
   scrollToBottom();
 }, { deep: true });
 
-const formatTimestamp = (date?: Date): string => {
-  if (!date) return '';
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+watch(() => adminChatStore.currentSessionId, (newSessionId, oldSessionId) => {
+  if (newSessionId) {
+    console.log(`AdminChat: Session ID changed to ${newSessionId}. Loading messages.`);
+    // Pass the setMessages function from useChat to the store action
+    adminChatStore.loadMessagesForCurrentSession(setMessages);
+  } else if (oldSessionId && !newSessionId) { // Cleared session
+    console.log('AdminChat: Session cleared. Clearing messages.');
+    setMessages([]);
+  }
+}, { immediate: false }); // Set immediate to false to avoid initial load if not desired, or true if initial load based on store's currentSessionId is needed. Let's start with false.
+
+const formatTimestamp = (dateInput?: Date | string | number | { seconds: number, nanoseconds: number }): string => {
+  if (!dateInput) return '';
+  let date: Date;
+  if (dateInput instanceof Date) {
+    date = dateInput;
+  } else if (typeof dateInput === 'object' && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
+    // Handle Firestore Timestamp-like object if it somehow reaches here
+    date = new Date(dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000);
+  } else {
+    // Try to parse if it's a string or number
+    date = new Date(dateInput);
+  }
+
+  if (date instanceof Date && !Number.isNaN(date.valueOf())) {
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  console.warn('AdminChat: formatTimestamp received an invalid dateInput', dateInput);
+  return 'Invalid Date';
 };
 
 // --- Resizing and Dragging Logic (preserved from original) ---
@@ -248,11 +398,37 @@ const onDragHeaderMouseUp = () => {
 
 onMounted(() => {
   scrollToBottom();
+  // Fetch sessions when the component is mounted
+  if (!adminChatStore.sessions.length) { // Fetch only if not already populated
+    adminChatStore.fetchSessions();
+  }
 });
 
 onBeforeUnmount(() => {
   // Cleanup for resize/drag listeners is handled in their respective mouseup events
 });
+
+// Placeholder for new session creation logic
+const handleCreateNewSession = () => {
+  console.log('AdminChat: handleCreateNewSession triggered');
+  adminChatStore.setCurrentSessionId(null); // This will trigger the watcher
+  // Watcher will call loadMessagesForCurrentSession, which should call setMessages([]) if sessionId is null
+  input.value = ''; // Clear input field
+};
+
+// Session selection logic
+const handleSelectSession = (sessionId: string) => {
+  if (adminChatStore.currentSessionId === sessionId && messages.value.length > 0) {
+    // If same session is clicked and messages are already loaded, do nothing
+    // or if you want to allow re-fetching, remove the messages.value.length > 0 check
+    console.log(`AdminChat: Session ${sessionId} is already active.`);
+    return;
+  }
+  console.log(`AdminChat: Selecting session ${sessionId}`);
+  adminChatStore.setCurrentSessionId(sessionId);
+  // The watch on currentSessionId will trigger loading messages.
+};
+
 
 const getAppCountFromResult = (jsonString: string | undefined | null): number | null => {
   if (!jsonString) return null;
