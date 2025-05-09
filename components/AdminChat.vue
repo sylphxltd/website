@@ -226,20 +226,16 @@ const submitForm = async (event?: Event | SubmitEvent) => {
   }
 
   let currentSessionIdForThisSubmit = adminChatStore.currentSessionId;
-  let isNewSessionFlow = false;
-
   if (!currentSessionIdForThisSubmit) { // New session flow
     const newSessionData = await adminChatStore.createNewSession(userInput);
-    if (newSessionData?.sessionId && newSessionData.initialMessage) {
+    if (newSessionData?.sessionId) { // We only strictly need sessionId here. initialMessage from response is not directly used to setMessages here.
       currentSessionIdForThisSubmit = newSessionData.sessionId;
       adminChatStore.setCurrentSessionId(currentSessionIdForThisSubmit); // Triggers watcher to load/set messages
-      // Ensure the UI reflects the initial message immediately for AI context
-      setMessages([newSessionData.initialMessage]);
-      isNewSessionFlow = true;
-      // input.value was used for createNewSession, clear it now before handleSubmit
-      // so handleSubmit doesn't re-process it from the input field.
-      // The `messages` ref now contains the initial user message.
-      input.value = '';
+      // isNewSessionFlow = true; // This flag can be set if needed for other logic.
+
+      // DO NOT call setMessages([newSessionData.initialMessage]); here.
+      // `handleSubmit` will use `input.value` (which is `userInput`) to form the new user message.
+      // DO NOT clear input.value here. It holds the first message content.
     } else {
       toastStore.error('Could not create a new chat session. Please try again.');
       return;
@@ -276,8 +272,11 @@ const submitForm = async (event?: Event | SubmitEvent) => {
   }
 
   // Call AI.
-  // If new session: input.value is now empty, messages = [initialUserMsg]. handleSubmit uses these.
-  // If existing session: input.value has current user input, messages = [history...]. handleSubmit uses these.
+  // For new session: `input.value` (which is `userInput`) contains the first message.
+  //                  `handleSubmit` will take this `input.value`, create a new user message,
+  //                  append it to the (likely empty) `messages` ref, and send.
+  // For existing session: `input.value` (which is `userInput`) has current user input.
+  //                     `handleSubmit` takes this, appends to history, and sends.
   handleSubmit(event, {
     headers: { 'Authorization': `Bearer ${token}` },
     body: { sessionId: currentSessionIdForThisSubmit }
