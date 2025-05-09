@@ -121,10 +121,15 @@ export const useUserStore = defineStore('user', () => {
     return (currentUser.value.displayName?.charAt(0) ||
             currentUser.value.email?.charAt(0) ||
             'U').toUpperCase()
-  })
+ })
 
-  // Helper function for showing toasts
-  function showToast(message: string, type: ToastType = 'info') {
+ const userUid = computed(() => {
+   // Use the top-level currentUser
+   return currentUser.value?.uid || null;
+ })
+
+ // Helper function for showing toasts
+ function showToast(message: string, type: ToastType = 'info') {
     toastStore[type](message)
   }
 
@@ -285,6 +290,7 @@ export const useUserStore = defineStore('user', () => {
     userEmail,
     userPhotoURL,
     userInitial,
+    userUid, // Expose userUid
 
     // Actions
     clearError,

@@ -2,48 +2,58 @@ import { defineStore } from 'pinia';
 import { getAuth } from 'firebase/auth';
 import { useUserStore } from '~/stores/user';
 import { useToastStore } from '~/stores/toast';
+import { useOptimisticCrud, type OptimisticItemBase } from '~/composables/useOptimisticCrud';
+// generateTempId, deepClone, getCurrentISOTimestamp are used within useOptimisticCrud
 
 // Interface for Resource Metadata (matching API response)
-export interface Resource {
-  id: string; // Firestore document ID
-  name: string; // User-defined name (or original filename)
-  path: string; // Full path in Firebase Storage
-  url?: string; // Optional: Download URL (signed URL)
-  size: number; // File size in bytes
-  contentType: string; // MIME type
-  createdAt: string; // ISO timestamp string
-  appId: string; // Associated application ID
-  description?: string; // Description from Firestore
-  type?: string; // Type from Firestore (e.g., 'document', 'image')
-  isPublic?: boolean; // Visibility from Firestore
-  filename?: string; // Original filename from Firestore
-  uploaderUid?: string; // Uploader's UID from Firestore
+export interface Resource extends OptimisticItemBase {
+  // id, createdAt, updatedAt are from OptimisticItemBase
+  name: string; 
+  path: string; 
+  url?: string; 
+  size: number; 
+  contentType: string; 
+  appId: string; 
+  description?: string; 
+  type?: string; 
+  isPublic?: boolean; 
+  filename?: string; 
+  uploaderUid?: string; 
 }
 
-// Interface for pagination state (if needed)
-interface ResourcePaginationState {
-  currentPage: number;
-  pageSize: number;
-  totalResources: number | null;
-  // Add cursor/token if API uses it
+// Interface for metadata passed from component for upload
+interface ResourceMetadata {
+  name: string;
+  description: string;
+  type: string;
+  isPublic: boolean;
 }
+
+// DTO for uploading a resource, used by the composable's createItem
+interface ResourceUploadPayload {
+  file: File;
+  metadata: ResourceMetadata;
+  appId: string; 
+}
+
+// Placeholder DTO for update operations (not yet refactored with composable)
+type ResourceUpdateDto = Omit<Partial<Resource>, 'id' | 'createdAt' | 'updatedAt'>;
+
 
 export const useResourcesStore = defineStore('resources', () => {
   // State
   const resources = ref<Resource[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const selectedAppId = ref<string | null>(null); // Track which app's resources are shown
-  // Add pagination state if implementing pagination
-  // const pagination = ref<ResourcePaginationState>({ ... });
+  const fetchLoading = ref(false); // For fetchResources and getDownloadUrl
+  const fetchError = ref<string | null>(null);   // For fetchResources and getDownloadUrl
+  const selectedAppId = ref<string | null>(null); 
 
   // Dependencies
   const userStore = useUserStore();
   const toastStore = useToastStore();
+  // const auth = getAuth(); // Removed: Will call getAuth() inside functions that need it
 
-  // Helper to get auth token
   async function getIdToken(): Promise<string> {
-    const auth = getAuth();
+    const auth = getAuth(); // Call getAuth() here
     const idToken = await auth.currentUser?.getIdToken();
     if (!idToken) {
       throw new Error("Could not retrieve user token");
@@ -51,178 +61,168 @@ export const useResourcesStore = defineStore('resources', () => {
     return idToken;
   }
 
-  // --- Utility Function for Error Handling ---
   function getSafeErrorMessage(error: unknown): string {
     if (typeof error === 'string') return error;
-    
-    // Check for standard Error object first
-    if (error instanceof Error) {
-      return error.message;
-    }
-    
-    // Check for Nuxt/H3 fetch error structure (more specific checks)
+    if (error instanceof Error) return error.message;
     if (typeof error === 'object' && error !== null) {
-      // Check for H3Error structure (e.g., from createError)
-      if ('statusMessage' in error && typeof error.statusMessage === 'string') {
-        return error.statusMessage;
+      if ('data' in error && (error as {data?: {message?: string}}).data && typeof (error as {data: {message: string}}).data.message === 'string') {
+        return (error as {data: {message: string}}).data.message;
       }
-      // Check for $fetch error structure (often has a 'data' property)
-      if ('data' in error) {
-        const errorData = (error as { data?: unknown }).data;
-        if (typeof errorData === 'object' && errorData !== null && 'message' in errorData && typeof errorData.message === 'string') {
-          return errorData.message;
-        }
+      if ('statusMessage' in error && typeof (error as {statusMessage: string}).statusMessage === 'string') {
+        return (error as {statusMessage: string}).statusMessage;
       }
-      // Fallback for other object types with a message property
-      if ('message' in error && typeof error.message === 'string') {
-         return error.message;
+      if ('message' in error && typeof (error as {message: string}).message === 'string') {
+        return (error as {message: string}).message;
       }
     }
-    
-    // Default fallback
     return 'An unknown error occurred';
   }
 
-  // Fetch resources for a specific app
+  // API call wrappers for the composable
+  const _apiUploadResource = async (data: ResourceUploadPayload): Promise<{ success: boolean, filename: string, newId?: string, newPath?: string }> => {
+    const token = await getIdToken();
+    const formDataObj = new FormData();
+    formDataObj.append('file', data.file);
+    formDataObj.append('name', data.metadata.name);
+    formDataObj.append('description', data.metadata.description || '');
+    formDataObj.append('type', data.metadata.type);
+    formDataObj.append('isPublic', data.metadata.isPublic.toString());
+    
+    const queryParams = new URLSearchParams({ appId: data.appId });
+
+    const responseFromApi = await $fetch<{ success?: boolean, id?: string, path?: string }>(`/api/resources/upload?${queryParams.toString()}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formDataObj,
+    });
+    const success = !!responseFromApi.id || responseFromApi.success === true;
+    return { success, filename: data.file.name, newId: responseFromApi.id, newPath: responseFromApi.path };
+  };
+
+  const _apiDeleteResource = async (id: string): Promise<void> => {
+    const token = await getIdToken();
+    await $fetch('/api/resources/delete', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: { resourceId: id },
+    });
+  };
+
+  const _transformUploadResponse = (
+    optimisticItem: Resource, 
+    response: { success: boolean, filename: string, newId?: string, newPath?: string },
+    tempId: string 
+  ): Resource => {
+    if (!response.success) {
+      throw new Error(`Upload API call indicated failure for ${response.filename}`);
+    }
+    return { 
+      ...optimisticItem,
+      id: response.newId || tempId, 
+      path: response.newPath || optimisticItem.path, 
+      // Ensure other fields from optimisticItem are preserved if not in response
+      name: optimisticItem.name,
+      size: optimisticItem.size,
+      contentType: optimisticItem.contentType,
+      appId: optimisticItem.appId,
+      description: optimisticItem.description,
+      type: optimisticItem.type,
+      isPublic: optimisticItem.isPublic,
+      filename: optimisticItem.filename,
+      uploaderUid: optimisticItem.uploaderUid,
+      // createdAt and updatedAt are handled by the composable initially
+    }; 
+  };
+  
+  const _dummyApiUpdate = async (id: string, data: ResourceUpdateDto): Promise<Partial<Resource>> => {
+    throw new Error('Update operation for resources not implemented.');
+  };
+
+  const {
+    createItem: createResourceOptimistic,
+    deleteItem: deleteResourceOptimistic,
+    isLoadingCreate,
+    isLoadingUpdate, 
+    isLoadingDelete,
+    error: crudError,
+  } = useOptimisticCrud<
+    Resource, 
+    ResourceUploadPayload, 
+    ResourceUpdateDto, 
+    { success: boolean, filename: string, newId?: string, newPath?: string }, 
+    Partial<Resource> 
+  >({
+    itemsRef: resources,
+    apiCreate: _apiUploadResource,
+    apiUpdate: _dummyApiUpdate, 
+    apiDelete: _apiDeleteResource,
+    transformCreateResponse: _transformUploadResponse,
+    tempIdPrefix: 'resource-temp',
+  });
+
   const fetchResources = async (appId: string | null) => {
     if (!appId) {
       resources.value = [];
       selectedAppId.value = null;
       return;
     }
-    if (!userStore.isAdmin) return; // Basic check
+    if (!userStore.isAdmin) return; 
 
     selectedAppId.value = appId;
-    loading.value = true;
-    error.value = null;
-
+    fetchLoading.value = true;
+    fetchError.value = null;
+  
     try {
       const token = await getIdToken();
       const queryParams = new URLSearchParams({ appId });
-      // Add pagination params if needed: queryParams.append('page', '1');
-
       const response = await $fetch<{ resources: Resource[]; total?: number }>('/api/resources/list', {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
         query: queryParams,
       });
-
       resources.value = response.resources;
-      // Update pagination state if needed
-      // pagination.value.totalResources = response.total ?? null;
-
-    } catch (err: unknown) { // Use unknown
+    } catch (err: unknown) { 
       console.error("Error fetching resources:", err);
-      error.value = getSafeErrorMessage(err); // Use utility function
-      if (error.value) {
-          toastStore.error(error.value);
+      fetchError.value = getSafeErrorMessage(err); 
+      if (fetchError.value) {
+          toastStore.error(fetchError.value);
       }
-      resources.value = []; // Clear list on error
+      resources.value = []; 
     } finally {
-      loading.value = false;
+      fetchLoading.value = false;
     }
   };
 
-  // Define interface for metadata passed from component
-  interface ResourceMetadata {
-      name: string;
-      description: string;
-      type: string;
-      isPublic: boolean;
-  }
+  const uploadResource = async (appId: string, file: File, metadata: ResourceMetadata): Promise<Resource | null> => {
+    if (!appId || !file || !metadata || !userStore.isAdmin) return null;
 
-  // Upload a resource
-  const uploadResource = async (appId: string, file: File, metadata: ResourceMetadata) => { // Add metadata parameter
-    if (!appId || !file || !metadata || !userStore.isAdmin) return;
+    const uploadData: ResourceUploadPayload = { appId, file, metadata };
+    const result = await createResourceOptimistic(uploadData);
 
-    loading.value = true; // Consider a separate loading state for upload
-    error.value = null;
-
-    try {
-      const token = await getIdToken();
-      const formData = new FormData();
-      formData.append('file', file);
-      // Append metadata to FormData
-      formData.append('name', metadata.name);
-      formData.append('description', metadata.description || '');
-      formData.append('type', metadata.type);
-      formData.append('isPublic', metadata.isPublic.toString());
-      // Keep appId in query params as API expects it there
-      const queryParams = new URLSearchParams({ appId });
-
-      await $fetch(`/api/resources/upload?${queryParams.toString()}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
-
-      toastStore.success(`Successfully uploaded ${file.name}`);
-      await fetchResources(appId); // Refresh list
-
-    } catch (err: unknown) { // Use unknown
-      console.error("Error uploading resource:", err);
-      error.value = getSafeErrorMessage(err); // Use utility function
-      if (error.value) {
-          toastStore.error(error.value);
+    if (result.item) {
+      const createdResourceItem = result.item; // Assign to a new const to help TS type narrowing
+      // If the uploaded resource's appId is not the currently selected one,
+      // remove it from the local `resources` ref as it was added by the composable.
+      // This maintains the original behavior of only showing newly uploaded resources
+      // if they belong to the currently viewed app.
+      if (appId !== selectedAppId.value) {
+        resources.value = resources.value.filter(r => r.id !== createdResourceItem.id);
       }
-    } finally {
-      loading.value = false; // Reset general loading or specific upload loading
     }
+    return result.item; // Return the Resource item from the result
   };
 
-  // Delete a resource
-  const deleteResource = async (resourceId: string) => { // Change parameter to resourceId
-    if (!resourceId || !userStore.isAdmin) return;
-
-    // Find the resource locally first to get the name for the toast message (optional)
-    const resourceName = resources.value.find(r => r.id === resourceId)?.name || resourceId;
-
-    loading.value = true; // Consider separate loading state
-    error.value = null;
-
-    try {
-      const token = await getIdToken();
-      await $fetch('/api/resources/delete', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-         },
-        body: { resourceId: resourceId } // Send the Firestore document ID
-      });
-
-      toastStore.success(`Successfully deleted ${resourceName}`); // Use resourceName
-      // Refresh list for the currently selected app by fetching page 1
-      if (selectedAppId.value) {
-        await fetchResources(selectedAppId.value); // Re-fetch the list
-      }
-
-    } catch (err: unknown) { // Use unknown
-      console.error("Error deleting resource:", err);
-      let message = 'Failed to delete resource';
-      if (typeof err === 'object' && err !== null) {
-        if ('data' in err && typeof err.data === 'object' && err.data !== null && 'message' in err.data && typeof err.data.message === 'string') {
-          message = err.data.message;
-        } else if ('statusMessage' in err && typeof err.statusMessage === 'string') {
-          message = err.statusMessage;
-        } else if (err instanceof Error) {
-          message = err.message;
-        }
-      }
-      error.value = message;
-      if (error.value) {
-          toastStore.error(error.value);
-      }
-    } finally {
-      loading.value = false;
-    }
+  const deleteResource = async (resourceId: string): Promise<boolean> => {
+    if (!resourceId || !userStore.isAdmin) return false;
+    // The composable handles the core optimistic removal from itemsRef.
+    // The conditional removal based on selectedAppId for UI consistency is handled
+    // by fetchResources clearing the list when selectedAppId changes.
+    return await deleteResourceOptimistic(resourceId);
   };
 
-  // Get download URL
   const getDownloadUrl = async (resourcePath: string): Promise<string | null> => {
       if (!resourcePath || !userStore.isAdmin) return null;
-      // Consider adding a loading state specific to download URL generation if needed
-      error.value = null;
+      fetchError.value = null; 
       try {
           const token = await getIdToken();
           const queryParams = new URLSearchParams({ path: resourcePath });
@@ -233,21 +233,23 @@ export const useResourcesStore = defineStore('resources', () => {
           return response.downloadUrl;
       } catch (err: unknown) {
           console.error(`Error getting download URL for ${resourcePath}:`, err);
-          error.value = getSafeErrorMessage(err);
-          toastStore.error(error.value || 'Failed to get download link.');
+          fetchError.value = getSafeErrorMessage(err);
+          toastStore.error(fetchError.value || 'Failed to get download link.');
           return null;
       }
   };
 
   return {
     resources,
-    loading,
-    error,
+    fetchLoading, 
+    fetchError,   
+    isLoadingCreate, 
+    isLoadingDelete, 
+    crudError,       
     selectedAppId,
-    // pagination, // if used
     fetchResources,
     uploadResource,
     deleteResource,
-    getDownloadUrl, // Expose the new action
+    getDownloadUrl, 
   };
 });

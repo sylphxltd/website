@@ -2,10 +2,12 @@ import { defineStore } from 'pinia';
 import { getAuth } from 'firebase/auth';
 import { useUserStore } from '~/stores/user';
 import { useToastStore } from '~/stores/toast';
+import { useOptimisticCrud, type OptimisticItemBase } from '~/composables/useOptimisticCrud';
+import { getCurrentISOTimestamp } from '~/utils/optimisticUpdateHelpers'; // Still needed for optimistic reply object
 
 // Interface for a Review (adjust based on actual API response)
-export interface Review {
-  id: string; // Unique ID for the review (e.g., from the store API)
+export interface Review extends OptimisticItemBase {
+  // id, createdAt are from OptimisticItemBase
   appId: string; // Associated application ID
   store: 'googlePlay' | 'appStore' | string; // Source store
   author: string;
@@ -39,10 +41,12 @@ interface ReviewFilters {
 export const useReviewsStore = defineStore('reviews', () => {
   // State
   const reviews = ref<Review[]>([]);
-  const loading = ref(false);
-  const replying = ref<Record<string, boolean>>({}); // Track reply loading state per review ID
-  const generatingReply = ref<Record<string, boolean>>({}); // Track AI generation loading state
-  const error = ref<string | null>(null);
+  const fetchLoading = ref(false); // For fetchReviews
+  // replying and generatingReply are specific to certain actions, keep them for now
+  // crudError from composable will handle CUD errors. fetchError for fetch.
+  const replying = ref<Record<string, boolean>>({});
+  const generatingReply = ref<Record<string, boolean>>({});
+  const fetchError = ref<string | null>(null); // For fetchReviews
   const selectedAppId = ref<string | null>(null);
   const selectedStore = ref<string>(''); // e.g., 'googlePlay', 'appStore', '' for all
   const pagination = ref<ReviewPaginationState>({
@@ -60,10 +64,11 @@ export const useReviewsStore = defineStore('reviews', () => {
   // Dependencies
   const userStore = useUserStore();
   const toastStore = useToastStore();
+  // const auth = getAuth(); // Removed: Will call getAuth() inside functions that need it
 
   // Helper to get auth token
   async function getIdToken(): Promise<string> {
-    const auth = getAuth();
+    const auth = getAuth(); // Call getAuth() here
     const idToken = await auth.currentUser?.getIdToken();
     if (!idToken) {
       throw new Error("Could not retrieve user token");
@@ -110,8 +115,8 @@ export const useReviewsStore = defineStore('reviews', () => {
         return;
     }
 
-    loading.value = true;
-    error.value = null;
+    fetchLoading.value = true;
+    fetchError.value = null;
 
     try {
       const token = await getIdToken();
@@ -138,45 +143,151 @@ export const useReviewsStore = defineStore('reviews', () => {
       pagination.value.currentPage = page;
 
     } catch (err: unknown) {
-      error.value = getSafeErrorMessage(err);
-      toastStore.error(error.value);
+      fetchError.value = getSafeErrorMessage(err);
+      toastStore.error(fetchError.value);
       reviews.value = [];
     } finally {
-      loading.value = false;
+      fetchLoading.value = false;
     }
   };
 
-  // Post a reply
+  // --- CRUD Operations using Composable ---
+  interface ReviewReplyDto {
+    replyText: string;
+    // For API call, we also need appId and store, but these are not part of "what's changing" directly on the Review item
+    // They will be passed to the _apiPostReply wrapper.
+  }
+  // The API for postReply doesn't return the updated review, so TApiUpdateResponse is undefined or a simple success object
+  type PostReplyApiResponse = undefined; // Or { success: boolean }
+
+  const _apiPostReply = async (reviewId: string, dto: ReviewReplyDto & { appId: string, storePlatform: string }): Promise<PostReplyApiResponse> => {
+    const token = await getIdToken();
+    await $fetch('/api/reviews/reply', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: {
+            appId: dto.appId,
+            store: dto.storePlatform,
+            reviewId: reviewId,
+            text: dto.replyText,
+        }
+    });
+    // Assuming success if no error is thrown by $fetch
+  };
+
+  const _transformReviewAfterReply = (
+    itemInState: Review, // This is the review item from reviews.value with the optimistic reply
+    _response: PostReplyApiResponse // API response is void or simple success, not used to update item
+  ): Review => {
+    // The optimistic update of the reply object itself (creating the new reply object)
+    // should happen in the `postReply` wrapper before calling `updateReviewReplyOptimistic`.
+    // This transform function is for the parent `Review` item. Since the API doesn't
+    // return the updated parent `Review`, we just return the `itemInState` which
+    // should already have its `updatedAt` (if applicable) and `reply` array updated by the wrapper
+    // and the composable's default behavior for `updatedAt`.
+    return {
+        ...itemInState,
+        updatedAt: getCurrentISOTimestamp(), // Ensure parent review's updatedAt is also refreshed
+    };
+  };
+  
+  // Dummy create/delete for now as they are not implemented in this store
+  type DummyReviewCreateDto = Record<string, never>;
+  const _dummyApiCreate = async (data: DummyReviewCreateDto): Promise<unknown> => { throw new Error('Not implemented for reviews'); };
+  const _dummyApiDelete = async (id: string): Promise<void> => { throw new Error('Not implemented for reviews'); };
+
+  const {
+    updateItem: updateReviewReplyOptimistic,
+    isLoadingUpdate,
+    error: crudError,
+  } = useOptimisticCrud<
+    Review,
+    DummyReviewCreateDto,
+    ReviewReplyDto & { appId: string, storePlatform: string },
+    unknown,
+    PostReplyApiResponse
+  >({
+    itemsRef: reviews,
+    apiCreate: _dummyApiCreate,
+    apiUpdate: _apiPostReply,
+    apiDelete: _dummyApiDelete,
+    transformUpdateResponse: _transformReviewAfterReply,
+  });
+
+
   const postReply = async (reviewId: string, replyText: string) => {
      if (!selectedAppId.value || !reviewId || !replyText || !userStore.isAdmin) return;
 
-     replying.value[reviewId] = true;
-     error.value = null; // Clear previous errors
-
-     try {
-        const token = await getIdToken();
-        await $fetch('/api/reviews/reply', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-            body: {
-                appId: selectedAppId.value,
-                store: reviews.value.find(r => r.id === reviewId)?.store, // Find store type
-                reviewId: reviewId,
-                text: replyText,
-            }
-        });
-        toastStore.success('Reply posted successfully!');
-        // Refresh reviews for the current page
-        await fetchReviews(pagination.value.currentPage);
-     } catch (err: unknown) {
-        error.value = getSafeErrorMessage(err);
-        toastStore.error(`Failed to post reply: ${error.value}`);
-     } finally {
-        replying.value[reviewId] = false;
+     const reviewIndex = reviews.value.findIndex(r => r.id === reviewId);
+     if (reviewIndex === -1) {
+         toastStore.error(`Review with ID ${reviewId} not found.`);
+         return;
      }
+
+    // This specific loading state can be driven by isLoadingUpdate[reviewId] from the composable
+    // For now, we keep it to show how it would map.
+     replying.value[reviewId] = true;
+
+    // 1. Optimistically update the local Review item's 'reply' property
+    const originalReview = reviews.value[reviewIndex]; // No need to deepClone here, composable handles it
+    const newReplyObject = {
+        body: replyText,
+        createdAt: getCurrentISOTimestamp(),
+    };
+    
+    // Create a new review object with the updated reply
+    const optimisticallyUpdatedReview = {
+        ...originalReview,
+        reply: newReplyObject,
+        updatedAt: getCurrentISOTimestamp(), // Also update parent's updatedAt
+    };
+    
+    // Temporarily replace in the array for UI to update, before calling composable
+    // The composable will do its own cloning and replacement.
+    // This direct mutation is for the immediate UI effect of the new reply object.
+    // The composable's updateItem will then take over.
+    // This is a bit complex; ideally, the DTO would carry the new reply structure.
+    // For now, we'll let the composable update the parent `Review` item,
+    // and the `transformUpdateResponse` will ensure the `reply` field is correctly set.
+    // The DTO passed to `updateReviewReplyOptimistic` will just be the `replyText` and context.
+
+     const dto: ReviewReplyDto & { appId: string, storePlatform: string } = {
+        replyText,
+        appId: selectedAppId.value,
+        storePlatform: originalReview.store,
+     };
+    
+     // The `updateReviewReplyOptimistic` will call `_apiPostReply`.
+     // `_transformReviewAfterReply` will be called with the `itemInState` (which is the review from `reviews.value`)
+     // and the API response.
+     // The `itemInState` passed to `_transformReviewAfterReply` by the composable will be a clone
+     // of the review *before* the DTO is applied. The DTO is applied *after* transform by default.
+     // This means `_transformReviewAfterReply` needs to construct the new reply.
+     // Let's adjust `_transformReviewAfterReply` to use the DTO.
+
+    // Redefining _transformReviewAfterReply to use the DTO to build the reply
+    // This means the DTO needs to be available in _transformReviewAfterReply's scope,
+    // or the composable needs to pass it. The composable does not pass the DTO to transformUpdateResponse.
+    // So, the optimistic update of the 'reply' field must happen in the `updateItem` wrapper (this function).
+
+    // Optimistic update of the reply directly on the item in the ref
+    // This will be part of what `deepClone` in the composable captures as `originalItem`.
+    reviews.value[reviewIndex].reply = newReplyObject;
+    reviews.value[reviewIndex].updatedAt = getCurrentISOTimestamp();
+
+
+    const result = await updateReviewReplyOptimistic(reviewId, dto);
+
+     if (!result) { // If result is null, implies update failed to produce an item
+        // Rollback the optimistic change to the reply if API call failed
+        reviews.value[reviewIndex].reply = originalReview.reply;
+        reviews.value[reviewIndex].updatedAt = originalReview.updatedAt;
+        // Error toast is handled by the composable.
+     }
+     replying.value[reviewId] = false;
   };
 
   // Generate AI Reply Suggestion
@@ -184,7 +295,7 @@ export const useReviewsStore = defineStore('reviews', () => {
       if (!review || !userStore.isAdmin) return null;
 
       generatingReply.value[review.id] = true;
-      error.value = null;
+      fetchError.value = null; // Use fetchError for non-CRUD async operations
 
       try {
           const token = await getIdToken();
@@ -203,8 +314,8 @@ export const useReviewsStore = defineStore('reviews', () => {
           });
           return response.suggestion;
       } catch (err: unknown) {
-          error.value = getSafeErrorMessage(err);
-          toastStore.error(`AI reply generation failed: ${error.value}`);
+          fetchError.value = getSafeErrorMessage(err);
+          toastStore.error(`AI reply generation failed: ${fetchError.value}`);
           return null;
       } finally {
           generatingReply.value[review.id] = false;
@@ -219,10 +330,12 @@ export const useReviewsStore = defineStore('reviews', () => {
 
   return {
     reviews,
-    loading,
-    replying,
-    generatingReply,
-    error,
+    fetchLoading, // For fetchReviews
+    replying, // Per-item reply loading state (can be kept or replaced by isLoadingUpdate)
+    generatingReply, // Per-item AI generation loading state
+    fetchError,  // For fetchReviews and generateAIReply
+    crudError,   // For postReply (update operation)
+    isLoadingUpdate, // For postReply loading state from composable
     selectedAppId,
     selectedStore,
     pagination,

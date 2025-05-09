@@ -2,10 +2,12 @@ import { defineStore } from 'pinia';
 import { getAuth } from 'firebase/auth';
 import { useUserStore } from '~/stores/user';
 import { useToastStore } from '~/stores/toast';
+// generateTempId, deepClone, getCurrentISOTimestamp are now used within useOptimisticCrud or by its helpers
+import { useOptimisticCrud, type OptimisticItemBase } from '~/composables/useOptimisticCrud';
 
 // Interface for an Email Thread/Message (adjust based on actual API)
-export interface EmailMessage {
-  id: string; // Unique ID for the email/thread
+export interface EmailMessage extends OptimisticItemBase {
+  // id, createdAt (receivedAt can be alias for createdAt) are from OptimisticItemBase
   subject: string;
   senderName?: string;
   senderEmail: string;
@@ -38,12 +40,12 @@ interface EmailFilters {
 export const useEmailsStore = defineStore('emails', () => {
   // State
   const emails = ref<EmailMessage[]>([]);
-  const currentEmail = ref<EmailMessage | null>(null); // For detail view
-  const loadingList = ref(false);
-  const loadingDetail = ref(false);
-  const sendingReply = ref(false);
-  const generatingReply = ref(false);
-  const error = ref<string | null>(null);
+  const currentEmail = ref<EmailMessage | null>(null);
+  const fetchListLoading = ref(false); // Renamed
+  const fetchDetailLoading = ref(false); // Renamed
+  // sendingReply will be handled by isLoadingUpdate from composable
+  const generatingReply = ref(false); // For AI suggestions, separate from CRUD
+  const fetchError = ref<string | null>(null); // Renamed for fetch errors
   const pagination = ref<EmailPaginationState>({
       currentPage: 1,
       pageSize: 20,
@@ -59,10 +61,11 @@ export const useEmailsStore = defineStore('emails', () => {
   // Dependencies
   const userStore = useUserStore();
   const toastStore = useToastStore();
+  // const auth = getAuth(); // Removed: Will call getAuth() inside functions that need it
 
   // Helper to get auth token
   async function getIdToken(): Promise<string> {
-    const auth = getAuth();
+    const auth = getAuth(); // Call getAuth() here
     const idToken = await auth.currentUser?.getIdToken();
     if (!idToken) {
       throw new Error("Could not retrieve user token");
@@ -106,8 +109,8 @@ export const useEmailsStore = defineStore('emails', () => {
   const fetchEmails = async (page = 1) => {
     if (!userStore.isAdmin) return;
 
-    loadingList.value = true;
-    error.value = null;
+    fetchListLoading.value = true;
+    fetchError.value = null;
 
     try {
       const token = await getIdToken();
@@ -131,77 +134,179 @@ export const useEmailsStore = defineStore('emails', () => {
       pagination.value.currentPage = page;
 
     } catch (err: unknown) {
-      error.value = getSafeErrorMessage(err);
-      toastStore.error(error.value);
+      fetchError.value = getSafeErrorMessage(err);
+      toastStore.error(fetchError.value);
       emails.value = [];
     } finally {
-      loadingList.value = false;
+      fetchListLoading.value = false;
     }
   };
 
   // Fetch single email detail (if needed)
   const fetchEmailDetail = async (id: string) => {
       if (!id || !userStore.isAdmin) return;
-      loadingDetail.value = true;
-      error.value = null;
+      fetchDetailLoading.value = true;
+      fetchError.value = null;
       currentEmail.value = null;
       try {
           const token = await getIdToken();
-          // Assuming an endpoint like /api/emails/{id} exists
           const response = await $fetch<EmailMessage>(`/api/emails/${id}`, {
               method: 'GET',
               headers: { 'Authorization': `Bearer ${token}` },
           });
           currentEmail.value = response;
       } catch (err: unknown) {
-          error.value = getSafeErrorMessage(err);
-          toastStore.error(error.value);
+          fetchError.value = getSafeErrorMessage(err);
+          toastStore.error(fetchError.value);
       } finally {
-          loadingDetail.value = false;
+          fetchDetailLoading.value = false;
       }
   };
 
-  // Send reply
+  // --- CRUD Operations using Composable ---
+  interface EmailReplyDto {
+    body: string;
+    recipientEmail: string;
+    subject: string; // Subject for the reply email
+    // threadId is the ID of the item being "updated"
+    }
+    type SendReplyApiResponse = undefined; // API likely doesn't return significant data
+  
+    const _apiSendReply = async (threadId: string, dto: EmailReplyDto): Promise<SendReplyApiResponse> => {
+    const token = await getIdToken();
+    await $fetch('/api/emails/send', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: {
+            threadId: threadId,
+            to: dto.recipientEmail,
+            subject: dto.subject,
+            body: dto.body,
+        }
+    });
+  };
+
+  const _transformEmailAfterReply = (
+    itemInState: EmailMessage, // The parent email message
+    _response: SendReplyApiResponse, // API response (void)
+    // We need the DTO to construct the optimistic reply object
+    // This suggests transformUpdateResponse might need access to the DTO or the optimistic update logic needs adjustment
+    // For now, we'll assume the DTO's data is available via closure or passed differently if needed.
+    // Let's assume the optimistic update of itemInState.replies happens *before* this transform is called by the composable,
+    // or this transform is responsible for adding the new reply.
+    // The composable's updateItem applies DTO to item, then calls this.
+    // So, itemInState here would be the parent email *after* its 'updatedAt' (if any) is set by composable,
+    // but *before* the 'replies' array is modified with the new reply.
+    // This transform should construct the new reply and add it.
+    // However, the DTO for updateItem is `EmailReplyDto`, not the full `EmailMessage` for the reply.
+    // This means the optimistic construction of the reply needs to happen in the `sendReply` wrapper.
+    // The `transformUpdateResponse` here will just return the `itemInState` as the API doesn't give new info for the parent.
+    // The actual addition to `replies` array will be done optimistically in the `sendReply` wrapper *before* calling composable's updateItem.
+    // This is a bit of a workaround because `updateItem` is designed to update the item itself, not its children.
+    // A more advanced Composable might handle "sub-item creation" as a specific type of update.
+    // For now, we'll manage the `replies` array optimistically outside the direct `transformUpdateResponse` of the parent.
+  ): EmailMessage => {
+    // The main email thread item itself isn't changed by the API response here.
+    // The optimistic update of its 'replies' array is handled in the sendReply wrapper.
+    return itemInState;
+  };
+
+  const {
+    updateItem: updateEmailOptimistic,
+    isLoadingUpdate,
+    error: crudError,
+  } = useOptimisticCrud<
+    EmailMessage,
+    Record<string, never>, // TCreateDto (not used)
+    EmailReplyDto,         // TUpdateDto for sending a reply (updates the parent thread)
+    unknown,               // TApiCreateResponse (not used)
+    SendReplyApiResponse
+  >({
+    itemsRef: emails,
+    apiCreate: async () => { throw new Error('Create not implemented for emails store via composable'); },
+    apiUpdate: _apiSendReply,
+    apiDelete: async () => { throw new Error('Delete not implemented for emails store via composable'); },
+    transformUpdateResponse: _transformEmailAfterReply,
+  });
+
   const sendReply = async (threadId: string, body: string, recipientEmail: string) => {
-      if (!threadId || !body || !recipientEmail || !userStore.isAdmin) return;
-      sendingReply.value = true;
-      error.value = null;
-      try {
-          const token = await getIdToken();
-          await $fetch('/api/emails/send', { // Assuming one endpoint handles new/reply
-              method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-              },
-              body: {
-                  threadId: threadId, // Indicate it's a reply
-                  to: recipientEmail,
-                  subject: `Re: ${currentEmail.value?.subject || 'Support Inquiry'}`, // Generate subject
-                  body: body,
-              }
-          });
-          toastStore.success('Reply sent successfully!');
-          // Refresh detail view or list?
-          if (currentEmail.value?.id === threadId) {
-              await fetchEmailDetail(threadId); // Refresh detail
-          } else {
-              await fetchEmails(pagination.value.currentPage); // Refresh list
-          }
-      } catch (err: unknown) {
-          error.value = getSafeErrorMessage(err);
-          toastStore.error(`Failed to send reply: ${error.value}`);
-      } finally {
-          sendingReply.value = false;
-      }
+    if (!threadId || !body || !recipientEmail || !userStore.isAdmin) return;
+
+    const parentEmailIndex = emails.value.findIndex(e => e.id === threadId);
+    const parentEmailInDetail = (currentEmail.value?.id === threadId) ? currentEmail.value : null;
+
+    if (parentEmailIndex === -1 && !parentEmailInDetail) {
+        toastStore.error(`Email thread with ID ${threadId} not found.`);
+        return;
+    }
+    
+    // This ref is for UI, can be mapped from isLoadingUpdate[threadId] from composable
+    // sendingReply.value = true; // Replaced by isLoadingUpdate[threadId]
+    // crudError will be set by composable
+
+    const subject = `Re: ${parentEmailInDetail?.subject || emails.value[parentEmailIndex]?.subject || 'Support Inquiry'}`;
+    const replyDto: EmailReplyDto = { body, recipientEmail, subject };
+
+    // Optimistically create the reply and add it to the local state
+    const tempReplyId = `temp-reply-${Date.now()}`; // Simplified tempId generation
+    const now = getCurrentISOTimestamp();
+    const userDisplayName = userStore.userDisplayName || 'You';
+    const userEmailValue = userStore.userEmail || 'unknown@sender.com';
+
+    const optimisticReply: EmailMessage = {
+        id: tempReplyId,
+        subject: subject,
+        senderName: userDisplayName,
+        senderEmail: userEmailValue,
+        recipientEmail: recipientEmail,
+        body: body,
+        isRead: true,
+        isArchived: false,
+        receivedAt: now,
+        createdAt: now, // from OptimisticItemBase
+        replies: [],
+    };
+
+    let originalRepliesInList: EmailMessage[] | undefined;
+    if (parentEmailIndex !== -1) {
+        originalRepliesInList = emails.value[parentEmailIndex].replies ? [...(emails.value[parentEmailIndex].replies ?? [])] : []; // Shallow clone for rollback
+        if (!emails.value[parentEmailIndex].replies) {
+            emails.value[parentEmailIndex].replies = [];
+        }
+        // Ensure replies array exists before pushing
+        (emails.value[parentEmailIndex].replies as EmailMessage[]).push(optimisticReply);
+    }
+  
+    let originalRepliesInDetail: EmailMessage[] | undefined;
+    if (parentEmailInDetail) {
+        originalRepliesInDetail = parentEmailInDetail.replies ? [...(parentEmailInDetail.replies ?? [])] : []; // Shallow clone for rollback
+        if (!parentEmailInDetail.replies) {
+            parentEmailInDetail.replies = [];
+        }
+        // Ensure replies array exists before pushing
+        (parentEmailInDetail.replies as EmailMessage[]).push(optimisticReply);
+    }
+  
+    const result = await updateEmailOptimistic(threadId, replyDto);
+
+    if (!result) { // If result is null, implies update failed
+        if (parentEmailIndex !== -1) {
+            emails.value[parentEmailIndex].replies = originalRepliesInList;
+        }
+        if (parentEmailInDetail) {
+            parentEmailInDetail.replies = originalRepliesInDetail;
+        }
+        // Toast is handled by composable
+    }
+    // sendingReply.value = false; // isLoadingUpdate[threadId] will be false
   };
 
    // Generate AI Reply Suggestion
   const generateAIReply = async (emailBody: string): Promise<string | null> => {
       if (!emailBody || !userStore.isAdmin) return null;
 
-      generatingReply.value = true;
-      error.value = null;
+      generatingReply.value = true; // This is a separate loading state
+      fetchError.value = null;    // Use fetchError for this non-CRUD async op
 
       try {
           const token = await getIdToken();
@@ -218,8 +323,8 @@ export const useEmailsStore = defineStore('emails', () => {
           });
           return response.suggestion;
       } catch (err: unknown) {
-          error.value = getSafeErrorMessage(err);
-          toastStore.error(`AI reply generation failed: ${error.value}`);
+          fetchError.value = getSafeErrorMessage(err);
+          toastStore.error(`AI reply generation failed: ${fetchError.value}`);
           return null;
       } finally {
           generatingReply.value = false;
@@ -236,11 +341,13 @@ export const useEmailsStore = defineStore('emails', () => {
   return {
     emails,
     currentEmail,
-    loadingList,
-    loadingDetail,
-    sendingReply,
-    generatingReply,
-    error,
+    fetchListLoading, // Renamed
+    fetchDetailLoading, // Renamed
+    // sendingReply, // Replaced by isLoadingUpdate from composable
+    generatingReply, // Kept for AI suggestions
+    fetchError,   // For fetch operations
+    crudError,    // For CUD operations (sendReply)
+    isLoadingUpdate, // Specifically for sendReply loading state
     pagination,
     filters,
     fetchEmails,

@@ -1,11 +1,16 @@
 import { defineStore } from 'pinia'
 import { getAuth } from 'firebase/auth'
 import { useUserStore } from '~/stores/user'
+// deepClone will be used by the composable
+import { useOptimisticCrud, type OptimisticItemBase } from '~/composables/useOptimisticCrud';
+import { getCurrentISOTimestamp } from '~/utils/optimisticUpdateHelpers';
 
-// Define User interface based on API response
-export interface ApiUser {
-  uid: string
-  email?: string
+
+// Define User interface based on API response, conforming to OptimisticItemBase
+export interface ApiUser extends OptimisticItemBase { // OptimisticItemBase provides id, createdAt?, updatedAt?
+  uid: string; // Keep uid as the primary identifier used by Firebase Auth
+  // id will be an alias or managed by composable if itemIdKey is 'uid'
+  email?: string;
   displayName?: string
   photoURL?: string;
   phoneNumber?: string; // Add phoneNumber
@@ -37,9 +42,9 @@ interface PaginationState {
 export const useAdminUsersStore = defineStore('adminUsers', () => {
   // State
   const users = ref<ApiUser[]>([]) // Holds the users for the CURRENT page
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-  const settingRoleUid = ref<string | null>(null)
+  const fetchLoading = ref(false) // For fetchUsers and fetchUserById
+  const fetchError = ref<string | null>(null)   // For fetchUsers and fetchUserById
+  // settingRoleUid will be replaced by isLoadingUpdate from composable
   const pagination = ref<PaginationState>({ // Add pagination state
       currentPage: 1,
       pageSize: 10, // Default page size
@@ -49,6 +54,7 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
   
   // Get dependencies
   const userStore = useUserStore()
+  // const auth = getAuth(); // Removed: Will call getAuth() inside functions that need it
   
   // Helper to extract error messages from various error types
   const getErrorMessage = (err: unknown): string => {
@@ -81,8 +87,8 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
       return
     }
 
-    loading.value = true
-    error.value = null
+    fetchLoading.value = true
+    fetchError.value = null
     
     // Determine page size and token for the request
     const requestedPageSize = options.pageSize ?? pagination.value.pageSize;
@@ -90,7 +96,7 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
     const requestedPageToken = options.pageToken;
 
     try {
-      const auth = getAuth()
+      const auth = getAuth();
       const idToken = await auth.currentUser?.getIdToken()
       
       if (!idToken) {
@@ -135,72 +141,101 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
 
     } catch (err: unknown) {
       console.error("Error fetching users:", err)
-      error.value = getErrorMessage(err)
+      fetchError.value = getErrorMessage(err)
       
-      if (error.value) {
-        userStore.showToast(error.value, 'error')
+      if (fetchError.value) {
+        userStore.showToast(fetchError.value, 'error')
       }
     } finally {
-      loading.value = false
+      fetchLoading.value = false
     }
   }
 
-  // Toggle admin role for a user
+  // --- CRUD Operations using Composable ---
+  interface UserRoleUpdateDto {
+    // DTO should reflect the part of ApiUser that is being updated.
+    // In this case, it's the admin status within customClaims.
+    customClaims: { admin: boolean };
+  }
+  // API returns void or simple success for setRole
+  type SetRoleApiResponse = undefined;
+
+  const _apiSetUserRole = async (uid: string, dto: UserRoleUpdateDto): Promise<SetRoleApiResponse> => {
+    const auth = getAuth(); // Ensure auth is obtained here
+    const currentUser = auth.currentUser;
+    if (!currentUser) throw new Error("User not authenticated for _apiSetUserRole");
+    const idToken = await currentUser.getIdToken();
+    if (!idToken) throw new Error("Could not retrieve user token for _apiSetUserRole");
+
+    // The rolePayload sent to the API is { admin: boolean }
+    const rolePayload = dto.customClaims;
+    await $fetch('/api/users/setRole', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, role: rolePayload }),
+    });
+  };
+
+  const _transformUserAfterRoleChange = (
+    itemInState: ApiUser, // User object from users.value with optimistic claims
+    _response: SetRoleApiResponse, // API response is void
+  ): ApiUser => {
+    return {
+        ...itemInState,
+        updatedAt: getCurrentISOTimestamp(), // Ensure updatedAt is fresh
+    };
+  };
+
+  const {
+    updateItem: updateUserRoleOptimistic,
+    isLoadingUpdate,
+    error: crudError,
+  } = useOptimisticCrud<
+    ApiUser,
+    Record<string, never>, // TCreateDto (not used)
+    UserRoleUpdateDto,
+    unknown, // TApiCreateResponse (not used)
+    SetRoleApiResponse
+  >({
+    itemsRef: users,
+    apiCreate: async () => { throw new Error('Create not implemented for adminUsers store'); },
+    apiUpdate: _apiSetUserRole,
+    apiDelete: async () => { throw new Error('Delete not implemented for adminUsers store'); },
+    transformUpdateResponse: _transformUserAfterRoleChange,
+    itemIdKey: 'uid', // Firebase uses 'uid' as the identifier
+  });
+
+
   const toggleAdminRole = async (user: ApiUser) => {
-    const auth = getAuth()
-    
-    // Prevent changing your own role or if already processing another user
-    if (settingRoleUid.value || user.uid === auth.currentUser?.uid) {
-      return
+    const auth = getAuth();
+    if (user.uid === auth.currentUser?.uid) {
+      userStore.showToast("You cannot change your own role.", "warning");
+      return;
     }
 
-    settingRoleUid.value = user.uid
-    const newAdminStatus = !user.customClaims?.admin
-    const rolePayload = { admin: newAdminStatus }
+    const newAdminStatus = !user.customClaims?.admin;
+    const dto: UserRoleUpdateDto = { customClaims: { admin: newAdminStatus } };
+    
+    const updatedUser = await updateUserRoleOptimistic(user.uid, dto);
 
-    try {
-      const idToken = await auth.currentUser?.getIdToken()
-      
-      if (!idToken) {
-        throw new Error("Could not retrieve user token")
-      }
-
-      await $fetch('/api/users/setRole', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ uid: user.uid, role: rolePayload })
-      })
-
+    if (updatedUser) {
       userStore.showToast(
         `Successfully ${newAdminStatus ? 'granted' : 'revoked'} admin role for ${user.email || user.uid}.`,
         'success'
-      )
-      
-      // Refresh the user list (refetch page 1 with current filters via watcher)
-      // We trigger this by calling fetchUsers without arguments, which defaults to page 1.
-      // The watcher in the component will pick up the current filter values.
-      await fetchUsers();
-    } catch (err: unknown) {
-      console.error("Error setting user role:", err)
-      userStore.showToast(getErrorMessage(err), 'error')
-    } finally {
-      settingRoleUid.value = null
+      );
     }
-  }
+  };
 
   // Fetch a single user by ID
   const fetchUserById = async (userId: string): Promise<ApiUser | null> => {
       if (!userId || !userStore.isAdmin) return null;
 
-      loading.value = true; // Use general loading state
-      error.value = null;
+      fetchLoading.value = true;
+      fetchError.value = null;
 
       try {
-          const auth = getAuth(); // Get auth instance
-          const token = await auth.currentUser?.getIdToken(); // Use auth instance
+          const auth = getAuth();
+          const token = await auth.currentUser?.getIdToken();
           if (!token) {
               throw new Error("Could not retrieve user token");
           }
@@ -209,35 +244,32 @@ export const useAdminUsersStore = defineStore('adminUsers', () => {
               headers: { 'Authorization': `Bearer ${token}` },
           });
 
-          // Optional: Update user in the local list if present?
           const index = users.value.findIndex(u => u.uid === userId);
           if (index !== -1) {
-              users.value[index] = userData;
+              users.value[index] = { ...userData, id: userData.uid }; // Ensure 'id' for OptimisticItemBase
           }
-
-          return userData; // Return fetched user data
-
+          return { ...userData, id: userData.uid };
       } catch (err: unknown) {
           console.error(`Error fetching user ${userId}:`, err);
-          error.value = getErrorMessage(err);
-          // Get toast store instance directly in catch block if scope issue persists
+          fetchError.value = getErrorMessage(err);
           const toast = useToastStore();
-          toast.error(error.value || 'Failed to fetch user data.'); // Use the instance
-          return null; // Return null on error
+          toast.error(fetchError.value || 'Failed to fetch user data.');
+          return null;
       } finally {
-          loading.value = false;
+          fetchLoading.value = false;
       }
   }
 
   // Return state and methods
   return {
-    users, // Current page of users
-    loading,
-    error,
-    settingRoleUid,
-    pagination, // Expose pagination state
+    users,
+    fetchLoading,
+    fetchError,
+    isLoadingUpdate, // For toggleAdminRole
+    crudError,      // For toggleAdminRole errors
+    pagination,
     fetchUsers,
     toggleAdminRole,
-    fetchUserById, // Expose the new action
+    fetchUserById,
   }
 })

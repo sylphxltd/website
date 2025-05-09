@@ -15,11 +15,11 @@
       <div class="session-list flex-grow overflow-y-auto space-y-1 pr-1">
         <div
           v-for="session in adminChatStore.sessions"
-          :key="session.sessionId"
-          @click="handleSelectSession(session.sessionId)"
+          :key="session.id"
+          @click="handleSelectSession(session.id)"
           :class="[
             'session-item p-2 rounded-md cursor-pointer text-sm truncate',
-            adminChatStore.currentSessionId === session.sessionId ? 'bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 font-semibold' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+            adminChatStore.currentSessionId === session.id ? 'bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 font-semibold' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
           ]"
           :title="session.title || session.firstUserMessageSnippet"
         >
@@ -228,8 +228,8 @@ const submitForm = async (event?: Event | SubmitEvent) => {
   let currentSessionIdForThisSubmit = adminChatStore.currentSessionId;
   if (!currentSessionIdForThisSubmit) { // New session flow
     const newSessionData = await adminChatStore.createNewSession(userInput);
-    if (newSessionData?.sessionId) { // We only strictly need sessionId here. initialMessage from response is not directly used to setMessages here.
-      currentSessionIdForThisSubmit = newSessionData.sessionId;
+    if (newSessionData?.id) { // Changed from sessionId to id
+      currentSessionIdForThisSubmit = newSessionData.id; // Changed from sessionId to id
       adminChatStore.setCurrentSessionId(currentSessionIdForThisSubmit); // Triggers watcher to load/set messages
       // isNewSessionFlow = true; // This flag can be set if needed for other logic.
 
