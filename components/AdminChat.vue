@@ -241,26 +241,54 @@ const submitForm = async (event?: Event | SubmitEvent) => {
       return;
     }
   } else { // Existing session flow
-    // The userInput is from input.value.trim()
-    const userMessageForExistingSession: VercelMessage = {
+    // Create the optimistic user message
+    const optimisticUserMessage: VercelMessage = {
       id: `local-${Date.now().toString()}`,
       role: 'user',
       content: userInput,
       createdAt: new Date(),
       parts: [{ type: 'text', text: userInput }],
     };
+
+    // Optimistically add the message to the messages array
+    const updatedMessages = [...messages.value, optimisticUserMessage];
+    setMessages(updatedMessages);
+    
+    // Save the message in background
     try {
-      await $fetch(`/api/admin/chat/sessions/${currentSessionIdForThisSubmit}/messages`, {
+      const response = await $fetch<VercelMessage>(`/api/admin/chat/sessions/${currentSessionIdForThisSubmit}/messages`, {
         method: 'POST',
-        body: userMessageForExistingSession,
+        body: optimisticUserMessage,
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
       console.log('AdminChat: User message saved to existing session', currentSessionIdForThisSubmit);
-      // For existing sessions, we rely on handleSubmit to take the current input.value
-      // and append it to the messages for the AI call.
-      // No need to manually call setMessages here if useChat's handleSubmit handles input.
+      
+      // Update the optimistic message with server data if needed
+      if (response && response.id !== optimisticUserMessage.id) {
+        const messageIndex = messages.value.findIndex(m => m.id === optimisticUserMessage.id);
+        if (messageIndex !== -1) {
+          // Keep the existing optimistic message in the array but update its id
+          // This is safer than trying to replace it completely
+          const updatedMessagesArray = [...messages.value];
+          
+          // Only update specific fields from the response
+          updatedMessagesArray[messageIndex] = {
+            ...updatedMessagesArray[messageIndex],
+            id: response.id || updatedMessagesArray[messageIndex].id,
+            // Keep existing parts array which we know is valid
+          };
+          
+          setMessages(updatedMessagesArray);
+        }
+      }
     } catch (saveError) {
       console.error('AdminChat: Failed to save user message to existing session:', saveError);
+      
+      // Remove the optimistic message on error
+      const filteredMessages = messages.value.filter(m => m.id !== optimisticUserMessage.id);
+      setMessages(filteredMessages);
+      
       toastStore.error('Failed to save your message.');
       return;
     }
@@ -272,17 +300,14 @@ const submitForm = async (event?: Event | SubmitEvent) => {
   }
 
   // Call AI.
-  // For new session: `input.value` (which is `userInput`) contains the first message.
-  //                  `handleSubmit` will take this `input.value`, create a new user message,
-  //                  append it to the (likely empty) `messages` ref, and send.
-  // For existing session: `input.value` (which is `userInput`) has current user input.
-  //                     `handleSubmit` takes this, appends to history, and sends.
+  // For existing session flow, we've already added the message optimistically,
+  // but we still need to call the AI API
   handleSubmit(event, {
     headers: { 'Authorization': `Bearer ${token}` },
     body: { sessionId: currentSessionIdForThisSubmit }
   });
   
-  // Clear input after handleSubmit has been called (it would have used the input.value if it was an existing session flow)
+  // Clear input after handleSubmit has been called
   input.value = '';
 };
 
