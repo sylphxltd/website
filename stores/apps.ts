@@ -207,7 +207,21 @@ export const useAppsStore = defineStore('apps', () => {
 
       // Safely update state based on API response
       if (Array.isArray(response.apps)) {
-        apps.value = response.apps;
+        const processedApps = response.apps.map(app => {
+          const originalId = app.id === null || typeof app.id === 'undefined' ? '' : String(app.id);
+          const cleanedId = originalId.replace(/<!--.*?-->/g, "").trim();
+          
+          if (!cleanedId) {
+            console.error("fetchApps: App received with invalid or empty ID after cleaning. Original ID:", app.id, "App data:", app);
+            return null; // Mark for filtering
+          }
+          return {
+            ...app,
+            id: cleanedId,
+          };
+        }).filter(appOrNull => appOrNull !== null) as Application[]; // Filter out nulls and assert type
+
+        apps.value = processedApps;
       } else {
         console.warn("fetchApps: API response.apps is not an array. Setting apps to []. Response:", response);
         apps.value = [];

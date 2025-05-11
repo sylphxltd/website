@@ -230,19 +230,19 @@
       <div class="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
         <!-- Mobile Pagination -->
         <div class="flex-1 flex justify-between sm:hidden">
+          <!-- Disable based on if it's the first fetch -->
           <button
             @click="previousPage"
             :disabled="isFirstPage"
             class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            ><!-- Disable based on if it's the first fetch -->
           >
             Previous (First Page)
           </button>
+          <!-- Disable based on cursor -->
           <button
             @click="nextPage"
             :disabled="!pagination.nextPageCursor"
             class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            ><!-- Disable based on cursor -->
           >
             Next
           </button>
@@ -257,21 +257,21 @@
           </div>
           <div>
             <nav v-if="pagination" class="relative z-0 inline-flex rounded-lg shadow-sm -space-x-px" aria-label="Pagination">
+              <!-- Disable based on if it's the first fetch -->
               <button
                 @click="previousPage"
                 :disabled="isFirstPage"
                 class="relative inline-flex items-center px-2 py-2 rounded-l-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                ><!-- Disable based on if it's the first fetch -->
               >
                 <span class="sr-only">Previous (First Page)</span>
                 <span class="i-carbon-chevron-left"></span>
               </button>
               <!-- Page number display removed as it's not accurate with cursors -->
+              <!-- Disable based on cursor -->
               <button
                 @click="nextPage"
                 :disabled="!pagination.nextPageCursor"
                 class="relative inline-flex items-center px-2 py-2 rounded-r-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                ><!-- Disable based on cursor -->
               >
                 <span class="sr-only">Next</span>
                 <span class="i-carbon-chevron-right"></span>
@@ -308,7 +308,7 @@ const statusFilter = ref<string>('');
 const isFirstPage = ref(true);
 
 // --- Store State Refs ---
-const loading = computed<boolean>(() => appsStore.loading);
+const loading = computed<boolean>(() => appsStore.fetchLoading);
 const apps = computed<App[]>(() => appsStore.apps);
 const pagination = computed(() => appsStore.pagination);
 

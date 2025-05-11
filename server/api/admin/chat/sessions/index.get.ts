@@ -3,11 +3,59 @@ import { getAdminAuth } from '~/server/utils/firebaseAdmin';
 import type { DecodedIdToken, Auth } from 'firebase-admin/auth';
 import { getFirestore, type Firestore, type Timestamp } from 'firebase-admin/firestore';
 
+/**
+ * Interface representing a Firestore timestamp-like object
+ */
+interface TimestampLike {
+  seconds: number;
+  nanoseconds: number;
+}
+
+/**
+ * Normalize a Firestore timestamp to ensure it always has valid seconds and nanoseconds
+ * Will fallback to createdAt or Unix Epoch (Jan 1, 1970) if lastUpdatedAt is invalid
+ */
+function normalizeFirestoreTimestamp(data: Record<string, unknown>, sessionId: string): TimestampLike {
+  // Check if lastUpdatedAt is a valid Firestore Timestamp object
+  if (data.lastUpdatedAt &&
+      typeof data.lastUpdatedAt === 'object' &&
+      'seconds' in data.lastUpdatedAt &&
+      typeof data.lastUpdatedAt.seconds === 'number' &&
+      'nanoseconds' in data.lastUpdatedAt &&
+      typeof data.lastUpdatedAt.nanoseconds === 'number') {
+    return {
+      seconds: data.lastUpdatedAt.seconds,
+      nanoseconds: data.lastUpdatedAt.nanoseconds
+    };
+  }
+  
+  // Fallback to createdAt if lastUpdatedAt is invalid
+  if (data.createdAt &&
+      typeof data.createdAt === 'object' &&
+      'seconds' in data.createdAt &&
+      typeof data.createdAt.seconds === 'number' &&
+      'nanoseconds' in data.createdAt &&
+      typeof data.createdAt.nanoseconds === 'number') {
+    console.warn(`Invalid lastUpdatedAt, falling back to createdAt for session: ${sessionId}`);
+    return {
+      seconds: data.createdAt.seconds,
+      nanoseconds: data.createdAt.nanoseconds
+    };
+  }
+  
+  // Default to Unix Epoch if both lastUpdatedAt and createdAt are invalid
+  console.warn(`Invalid lastUpdatedAt and createdAt, defaulting to Unix Epoch for session: ${sessionId}`);
+  return {
+    seconds: 0,
+    nanoseconds: 0
+  };
+}
+
 interface SessionSummary {
   sessionId: string;
   title?: string;
   firstUserMessageSnippet: string;
-  lastUpdatedAt: Timestamp | string; // Firestore Timestamp, or string for client
+  lastUpdatedAt: { seconds: number, nanoseconds: number }; // Always an object with seconds and nanoseconds
   messageCount: number;
 }
 
@@ -53,13 +101,15 @@ export default defineEventHandler(async (event: H3Event): Promise<ListSessionsRe
     const sessions: SessionSummary[] = [];
     for (const doc of querySnapshot.docs) {
       const data = doc.data();
-      // Ensure lastUpdatedAt is converted to a client-friendly format if necessary,
-      // or keep as Timestamp if client can handle it. For now, keep as is from DB.
+      // Normalize lastUpdatedAt to ensure it's always a valid timestamp object
+      // with seconds and nanoseconds properties
+      const normalizedLastUpdatedAt = normalizeFirestoreTimestamp(data, doc.id);
+      
       sessions.push({
         sessionId: doc.id,
         title: data.title,
         firstUserMessageSnippet: data.firstUserMessageSnippet,
-        lastUpdatedAt: data.lastUpdatedAt, // This will be a Firestore Timestamp object
+        lastUpdatedAt: normalizedLastUpdatedAt, // Normalized timestamp with seconds and nanoseconds
         messageCount: data.messageCount,
       });
     }
