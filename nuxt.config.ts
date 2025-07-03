@@ -6,7 +6,6 @@ export default defineNuxtConfig({
     '@unocss/nuxt',
     'nuxt-vuefire', // Revert back to module name
     '@pinia/nuxt', // Add Pinia module
-    '@nuxt/ui',     // Add Nuxt UI module
     '@vueuse/nuxt', // Add VueUse Nuxt module
     'nuxt-particles', // Add Nuxt Particles module
   ],
