@@ -165,11 +165,18 @@ const initialChatY = ref(0);
 
 const { messages, input, handleSubmit, isLoading, error, setMessages } = useChat({
   api: '/api/admin/chat',
+  body: { preventUserMessageOptimisticUpdate: true }, // Prevent auto-handling of user messages
   onToolCall: ({ toolCall: currentToolCall }) => {
     console.log('AdminChat: onToolCall triggered', JSON.parse(JSON.stringify(currentToolCall)));
   },
+  onResponse: async (response) => {
+    console.log('AdminChat DEBUG: onResponse triggered, status:', response.status);
+    console.log('AdminChat DEBUG: onResponse headers:',
+      [...response.headers.entries()].map(([k, v]) => `${k}: ${v}`).join(', '));
+    // Don't try to read the response body as it's a stream being handled by useChat internally
+  },
   onFinish: async (message) => { // Make onFinish async
-    console.log('AdminChat: onFinish triggered. Final AI message:', JSON.parse(JSON.stringify(message)));
+    console.log('AdminChat: onFinish TRIGGERED. Final AI message:', JSON.parse(JSON.stringify(message)));
     if (adminChatStore.currentSessionId && message.role === 'assistant') {
       try {
         const currentUser = auth.currentUser;
@@ -211,104 +218,204 @@ const submitForm = async (event?: Event | SubmitEvent) => {
     toastStore.error('You must be logged in to send a message.');
     return;
   }
+  
   let token: string | null = null;
   try {
-    // Get token without force refresh for regular operations
     token = await currentUser.getIdToken();
   } catch (e) {
     console.error('AdminChat: Error getting auth token before submit:', e);
     toastStore.error('Authentication error. Please try sending again.');
     return;
   }
+  
   if (!token) {
     toastStore.error('Authentication token is missing. Cannot send message.');
     return;
   }
 
-  let currentSessionIdForThisSubmit = adminChatStore.currentSessionId;
-  if (!currentSessionIdForThisSubmit) { // New session flow
-    const newSessionData = await adminChatStore.createNewSession(userInput);
-    if (newSessionData?.id) { // Changed from sessionId to id
-      currentSessionIdForThisSubmit = newSessionData.id; // Changed from sessionId to id
-      adminChatStore.setCurrentSessionId(currentSessionIdForThisSubmit); // Triggers watcher to load/set messages
-      // isNewSessionFlow = true; // This flag can be set if needed for other logic.
+  // Get current session ID first
+  const currentSessionId = adminChatStore.currentSessionId;
 
-      // DO NOT call setMessages([newSessionData.initialMessage]); here.
-      // `handleSubmit` will use `input.value` (which is `userInput`) to form the new user message.
-      // DO NOT clear input.value here. It holds the first message content.
-    } else {
-      toastStore.error('Could not create a new chat session. Please try again.');
-      return;
-    }
-  } else { // Existing session flow
-    // Create the optimistic user message
-    const optimisticUserMessage: VercelMessage = {
-      id: `local-${Date.now().toString()}`,
-      role: 'user',
-      content: userInput,
-      createdAt: new Date(),
-      parts: [{ type: 'text', text: userInput }],
-    };
-
-    // Optimistically add the message to the messages array
-    const updatedMessages = [...messages.value, optimisticUserMessage];
-    setMessages(updatedMessages);
-    
-    // Save the message in background
-    try {
-      const response = await $fetch<VercelMessage>(`/api/admin/chat/sessions/${currentSessionIdForThisSubmit}/messages`, {
-        method: 'POST',
-        body: optimisticUserMessage,
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      console.log('AdminChat: User message saved to existing session', currentSessionIdForThisSubmit);
-      
-      // Update the optimistic message with server data if needed
-      if (response && response.id !== optimisticUserMessage.id) {
-        const messageIndex = messages.value.findIndex(m => m.id === optimisticUserMessage.id);
-        if (messageIndex !== -1) {
-          // Keep the existing optimistic message in the array but update its id
-          // This is safer than trying to replace it completely
-          const updatedMessagesArray = [...messages.value];
-          
-          // Only update specific fields from the response
-          updatedMessagesArray[messageIndex] = {
-            ...updatedMessagesArray[messageIndex],
-            id: response.id || updatedMessagesArray[messageIndex].id,
-            // Keep existing parts array which we know is valid
-          };
-          
-          setMessages(updatedMessagesArray);
-        }
-      }
-    } catch (saveError) {
-      console.error('AdminChat: Failed to save user message to existing session:', saveError);
-      
-      // Remove the optimistic message on error
-      const filteredMessages = messages.value.filter(m => m.id !== optimisticUserMessage.id);
-      setMessages(filteredMessages);
-      
-      toastStore.error('Failed to save your message.');
-      return;
-    }
-  }
+  // Create a unique message ID that includes timestamp for better uniqueness
+  const clientMessageId = `local-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
   
-  if (!currentSessionIdForThisSubmit) {
-    toastStore.error('Session ID is missing after attempting creation/retrieval. Cannot proceed.');
-    return;
-  }
-
-  // Call AI.
-  // For existing session flow, we've already added the message optimistically,
-  // but we still need to call the AI API
-  handleSubmit(event, {
-    headers: { 'Authorization': `Bearer ${token}` },
-    body: { sessionId: currentSessionIdForThisSubmit }
+  console.log('AdminChat: Creating optimistic user message', {
+    messageId: clientMessageId,
+    content: userInput,
+    currentSessionId: currentSessionId
   });
   
-  // Clear input after handleSubmit has been called
+  // Create the optimistic user message with our uniquely generated ID
+  const optimisticUserMessage: VercelMessage = {
+    id: clientMessageId,
+    role: 'user',
+    content: userInput,
+    createdAt: new Date(),
+    parts: [{ type: 'text', text: userInput }],
+  };
+  
+  // Store the user input before clearing - CRITICAL for AI functionality
+  const storedUserInput = userInput;
+  
+  // Clear input field to prevent double-submissions
   input.value = '';
+  
+  // Handle new session flow
+  if (!currentSessionId) {
+    // First create the session without any optimistic UI updates
+    try {
+      const newSessionData = await adminChatStore.createNewSession(userInput);
+      
+      if (!newSessionData?.id) {
+        toastStore.error('Could not create a new chat session. Please try again.');
+        return;
+      }
+      
+      const sessionId = newSessionData.id;
+
+      // Create a loading state flag to track when messages are loaded
+      let messagesLoaded = false;
+      const onMessagesLoaded = () => { messagesLoaded = true; };
+      
+      // Setup one-time watcher to know when messages are loaded
+      const stopWatcher = watch(messages, async () => {
+        // Look for our user message in the loaded messages
+        const hasUserMessage = messages.value.some(m =>
+          m.role === 'user' && m.content === userInput);
+        
+        if (hasUserMessage) {
+          stopWatcher(); // Unwatch once we've confirmed our message is loaded
+          onMessagesLoaded();
+          
+          // Now call AI with the session ID AFTER messages are loaded
+          try {
+            const freshToken = await currentUser.getIdToken();
+            console.log('AdminChat: About to call AI for new session with handleSubmit', {
+              sessionId,
+              messageCount: messages.value.length,
+              firstMessageContent: messages.value[0]?.content
+            });
+            
+            // Add network debugging
+            console.log('AdminChat DEBUG: Network request about to be made for new session with:', {
+              headers: { Authorization: `Bearer ${freshToken.substring(0, 10)}...` },
+              body: { sessionId }
+            });
+            
+            // CRITICAL: Don't restore input.value for new sessions
+            // Just call handleSubmit with the session ID
+            try {
+              const result = await handleSubmit(undefined, {
+                headers: { 'Authorization': `Bearer ${freshToken}` },
+                body: { sessionId }
+              });
+              
+              console.log('AdminChat DEBUG: handleSubmit for new session returned:', result);
+              console.log('AdminChat: handleSubmit for new session completed successfully');
+            } catch (submitError) {
+              console.error('AdminChat DEBUG: handleSubmit for new session threw an error:', submitError);
+              throw submitError; // Re-throw to be caught by the outer catch
+            }
+          } catch (aiError) {
+            console.error('AdminChat: Error calling AI for new session:', aiError);
+            toastStore.error('Error requesting AI response. Please try again.');
+          }
+        }
+      }, { deep: true });
+      
+      // Set a timeout to prevent indefinite waiting
+      setTimeout(() => {
+        if (!messagesLoaded) {
+          stopWatcher();
+          console.error('AdminChat: Timed out waiting for messages to load for new session');
+          toastStore.error('Timed out waiting for messages to load. Please try again.');
+        }
+      }, 5000); // 5 second timeout
+      
+      // Update session ID which will trigger message loading via watcher
+      adminChatStore.setCurrentSessionId(sessionId);
+      
+    } catch (sessionError) {
+      console.error('AdminChat: Error creating new session:', sessionError);
+      toastStore.error('Could not create a new chat session. Please try again.');
+    }
+    
+    return;
+  }
+  
+  // Handle existing session flow - add optimistic message first
+  const updatedMessages = [...messages.value, optimisticUserMessage];
+  setMessages(updatedMessages);
+  
+  try {
+    // Save message to server
+    const response = await $fetch<VercelMessage>(`/api/admin/chat/sessions/${currentSessionId}/messages`, {
+      method: 'POST',
+      body: optimisticUserMessage,
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    console.log('AdminChat: User message saved to existing session', currentSessionId);
+    
+    // Update the message ID without causing a duplicate
+    const messageIndex = messages.value.findIndex(m => m.id === clientMessageId);
+    if (messageIndex !== -1 && response && response.id !== clientMessageId) {
+      // Update the message ID without causing a duplicate
+      const updatedMessagesArray = [...messages.value];
+      updatedMessagesArray[messageIndex] = {
+        ...updatedMessagesArray[messageIndex],
+        id: response.id
+      };
+      
+      setMessages(updatedMessagesArray);
+    }
+    
+    // Instead of restoring input.value, pass the message directly in the body
+    // This prevents duplicate user message from being added by handleSubmit
+    try {
+      console.log('AdminChat: About to call AI for existing session with handleSubmit', {
+        sessionId: currentSessionId,
+        messageLength: storedUserInput.length
+      });
+      
+      // Add network debugging
+      console.log('AdminChat DEBUG: Network request about to be made with:', {
+        headers: { Authorization: `Bearer ${token.substring(0, 10)}...` },
+        body: {
+          sessionId: currentSessionId,
+          message: storedUserInput
+        }
+      });
+      
+      // Wrap in a try-catch and log any errors
+      try {
+        const result = await handleSubmit(undefined, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: {
+            sessionId: currentSessionId,
+            message: storedUserInput // Pass message directly in body instead of using input.value
+          }
+        });
+        
+        console.log('AdminChat DEBUG: handleSubmit returned:', result);
+        console.log('AdminChat: handleSubmit for existing session completed successfully');
+      } catch (submitError) {
+        console.error('AdminChat DEBUG: handleSubmit threw an error:', submitError);
+        throw submitError; // Re-throw to be caught by the outer catch
+      }
+    } catch (aiError) {
+      console.error('AdminChat: Error calling AI for existing session:', aiError);
+      toastStore.error('Error requesting AI response. Please try again.');
+    }
+  } catch (saveError) {
+    console.error('AdminChat: Failed to save user message to existing session:', saveError);
+    
+    // Remove the optimistic message on error
+    const filteredMessages = messages.value.filter(m => m.id !== clientMessageId);
+    setMessages(filteredMessages);
+    
+    toastStore.error('Failed to save your message.');
+  }
 };
 
 const scrollToBottom = () => {
@@ -319,21 +426,27 @@ const scrollToBottom = () => {
   });
 };
 
-watch(messages, (currentMessages) => {
-  console.log('AdminChat: `messages` ref from useChat updated:', JSON.parse(JSON.stringify(currentMessages)));
-  scrollToBottom();
+// Improved messages watcher - only log message updates and scroll when messages actually change
+watch(messages, (currentMessages, oldMessages) => {
+  if (currentMessages.length !== oldMessages?.length ||
+      JSON.stringify(currentMessages.map(m => m.id)) !== JSON.stringify(oldMessages?.map(m => m.id))) {
+    console.log('AdminChat: `messages` ref from useChat updated:', JSON.parse(JSON.stringify(currentMessages)));
+    scrollToBottom();
+  }
 }, { deep: true });
 
 watch(() => adminChatStore.currentSessionId, (newSessionId, oldSessionId) => {
   if (newSessionId) {
     console.log(`AdminChat: Session ID changed to ${newSessionId}. Loading messages.`);
-    // Pass the setMessages function from useChat to the store action
+    // Reset messages to prevent flash of previous messages
+    setMessages([]);
+    // Load messages for new session
     adminChatStore.loadMessagesForCurrentSession(setMessages);
   } else if (oldSessionId && !newSessionId) { // Cleared session
     console.log('AdminChat: Session cleared. Clearing messages.');
     setMessages([]);
   }
-}, { immediate: false }); // Set immediate to false to avoid initial load if not desired, or true if initial load based on store's currentSessionId is needed. Let's start with false.
+}, { immediate: true }); // Set to true to ensure proper initial state
 
 const formatTimestamp = (dateInput?: Date | string | number | { seconds: number, nanoseconds: number }): string => {
   if (!dateInput) return '';
@@ -432,11 +545,12 @@ onBeforeUnmount(() => {
   // Cleanup for resize/drag listeners is handled in their respective mouseup events
 });
 
-// Placeholder for new session creation logic
+// Improved new session creation logic
 const handleCreateNewSession = () => {
   console.log('AdminChat: handleCreateNewSession triggered');
+  // Clear current state before starting a new session
+  setMessages([]); // Clear messages immediately
   adminChatStore.setCurrentSessionId(null); // This will trigger the watcher
-  // Watcher will call loadMessagesForCurrentSession, which should call setMessages([]) if sessionId is null
   input.value = ''; // Clear input field
 };
 

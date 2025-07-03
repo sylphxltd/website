@@ -9,6 +9,8 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore'; // Adde
 interface UseChatRequestBody {
   messages: CoreMessage[];
   sessionId: string; // Added sessionId
+  message?: string;  // Optional direct message content
+  preventUserMessageOptimisticUpdate?: boolean; // Flag to prevent automatic user message addition
   // id?: string;
   // data?: Record<string, string>;
 }
@@ -65,8 +67,37 @@ export default defineEventHandler(async (event: H3Event) => {
 
   try {
       const requestBody = await readBody<UseChatRequestBody>(event);
-      if (!requestBody || !Array.isArray(requestBody.messages) || requestBody.messages.length === 0 || !requestBody.sessionId) {
-        throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing or empty "messages" array, or missing "sessionId" in request body' });
+      if (!requestBody || !Array.isArray(requestBody.messages) || !requestBody.sessionId) {
+        throw createError({ statusCode: 400, statusMessage: 'Bad Request: Missing "messages" array or "sessionId" in request body' });
+      }
+      
+      // If messages array is empty but direct message is provided (for first messages handling)
+      if (requestBody.messages.length === 0 && requestBody.message) {
+        console.log(`Adding direct message to empty messages array: "${requestBody.message}"`);
+        requestBody.messages.push({
+          role: 'user',
+          content: requestBody.message
+          // Don't add id as CoreUserMessage type doesn't include it
+        });
+      }
+      
+      // If direct message is provided and we should add it to existing messages
+      if (requestBody.message && !requestBody.preventUserMessageOptimisticUpdate && requestBody.messages.length > 0) {
+        // Don't add if the last message is already this user message (prevents duplication)
+        const lastMessage = requestBody.messages[requestBody.messages.length - 1];
+        if (lastMessage.role !== 'user' || lastMessage.content !== requestBody.message) {
+          console.log(`Adding direct message to messages array: "${requestBody.message}"`);
+          requestBody.messages.push({
+            role: 'user',
+            content: requestBody.message
+            // Don't add id as CoreUserMessage type doesn't include it
+          });
+        }
+      }
+      
+      // Ensure we have at least one message after all processing
+      if (requestBody.messages.length === 0) {
+        throw createError({ statusCode: 400, statusMessage: 'Bad Request: Empty "messages" array and no "message" provided' });
       }
       
       receivedMessages = requestBody.messages;
@@ -259,12 +290,15 @@ export default defineEventHandler(async (event: H3Event) => {
 
   try {
     console.log(`Admin Chat: Received message for session [${sessionId}] from admin [${adminUid}]: "${userMessageContentForLog}"`);
+    console.log(`Admin Chat DEBUG: Request body messages count: ${receivedMessages.length}, first message:`, JSON.stringify(receivedMessages[0]));
 
     // The `receivedMessages` variable now holds the full message history from the client,
     // which is what `streamText` expects.
     // No need to reconstruct the messages array here if `receivedMessages` is already in the correct format.
     // The Vercel AI SDK's `useChat` hook sends the messages in the `CoreMessage[]` format.
     const messagesToAI: CoreMessage[] = receivedMessages;
+    
+    console.log(`Admin Chat DEBUG: Prepared ${messagesToAI.length} messages for AI`);
     
     // Ensure `messagesToAI` is what's passed to streamText below.
     // The old logic of just passing the last user message is incorrect for maintaining context.
@@ -282,10 +316,18 @@ export default defineEventHandler(async (event: H3Event) => {
       toolChoice: 'auto',
     });
 
-    // Convert the Vercel AI SDK stream to a StreamingTextResponse
-    // The toAIStream() method handles text, tool calls, and tool results
-    // according to the Vercel AI SDK spec, making it compatible with `useChat`
-    return result.toDataStream();
+    console.log("Admin Chat DEBUG: AI stream processing complete, preparing response");
+
+    // The key issue: We need to return a proper Response object, not just the raw stream
+    // This ensures the client receives the stream in the format expected by useChat
+    // Convert the Vercel AI SDK stream to a Response object with the proper headers
+    return new Response(result.toDataStream(), {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
