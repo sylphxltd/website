@@ -256,23 +256,23 @@ export default function ProductsPage() {
                         {product.name}
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {product.stars && (
+                        {'stars' in product && product.stars && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
                             <Star className="h-3 w-3" />
                             {product.stars}
                           </span>
                         )}
-                        {product.size && (
+                        {'size' in product && product.size && (
                           <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">
                             {product.size}
                           </span>
                         )}
-                        {product.pubPoints && (
+                        {'pubPoints' in product && product.pubPoints && (
                           <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                             {product.pubPoints} pts
                           </span>
                         )}
-                        {product.downloads && (
+                        {'downloads' in product && product.downloads && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
                             <Download className="h-3 w-3" />
                             {product.downloads}
@@ -309,7 +309,7 @@ export default function ProductsPage() {
 
                     {/* Links */}
                     <div className="flex flex-wrap gap-2">
-                      {product.links.github && (
+                      {'github' in product.links && product.links.github && (
                         <a
                           href={product.links.github}
                           target="_blank"
@@ -320,7 +320,7 @@ export default function ProductsPage() {
                           GitHub
                         </a>
                       )}
-                      {product.links.npm && (
+                      {'npm' in product.links && product.links.npm && (
                         <a
                           href={product.links.npm}
                           target="_blank"
@@ -331,7 +331,7 @@ export default function ProductsPage() {
                           NPM
                         </a>
                       )}
-                      {product.links.pub && (
+                      {'pub' in product.links && product.links.pub && (
                         <a
                           href={product.links.pub}
                           target="_blank"
@@ -342,7 +342,7 @@ export default function ProductsPage() {
                           pub.dev
                         </a>
                       )}
-                      {product.links.playStore && (
+                      {'playStore' in product.links && product.links.playStore && (
                         <a
                           href={product.links.playStore}
                           target="_blank"
