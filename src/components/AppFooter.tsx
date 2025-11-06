@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Logo } from './Logo'
 
 const productLinks = [{ name: 'All Products', path: '/products' }]
 
@@ -24,11 +25,8 @@ export function AppFooter() {
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           {/* Logo and about section */}
           <div className="col-span-1">
-            <div className="mb-4 flex items-center space-x-2">
-              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded bg-gradient-to-br from-indigo-600 to-purple-600">
-                <span className="text-2xl">🦋</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900 dark:text-white">Sylphx</span>
+            <div className="mb-4">
+              <Logo />
             </div>
             <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
               Simple, elegant & usable software. Creating digital products that empower without
