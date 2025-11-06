@@ -80,11 +80,11 @@ export default function GamePage() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const gameContainerRef = useRef<HTMLDivElement>(null)
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number | undefined>(undefined)
   const lastTimeRef = useRef<number>(0)
   const customerIdRef = useRef(0)
   const lastCustomerTimeRef = useRef(0)
-  const comboTimerRef = useRef<NodeJS.Timeout>()
+  const comboTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   // Initialize
   useEffect(() => {
