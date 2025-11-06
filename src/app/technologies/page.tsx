@@ -189,7 +189,7 @@ export default function TechnologiesPage() {
           <h1 className="mb-6 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl">
             Built for Speed & Safety
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
+          <p className="text-xl text-gray-700 dark:text-gray-200">
             Type-safe, battle-tested technologies powering the next generation of AI infrastructure
           </p>
         </div>
@@ -218,12 +218,12 @@ export default function TechnologiesPage() {
                     <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
                       {tech.name}
                     </h3>
-                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                    <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
                       {tech.description}
                     </p>
 
                     {/* Features */}
-                    <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                    <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                       {tech.features.map((feature) => (
                         <li key={feature} className="flex items-start gap-2">
                           <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
@@ -244,7 +244,7 @@ export default function TechnologiesPage() {
             <h2 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">
               Our Technology Philosophy
             </h2>
-            <div className="space-y-6 text-lg text-gray-600 dark:text-gray-300">
+            <div className="space-y-6 text-lg text-gray-700 dark:text-gray-200">
               <p>
                 We don't chase trends. We build on proven, performant technologies that align with
                 our core values:
@@ -330,7 +330,7 @@ export default function TechnologiesPage() {
                   <div className="mb-1 font-semibold text-gray-900 dark:text-white">
                     {stat.label}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-gray-700 dark:text-gray-300">
                     {stat.description}
                   </div>
                 </div>

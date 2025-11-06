@@ -217,14 +217,14 @@ export default function ProductsPage() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mx-auto mb-16 max-w-4xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-white/70 px-4 py-2 text-sm font-medium text-indigo-700 backdrop-blur-sm dark:border-indigo-800/50 dark:bg-gray-900/70 dark:text-indigo-300">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-white/70 px-4 py-2 text-sm font-medium text-indigo-800 backdrop-blur-sm dark:border-indigo-800/50 dark:bg-gray-900/70 dark:text-indigo-200">
             <Code2 className="h-4 w-4" />
             <span>10+ Open Source Projects</span>
           </div>
           <h1 className="mb-6 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl">
             Production-Ready Tools
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
+          <p className="text-lg text-gray-700 dark:text-gray-200">
             Battle-tested infrastructure powering the next generation of AI applications. All open-source,
             type-safe, and blazingly fast.
           </p>
@@ -281,7 +281,7 @@ export default function ProductsPage() {
                       </div>
                     </div>
 
-                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                    <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
                       {product.description}
                     </p>
 
@@ -298,7 +298,7 @@ export default function ProductsPage() {
                     </div>
 
                     {/* Highlights */}
-                    <ul className="mb-4 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                    <ul className="mb-4 space-y-1 text-sm text-gray-700 dark:text-gray-300">
                       {product.highlights.map((highlight) => (
                         <li key={highlight} className="flex items-start gap-2">
                           <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
@@ -366,7 +366,7 @@ export default function ProductsPage() {
           <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
             Want to Contribute?
           </h2>
-          <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600 dark:text-gray-300">
+          <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-700 dark:text-gray-200">
             All our tools are open-source and MIT licensed. We welcome contributions from the community.
           </p>
           <a

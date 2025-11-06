@@ -62,7 +62,7 @@ export default function ContactPage() {
           <h1 className="mb-6 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl">
             Get in Touch
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
+          <p className="text-xl text-gray-700 dark:text-gray-200">
             Questions about our tools? Want to contribute? We'd love to hear from you.
           </p>
         </div>
@@ -173,7 +173,7 @@ export default function ContactPage() {
               <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">Email Us</h3>
               <div className="space-y-3">
                 <div>
-                  <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">General Inquiries</p>
+                  <p className="mb-1 text-sm text-gray-700 dark:text-gray-300">General Inquiries</p>
                   <a
                     href="mailto:hi@sylphx.com"
                     className="text-lg font-medium text-indigo-600 hover:underline dark:text-indigo-400"
@@ -182,7 +182,7 @@ export default function ContactPage() {
                   </a>
                 </div>
                 <div>
-                  <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">Technical Support</p>
+                  <p className="mb-1 text-sm text-gray-700 dark:text-gray-300">Technical Support</p>
                   <a
                     href="mailto:support@sylphx.com"
                     className="text-lg font-medium text-indigo-600 hover:underline dark:text-indigo-400"
@@ -191,7 +191,7 @@ export default function ContactPage() {
                   </a>
                 </div>
                 <div>
-                  <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">Founder</p>
+                  <p className="mb-1 text-sm text-gray-700 dark:text-gray-300">Founder</p>
                   <a
                     href="mailto:kyle@sylphx.com"
                     className="text-lg font-medium text-indigo-600 hover:underline dark:text-indigo-400"
@@ -208,7 +208,7 @@ export default function ContactPage() {
                 <MapPin className="h-8 w-8 text-white" />
               </div>
               <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">Location</h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-gray-700 dark:text-gray-200">
                 <strong className="text-gray-900 dark:text-white">Sylphx Limited</strong>
                 <br />
                 Registered in London
@@ -267,7 +267,7 @@ export default function ContactPage() {
             <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
               Prefer to chat on GitHub?
             </h2>
-            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600 dark:text-gray-300">
+            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-700 dark:text-gray-200">
               Open an issue on any of our repositories for bug reports, feature requests, or
               technical questions. We're active in our community and respond quickly.
             </p>

@@ -33,7 +33,7 @@ export default function AboutPage() {
           <h1 className="mb-6 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl">
             Democratizing AI Through Elegant Code
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
+          <p className="text-xl text-gray-700 dark:text-gray-200">
             Building the infrastructure that empowers the next generation of AI applications
           </p>
         </div>
@@ -42,17 +42,17 @@ export default function AboutPage() {
         <div className="mx-auto mb-20 max-w-5xl">
           <div className="rounded-3xl border border-gray-200/50 bg-white/90 p-8 shadow-sm backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/90 md:p-12">
             <h2 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">Our Mission</h2>
-            <p className="mb-6 text-lg leading-relaxed text-gray-600 dark:text-gray-300">
+            <p className="mb-6 text-lg leading-relaxed text-gray-700 dark:text-gray-200">
               At Sylphx, we believe that powerful AI tools should be accessible to everyone. We're
               building production-ready, open-source infrastructure that makes AI development
               faster, safer, and more reliable.
             </p>
-            <p className="mb-6 text-lg leading-relaxed text-gray-600 dark:text-gray-300">
+            <p className="mb-6 text-lg leading-relaxed text-gray-700 dark:text-gray-200">
               Our tools power AI agents, state management systems, and developer workflows at
               companies around the world. From 5-10x faster PDF processing to 1.7-45x faster state
               management, we're obsessed with performance and developer experience.
             </p>
-            <p className="text-lg leading-relaxed text-gray-600 dark:text-gray-300">
+            <p className="text-lg leading-relaxed text-gray-700 dark:text-gray-200">
               Everything we build is <strong className="text-gray-900 dark:text-white">open-source</strong>,
               <strong className="text-gray-900 dark:text-white"> type-safe</strong>, and
               <strong className="text-gray-900 dark:text-white"> battle-tested</strong> with 94%+ test coverage.
@@ -101,7 +101,7 @@ export default function AboutPage() {
                   <div className="mb-1 text-3xl font-bold text-gray-900 dark:text-white">
                     {stat.value}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</div>
+                  <div className="text-sm text-gray-700 dark:text-gray-300">{stat.label}</div>
                 </div>
               </div>
             ))}
@@ -170,7 +170,7 @@ export default function AboutPage() {
                 <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
                   {value.title}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">{value.description}</p>
+                <p className="text-gray-700 dark:text-gray-300">{value.description}</p>
               </div>
             ))}
           </div>
@@ -190,13 +190,13 @@ export default function AboutPage() {
                 <p className="mb-4 text-lg text-indigo-600 dark:text-indigo-400">
                   Software Engineer & Open Source Advocate
                 </p>
-                <p className="mb-4 text-gray-600 dark:text-gray-300">
+                <p className="mb-4 text-gray-700 dark:text-gray-200">
                   Kyle founded Sylphx with a vision to democratize AI through elegant, performant
                   open-source tools. With a focus on type safety, performance optimization, and
                   developer experience, he's built a suite of production-ready infrastructure used
                   by developers worldwide.
                 </p>
-                <p className="text-gray-600 dark:text-gray-300">
+                <p className="text-gray-700 dark:text-gray-200">
                   From pioneering MCP servers that process PDFs 5-10x faster to state management
                   libraries that outperform the competition by 45x, Kyle's work reflects a
                   commitment to pushing the boundaries of what's possible in modern software
@@ -218,19 +218,19 @@ export default function AboutPage() {
                 <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
                   Legal Name
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">Sylphx Limited</p>
+                <p className="text-gray-700 dark:text-gray-300">Sylphx Limited</p>
               </div>
               <div>
                 <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
                   Registration
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">Registered in London, United Kingdom</p>
+                <p className="text-gray-700 dark:text-gray-300">Registered in London, United Kingdom</p>
               </div>
               <div>
                 <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
                   Business Type
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-700 dark:text-gray-300">
                   Open Source Software Development
                 </p>
               </div>
@@ -238,7 +238,7 @@ export default function AboutPage() {
                 <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
                   Focus Areas
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-700 dark:text-gray-300">
                   AI Infrastructure, State Management, Developer Tools
                 </p>
               </div>
@@ -252,7 +252,7 @@ export default function AboutPage() {
             <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
               Join Our Open Source Community
             </h2>
-            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600 dark:text-gray-300">
+            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-700 dark:text-gray-200">
               We're building the future of AI infrastructure in the open. Contribute code, report
               bugs, or just star our repos to show your support.
             </p>

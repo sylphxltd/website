@@ -70,7 +70,7 @@ export default function Home() {
         <div className="container relative mx-auto max-w-7xl">
           {/* Badge */}
           <div className="mb-8 flex justify-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-white/70 px-4 py-2 text-sm font-medium text-indigo-700 backdrop-blur-sm dark:border-indigo-800/50 dark:bg-gray-900/70 dark:text-indigo-300">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-white/70 px-4 py-2 text-sm font-medium text-indigo-800 backdrop-blur-sm dark:border-indigo-800/50 dark:bg-gray-900/70 dark:text-indigo-200">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-500"></span>
@@ -86,7 +86,7 @@ export default function Home() {
               <br />
               Through Elegant Code
             </h1>
-            <p className="mx-auto max-w-3xl text-xl text-gray-600 dark:text-gray-300 md:text-2xl">
+            <p className="mx-auto max-w-3xl text-xl text-gray-700 dark:text-gray-200 md:text-2xl">
               Production-ready, open-source infrastructure that makes AI development faster, safer,
               and more reliable.
             </p>
@@ -96,7 +96,7 @@ export default function Home() {
           <div className="mb-12 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/products"
-              className="group inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-3 text-base font-semibold text-white transition-all hover:shadow-xl hover:shadow-indigo-500/50"
+              className="group inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-3 text-base font-semibold text-white transition-all hover:shadow-xl hover:shadow-indigo-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
             >
               Explore Products
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
@@ -105,7 +105,7 @@ export default function Home() {
               href="https://github.com/sylphxltd"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border-2 border-gray-900 bg-white px-8 py-3 text-base font-semibold text-gray-900 transition-all hover:bg-gray-50 dark:border-white dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800"
+              className="inline-flex items-center gap-2 rounded-lg border-2 border-gray-900 bg-white px-8 py-3 text-base font-semibold text-gray-900 transition-all hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 dark:border-white dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 dark:focus-visible:ring-white"
             >
               <Github className="h-5 w-5" />
               View on GitHub
@@ -125,7 +125,7 @@ export default function Home() {
                   <div className="mb-1 text-3xl font-bold text-gray-900 dark:text-white">
                     {stat.value}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</div>
+                  <div className="text-sm text-gray-700 dark:text-gray-300">{stat.label}</div>
                 </div>
               </div>
             ))}
@@ -140,7 +140,7 @@ export default function Home() {
             <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
               Featured Products
             </h2>
-            <p className="mx-auto max-w-2xl text-lg text-gray-600 dark:text-gray-300">
+            <p className="mx-auto max-w-2xl text-lg text-gray-700 dark:text-gray-200">
               Battle-tested tools powering the next generation of AI applications
             </p>
           </div>
@@ -163,11 +163,11 @@ export default function Home() {
                   <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
                     {feature.name}
                   </h3>
-                  <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                  <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
                     {feature.description}
                   </p>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">
                       {feature.stats}
                     </span>
                   </div>
@@ -186,7 +186,7 @@ export default function Home() {
               <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
                 Performance First
               </h2>
-              <p className="mx-auto max-w-2xl text-lg text-gray-600 dark:text-gray-300">
+              <p className="mx-auto max-w-2xl text-lg text-gray-700 dark:text-gray-200">
                 We obsess over benchmarks and real-world performance
               </p>
             </div>
@@ -217,7 +217,7 @@ export default function Home() {
             <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
               Built in the Open
             </h2>
-            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600 dark:text-gray-300">
+            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-700 dark:text-gray-200">
               All our tools are open-source and MIT licensed. We believe everyone deserves access to
               great tools.
             </p>
@@ -226,7 +226,7 @@ export default function Home() {
                 href="https://github.com/sylphxltd"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group inline-flex items-center gap-2 rounded-lg bg-gray-900 px-8 py-3 text-base font-semibold text-white transition-all hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                className="group inline-flex items-center gap-2 rounded-lg bg-gray-900 px-8 py-3 text-base font-semibold text-white transition-all hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 dark:focus-visible:ring-white"
               >
                 <Github className="h-5 w-5" />
                 Explore on GitHub
@@ -234,7 +234,7 @@ export default function Home() {
               </a>
               <Link
                 href="/products"
-                className="inline-flex items-center gap-2 rounded-lg border-2 border-gray-900 bg-white px-8 py-3 text-base font-semibold text-gray-900 transition-all hover:bg-gray-50 dark:border-white dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800"
+                className="inline-flex items-center gap-2 rounded-lg border-2 border-gray-900 bg-white px-8 py-3 text-base font-semibold text-gray-900 transition-all hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 dark:border-white dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 dark:focus-visible:ring-white"
               >
                 View All Products
               </Link>

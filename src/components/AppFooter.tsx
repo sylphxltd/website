@@ -28,7 +28,7 @@ export function AppFooter() {
             <div className="mb-4">
               <Logo />
             </div>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
               Simple, elegant & usable software. Creating digital products that empower without
               overwhelming.
             </p>
