@@ -1,4 +1,18 @@
 import type { Metadata } from 'next'
+import {
+  MapPin,
+  Star,
+  Package,
+  CheckCircle2,
+  Rocket,
+  Zap,
+  Shield,
+  Globe,
+  Gem,
+  UserCircle2,
+  Github,
+  Code2,
+} from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'About - Sylphx',
@@ -12,8 +26,9 @@ export default function AboutPage() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mx-auto mb-16 max-w-4xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
-            <span>🇬🇧 Registered in London</span>
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-white/70 px-4 py-2 text-sm font-medium text-indigo-700 backdrop-blur-sm dark:border-indigo-800/50 dark:bg-gray-900/70 dark:text-indigo-300">
+            <MapPin className="h-4 w-4" />
+            <span>Registered in London</span>
           </div>
           <h1 className="mb-6 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl">
             Democratizing AI Through Elegant Code
@@ -25,7 +40,7 @@ export default function AboutPage() {
 
         {/* Mission */}
         <div className="mx-auto mb-20 max-w-5xl">
-          <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-700 dark:bg-gray-800 md:p-12">
+          <div className="rounded-3xl border border-gray-200/50 bg-white/90 p-8 shadow-sm backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/90 md:p-12">
             <h2 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">Our Mission</h2>
             <p className="mb-6 text-lg leading-relaxed text-gray-600 dark:text-gray-300">
               At Sylphx, we believe that powerful AI tools should be accessible to everyone. We're
@@ -52,37 +67,37 @@ export default function AboutPage() {
               {
                 value: '300+',
                 label: 'GitHub Stars',
-                icon: '⭐',
+                icon: Star,
                 gradient: 'from-yellow-500 to-orange-600',
               },
               {
                 value: '8,000+',
                 label: 'NPM Downloads',
-                icon: '📦',
+                icon: Package,
                 gradient: 'from-red-500 to-pink-600',
               },
               {
                 value: '94%+',
                 label: 'Test Coverage',
-                icon: '✅',
+                icon: CheckCircle2,
                 gradient: 'from-green-500 to-emerald-600',
               },
               {
                 value: '10+',
                 label: 'Open Source Projects',
-                icon: '🚀',
+                icon: Rocket,
                 gradient: 'from-blue-500 to-indigo-600',
               },
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
+                className="group relative overflow-hidden rounded-2xl border border-gray-200/50 bg-white/90 p-6 backdrop-blur-sm transition-all hover:shadow-xl dark:border-gray-700/50 dark:bg-gray-800/90"
               >
                 <div
-                  className={`absolute right-0 top-0 h-24 w-24 -translate-y-8 translate-x-8 rounded-full bg-gradient-to-br ${stat.gradient} opacity-10`}
+                  className={`absolute right-0 top-0 h-24 w-24 -translate-y-8 translate-x-8 rounded-full bg-gradient-to-br ${stat.gradient} opacity-10 transition-opacity group-hover:opacity-20`}
                 />
                 <div className="relative">
-                  <div className="mb-2 text-3xl">{stat.icon}</div>
+                  <stat.icon className="mb-2 h-8 w-8 text-indigo-600 dark:text-indigo-400" />
                   <div className="mb-1 text-3xl font-bold text-gray-900 dark:text-white">
                     {stat.value}
                   </div>
@@ -102,42 +117,42 @@ export default function AboutPage() {
             {[
               {
                 title: 'Performance First',
-                icon: '⚡',
+                icon: Zap,
                 description:
                   '5-10x, 1.7-45x, 30x faster. We obsess over benchmarks and real-world performance.',
                 gradient: 'from-yellow-500 to-orange-600',
               },
               {
                 title: 'Type Safety',
-                icon: '🛡️',
+                icon: Shield,
                 description:
                   'Complete type safety across TypeScript, Dart, and all our tools. Catch bugs at compile time.',
                 gradient: 'from-blue-500 to-indigo-600',
               },
               {
                 title: 'Open Source',
-                icon: '🌍',
+                icon: Globe,
                 description:
                   'MIT licensed, community-driven, and built in public. Everyone deserves access to great tools.',
                 gradient: 'from-green-500 to-emerald-600',
               },
               {
                 title: 'Battle Tested',
-                icon: '✅',
+                icon: CheckCircle2,
                 description:
                   '94%+ test coverage, extensive CI/CD, and real-world production usage at scale.',
                 gradient: 'from-purple-500 to-pink-600',
               },
               {
                 title: 'Developer Experience',
-                icon: '💎',
+                icon: Gem,
                 description:
                   'Minimal APIs, clear documentation, and thoughtful design. Your time is precious.',
                 gradient: 'from-cyan-500 to-blue-600',
               },
               {
                 title: 'Innovation',
-                icon: '🚀',
+                icon: Rocket,
                 description:
                   'From MCP servers to MEP paradigms, we pioneer new approaches to old problems.',
                 gradient: 'from-red-500 to-rose-600',
@@ -145,12 +160,12 @@ export default function AboutPage() {
             ].map((value) => (
               <div
                 key={value.title}
-                className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-indigo-500 hover:shadow-xl dark:border-gray-700 dark:bg-gray-800"
+                className="group relative overflow-hidden rounded-2xl border border-gray-200/50 bg-white/90 p-6 backdrop-blur-sm transition-all hover:border-indigo-500 hover:shadow-xl dark:border-gray-700/50 dark:bg-gray-800/90"
               >
                 <div
-                  className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${value.gradient} text-2xl`}
+                  className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${value.gradient} text-white`}
                 >
-                  {value.icon}
+                  <value.icon className="h-6 w-6" />
                 </div>
                 <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
                   {value.title}
@@ -163,10 +178,10 @@ export default function AboutPage() {
 
         {/* Founder */}
         <div className="mx-auto mb-20 max-w-4xl">
-          <div className="rounded-3xl border border-gray-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-8 dark:border-gray-700 dark:from-gray-800 dark:to-gray-800 md:p-12">
+          <div className="rounded-3xl border border-gray-200/50 bg-gradient-to-br from-indigo-50 to-purple-50 p-8 backdrop-blur-sm dark:border-gray-700/50 dark:from-gray-800 dark:to-gray-800 md:p-12">
             <div className="flex flex-col gap-8 md:flex-row md:items-center">
               <div className="flex h-32 w-32 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600">
-                <span className="text-6xl">👨‍💻</span>
+                <UserCircle2 className="h-20 w-20 text-white" strokeWidth={1.5} />
               </div>
               <div>
                 <h2 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">
@@ -194,7 +209,7 @@ export default function AboutPage() {
 
         {/* Company Info */}
         <div className="mx-auto mb-20 max-w-5xl">
-          <div className="rounded-3xl border border-gray-200 bg-white p-8 dark:border-gray-700 dark:bg-gray-800 md:p-12">
+          <div className="rounded-3xl border border-gray-200/50 bg-white/90 p-8 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/90 md:p-12">
             <h2 className="mb-8 text-3xl font-bold text-gray-900 dark:text-white">
               Company Information
             </h2>
@@ -233,7 +248,7 @@ export default function AboutPage() {
 
         {/* CTA */}
         <div className="mx-auto max-w-4xl text-center">
-          <div className="rounded-3xl border border-gray-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-12 dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
+          <div className="rounded-3xl border border-gray-200/50 bg-gradient-to-br from-indigo-50 to-purple-50 p-12 backdrop-blur-sm dark:border-gray-700/50 dark:from-gray-800 dark:to-gray-800">
             <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
               Join Our Open Source Community
             </h2>
@@ -248,9 +263,7 @@ export default function AboutPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-8 py-3 text-base font-semibold text-white transition-all hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                </svg>
+                <Github className="h-5 w-5" />
                 GitHub
               </a>
               <a
@@ -259,9 +272,7 @@ export default function AboutPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg border-2 border-gray-900 bg-white px-8 py-3 text-base font-semibold text-gray-900 transition-all hover:bg-gray-50 dark:border-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331zM10.665 10H12v2.667h-1.335V10z" />
-                </svg>
+                <Package className="h-5 w-5" />
                 NPM
               </a>
             </div>
