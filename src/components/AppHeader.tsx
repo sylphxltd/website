@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Menu, X } from 'lucide-react'
+import { Logo } from './Logo'
 
 const headerLinks = [
   { name: 'Home', path: '/' },
@@ -32,30 +34,17 @@ export function AppHeader() {
 
   return (
     <header
-      className={`fixed w-full z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white/90 backdrop-blur-md shadow-sm dark:bg-gray-900/90' : 'bg-transparent'
+      className={`fixed z-50 w-full transition-all duration-300 ${
+        isScrolled
+          ? 'border-b border-gray-200/50 bg-white/90 shadow-sm backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-900/90'
+          : 'bg-transparent'
       }`}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between md:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <div
-              className={`relative flex h-9 w-9 items-center justify-center overflow-hidden rounded transition-colors ${
-                isScrolled
-                  ? 'bg-gradient-to-br from-indigo-600 to-purple-600'
-                  : 'bg-white dark:bg-gradient-to-br dark:from-indigo-600 dark:to-purple-600'
-              }`}
-            >
-              <span className="text-2xl">🦋</span>
-            </div>
-            <span
-              className={`text-xl font-bold transition-colors ${
-                isScrolled ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
-              }`}
-            >
-              Sylphx
-            </span>
+          <Link href="/" className="transition-transform hover:scale-105">
+            <Logo />
           </Link>
 
           {/* Desktop Navigation */}
@@ -64,12 +53,12 @@ export function AppHeader() {
               <Link
                 key={link.path}
                 href={link.path}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   isActiveRoute(link.path)
                     ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
                     : isScrolled
                       ? 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
-                      : 'text-gray-800 hover:bg-white/20 hover:text-gray-900 dark:text-white dark:hover:bg-white/10 dark:hover:text-white'
+                      : 'text-gray-800 hover:bg-white/20 hover:text-gray-900 dark:text-white dark:hover:bg-white/10'
                 }`}
               >
                 {link.name}
@@ -80,23 +69,27 @@ export function AppHeader() {
           {/* Mobile Menu Button */}
           <button
             type="button"
-            className="rounded-md p-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 md:hidden"
+            className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 md:hidden"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
           >
-            <span className="text-2xl">{isMobileMenuOpen ? '✕' : '☰'}</span>
+            {isMobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="border-t border-gray-200 py-4 dark:border-gray-700 md:hidden">
+          <div className="animate-fade-in border-t border-gray-200 py-4 dark:border-gray-700 md:hidden">
             <nav className="flex flex-col space-y-2">
               {headerLinks.map((link) => (
                 <Link
                   key={link.path}
                   href={link.path}
-                  className={`rounded-md px-4 py-2 text-sm font-medium ${
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     isActiveRoute(link.path)
                       ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
                       : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
