@@ -1,4 +1,4 @@
-import { deepMap, get, setPath } from '@sylphx/zen'
+import { deepMap, get, setDeepMapPath as setPath } from '@sylphx/zen'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -11,7 +11,7 @@ export interface Toast {
   timeLeft: number
 }
 
-interface ToastState {
+export interface ToastState {
   toasts: Toast[]
   lastId: number
   timer: number | null

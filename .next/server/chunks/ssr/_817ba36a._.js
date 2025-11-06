@@ -1,0 +1,3 @@
+module.exports=[50645,a=>{a.n(a.i(27572))},43619,a=>{a.n(a.i(79962))},13718,a=>{a.n(a.i(85523))},18198,a=>{a.n(a.i(45518))},62212,a=>{a.n(a.i(66114))},60168,a=>{"use strict";var b=a.i(7997);function c(){return(0,b.jsx)("div",{className:"grid min-h-screen grid-rows-[20px_1fr_20px] items-center justify-items-center gap-16 p-8 pb-20 font-sans sm:p-20",children:(0,b.jsxs)("main",{className:"row-start-2 flex flex-col items-center gap-8 sm:items-start",children:[(0,b.jsx)("h1",{className:"text-4xl font-bold",children:"Sylphx - Simple, Elegant & Usable Software"}),(0,b.jsx)("p",{className:"text-center text-sm sm:text-left",children:"Migrating from Nuxt to Next.js with Zen state management"})]})})}a.s(["default",()=>c])}];
+
+//# sourceMappingURL=_817ba36a._.js.map

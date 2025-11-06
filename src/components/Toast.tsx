@@ -1,7 +1,13 @@
 'use client'
 
 import { useDeepMap } from '@/hooks/useZen'
-import { getTimeLeftPercentage, removeToast, type ToastType, toastStore } from '@/stores/toast'
+import {
+  type ToastState,
+  type ToastType,
+  getTimeLeftPercentage,
+  removeToast,
+  toastStore,
+} from '@/stores/toast'
 
 const toastStyles: Record<ToastType, { bg: string; border: string; icon: string }> = {
   success: {
@@ -27,7 +33,7 @@ const toastStyles: Record<ToastType, { bg: string; border: string; icon: string 
 }
 
 export function ToastContainer() {
-  const state = useDeepMap(toastStore)
+  const state = useDeepMap<ToastState>(toastStore)
 
   if (state.toasts.length === 0) return null
 
