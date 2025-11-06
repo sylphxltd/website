@@ -13,6 +13,8 @@ import {
   Package,
   ExternalLink,
   CheckCircle2,
+  Star,
+  Download,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
