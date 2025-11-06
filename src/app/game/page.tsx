@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Play, Pause, RotateCcw, Maximize, Minimize, Trophy, Volume2, VolumeX } from 'lucide-react'
 
 type FoodType = 'coffee' | 'cookie' | 'pizza' | 'icecream'
+type GameState = 'menu' | 'playing' | 'paused'
 
 interface Customer {
   id: number
@@ -38,35 +38,34 @@ interface Particle {
   vx: number
   vy: number
   life: number
-  maxLife: number
   color: string
   size: number
 }
 
+interface Button {
+  x: number
+  y: number
+  width: number
+  height: number
+  label: string
+  icon?: string
+  action: () => void
+  color: string
+  enabled?: boolean
+}
+
 const FOODS = [
   { type: 'coffee' as FoodType, name: 'Coffee', price: 5, time: 2000, emoji: '☕', color: '#8B4513' },
-  { type: 'cookie' as FoodType, name: 'Cookie', price: 3, time: 1500, emoji: '🍪', color: '#D2691E' },
+  { type: 'cookie' as FoodType, name: 'Cookie', price: 3, time: 1500, emoji: '🍪', color: '#CD853F' },
   { type: 'pizza' as FoodType, name: 'Pizza', price: 10, time: 3000, emoji: '🍕', color: '#FF6347' },
   { type: 'icecream' as FoodType, name: 'Ice Cream', price: 7, time: 2500, emoji: '🍦', color: '#FF69B4' },
-]
-
-const TABLES = [
-  { x: 150, y: 220 },
-  { x: 400, y: 220 },
-  { x: 650, y: 220 },
-  { x: 150, y: 420 },
-  { x: 400, y: 420 },
-  { x: 650, y: 420 },
 ]
 
 const SKIN_COLORS = ['#FFE0BD', '#F1C27D', '#C68642', '#8D5524', '#E0AC69', '#F4C2A0']
 const SHIRT_COLORS = ['#FF6B9D', '#4169E1', '#32CD32', '#FFD700', '#9370DB', '#FF4500']
 
 export default function GamePage() {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isMuted, setIsMuted] = useState(true)
+  const [gameState, setGameState] = useState<GameState>('menu')
   const [money, setMoney] = useState(100)
   const [score, setScore] = useState(0)
   const [highScore, setHighScore] = useState(0)
@@ -77,34 +76,56 @@ export default function GamePage() {
   const [selectedFood, setSelectedFood] = useState<FoodType | null>(null)
   const [particles, setParticles] = useState<Particle[]>([])
   const [preparing, setPreparing] = useState<Set<FoodType>>(new Set())
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const gameContainerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const animationFrameRef = useRef<number | undefined>(undefined)
   const lastTimeRef = useRef<number>(0)
   const customerIdRef = useRef(0)
   const lastCustomerTimeRef = useRef(0)
   const comboTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const tablesRef = useRef<Array<{ x: number; y: number }>>([])
+  const kitchenButtonsRef = useRef<Button[]>([])
+  const hudButtonsRef = useRef<Button[]>([])
 
   // Initialize
   useEffect(() => {
     const saved = localStorage.getItem('cafe-highscore')
     if (saved) setHighScore(parseInt(saved, 10))
 
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+    const handleResize = () => {
+      const container = containerRef.current
+      if (!container) return
+
+      const width = container.clientWidth
+      const height = container.clientHeight
+      setCanvasSize({ width, height })
     }
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  const toggleFullscreen = useCallback(async () => {
-    if (!document.fullscreenElement) {
-      await gameContainerRef.current?.requestFullscreen()
-    } else {
-      await document.exitFullscreen()
+  // Update table positions based on canvas size
+  useEffect(() => {
+    const cols = 3
+    const rows = 2
+    const padding = 100
+    const spaceX = (canvasSize.width - padding * 2) / (cols - 1)
+    const spaceY = (canvasSize.height * 0.6 - padding) / (rows - 1)
+
+    tablesRef.current = []
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        tablesRef.current.push({
+          x: padding + col * spaceX,
+          y: padding + row * spaceY,
+        })
+      }
     }
-  }, [])
+  }, [canvasSize])
 
   const addParticles = useCallback((x: number, y: number, color: string, count: number = 20) => {
     const newParticles: Particle[] = []
@@ -117,7 +138,6 @@ export default function GamePage() {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life: 1,
-        maxLife: 0.5 + Math.random() * 0.5,
         color,
         size: 3 + Math.random() * 4,
       })
@@ -126,8 +146,7 @@ export default function GamePage() {
   }, [])
 
   const startGame = useCallback(() => {
-    setIsPlaying(true)
-    setIsPaused(false)
+    setGameState('playing')
     setMoney(100)
     setScore(0)
     setLevel(1)
@@ -140,11 +159,12 @@ export default function GamePage() {
     lastCustomerTimeRef.current = Date.now()
   }, [])
 
-  const togglePause = useCallback(() => setIsPaused((prev) => !prev), [])
+  const togglePause = useCallback(() => {
+    setGameState((prev) => (prev === 'playing' ? 'paused' : 'playing'))
+  }, [])
 
-  const resetGame = useCallback(() => {
-    setIsPlaying(false)
-    setIsPaused(false)
+  const quitGame = useCallback(() => {
+    setGameState('menu')
     if (score > highScore) {
       setHighScore(score)
       localStorage.setItem('cafe-highscore', score.toString())
@@ -152,13 +172,15 @@ export default function GamePage() {
   }, [score, highScore])
 
   const spawnCustomer = useCallback(() => {
-    const availableTables = TABLES.filter(
+    const availableTables = tablesRef.current.filter(
       (_, index) => !customers.some((c) => c.tableIndex === index && c.state !== 'leaving')
     )
     if (availableTables.length === 0) return
 
-    const tableIndex = TABLES.findIndex((t) => t === availableTables[Math.floor(Math.random() * availableTables.length)])
-    const table = TABLES[tableIndex]
+    const tableIndex = tablesRef.current.findIndex(
+      (t) => t === availableTables[Math.floor(Math.random() * availableTables.length)]
+    )
+    const table = tablesRef.current[tableIndex]
     if (!table) return
 
     const isVIP = Math.random() < 0.15
@@ -194,15 +216,12 @@ export default function GamePage() {
       setPreparing((prev) => new Set(prev).add(foodType))
 
       setTimeout(() => {
-        const canvas = canvasRef.current
-        if (!canvas) return
-
         setReadyFood((prev) => [
           ...prev,
           {
             type: foodType,
-            x: canvas.width / 2 + (prev.length - 1.5) * 100,
-            y: canvas.height - 140,
+            x: canvasSize.width / 2 + (prev.length - 1.5) * 80,
+            y: canvasSize.height - 100,
             scale: 1,
             pulse: 0,
           },
@@ -212,10 +231,10 @@ export default function GamePage() {
           next.delete(foodType)
           return next
         })
-        addParticles(canvas.width / 2, canvas.height - 140, food.color, 15)
+        addParticles(canvasSize.width / 2, canvasSize.height - 100, food.color, 15)
       }, food.time)
     },
-    [money, preparing, addParticles]
+    [money, preparing, canvasSize, addParticles]
   )
 
   const serveFood = useCallback(
@@ -249,9 +268,7 @@ export default function GamePage() {
 
       addParticles(customer.x, customer.y, customer.isVIP ? '#FFD700' : '#10B981', 30)
 
-      setCustomers((prev) =>
-        prev.map((c) => (c.id === customer.id ? { ...c, state: 'leaving' as const } : c))
-      )
+      setCustomers((prev) => prev.map((c) => (c.id === customer.id ? { ...c, state: 'leaving' as const } : c)))
 
       setTimeout(() => {
         setCustomers((prev) => prev.filter((c) => c.id !== customer.id))
@@ -262,10 +279,8 @@ export default function GamePage() {
     [selectedFood, readyFood, combo, addParticles]
   )
 
-  // Game loop
+  // Render and game loop
   useEffect(() => {
-    if (!isPlaying || isPaused) return
-
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
@@ -274,115 +289,157 @@ export default function GamePage() {
       const deltaTime = timestamp - lastTimeRef.current
       lastTimeRef.current = timestamp
 
-      // Clear canvas
-      ctx.fillStyle = '#E8D4B8'
+      // Clear
+      ctx.fillStyle = '#1a1a1a'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // Draw floor pattern
-      ctx.save()
-      ctx.globalAlpha = 0.15
-      const tileSize = 60
-      for (let y = 0; y < canvas.height; y += tileSize) {
-        for (let x = 0; x < canvas.width; x += tileSize) {
-          ctx.fillStyle = (x / tileSize + y / tileSize) % 2 === 0 ? '#A0826B' : '#8B6F47'
-          ctx.fillRect(x, y, tileSize, tileSize)
-        }
-      }
-      ctx.restore()
-
-      // Draw counter
-      ctx.fillStyle = '#5D4E37'
-      ctx.fillRect(0, canvas.height - 120, canvas.width, 120)
-      ctx.fillStyle = '#6D5E47'
-      ctx.fillRect(0, canvas.height - 120, canvas.width, 4)
-
-      // Draw tables
-      TABLES.forEach((table) => {
+      if (gameState === 'menu') {
+        // Menu screen
         ctx.save()
-        ctx.translate(table.x, table.y)
 
-        // Chair
-        ctx.fillStyle = '#5D4E37'
-        roundRect(ctx, -50, 5, 25, 35, 4)
-        ctx.fillStyle = '#6D5E47'
-        roundRect(ctx, -50, 5, 25, 10, 4)
+        // Title
+        ctx.fillStyle = '#F59E0B'
+        ctx.font = 'bold 72px Arial'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('☕', canvas.width / 2, canvas.height / 2 - 100)
 
-        // Table shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
-        ctx.beginPath()
-        ctx.ellipse(0, 45, 40, 10, 0, 0, Math.PI * 2)
-        ctx.fill()
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 48px Arial'
+        ctx.fillText('Café Tycoon', canvas.width / 2, canvas.height / 2)
 
-        // Table
-        ctx.fillStyle = '#5D4E37'
-        roundRect(ctx, -45, -15, 90, 50, 12)
-        ctx.strokeStyle = '#4D3E27'
-        ctx.lineWidth = 3
-        ctx.strokeRect(-40, -10, 80, 40)
+        ctx.fillStyle = '#999'
+        ctx.font = '20px Arial'
+        ctx.fillText('Build your café empire!', canvas.width / 2, canvas.height / 2 + 50)
+
+        if (highScore > 0) {
+          ctx.fillStyle = '#FFD700'
+          ctx.font = 'bold 24px Arial'
+          ctx.fillText(`🏆 Best: ${highScore}`, canvas.width / 2, canvas.height / 2 + 100)
+        }
+
+        // Start button
+        const btnWidth = 300
+        const btnHeight = 80
+        const btnX = canvas.width / 2 - btnWidth / 2
+        const btnY = canvas.height / 2 + 150
+
+        ctx.fillStyle = '#10B981'
+        roundRect(ctx, btnX, btnY, btnWidth, btnHeight, 16)
+
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 32px Arial'
+        ctx.fillText('▶ Start Game', canvas.width / 2, btnY + btnHeight / 2)
 
         ctx.restore()
-      })
+      } else if (gameState === 'playing' || gameState === 'paused') {
+        // Game background
+        ctx.fillStyle = '#E8D4B8'
+        const gameHeight = canvas.height - 200
+        ctx.fillRect(0, 80, canvas.width, gameHeight)
 
-      // Update and draw customers
-      setCustomers((prev) =>
-        prev.map((customer) => {
-          let updated = { ...customer }
-
-          if (customer.state === 'entering') {
-            updated.x += 4
-            if (updated.x >= customer.targetX) {
-              updated.x = customer.targetX
-              updated.state = 'waiting'
-            }
-          } else if (customer.state === 'waiting') {
-            updated.patience -= deltaTime
-            updated.satisfaction = (updated.patience / updated.maxPatience) * 100
-            updated.rotation = Math.sin(timestamp / 500) * 0.05
-
-            if (updated.patience <= 0) {
-              updated.state = 'leaving'
-              updated.satisfaction = 0
-            }
-          } else if (customer.state === 'leaving') {
-            updated.x -= 4
+        // Floor pattern
+        ctx.save()
+        ctx.globalAlpha = 0.15
+        const tileSize = 60
+        for (let y = 80; y < 80 + gameHeight; y += tileSize) {
+          for (let x = 0; x < canvas.width; x += tileSize) {
+            ctx.fillStyle = (x / tileSize + y / tileSize) % 2 === 0 ? '#A0826B' : '#8B6F47'
+            ctx.fillRect(x, y, tileSize, tileSize)
           }
+        }
+        ctx.restore()
 
-          // Draw customer
+        // Counter
+        ctx.fillStyle = '#5D4E37'
+        ctx.fillRect(0, canvas.height - 180, canvas.width, 180)
+        ctx.fillStyle = '#6D5E47'
+        ctx.fillRect(0, canvas.height - 180, canvas.width, 4)
+
+        // Tables
+        tablesRef.current.forEach((table) => {
           ctx.save()
-          ctx.translate(updated.x, updated.y)
-          ctx.rotate(updated.rotation)
-          ctx.scale(updated.scale, updated.scale)
+          ctx.translate(table.x, table.y + 80)
+
+          // Chair
+          ctx.fillStyle = '#5D4E37'
+          roundRect(ctx, -40, 5, 20, 30, 4)
+
+          // Table shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
+          ctx.beginPath()
+          ctx.ellipse(0, 35, 35, 8, 0, 0, Math.PI * 2)
+          ctx.fill()
+
+          // Table
+          ctx.fillStyle = '#5D4E37'
+          roundRect(ctx, -35, -12, 70, 40, 10)
+          ctx.strokeStyle = '#4D3E27'
+          ctx.lineWidth = 2
+          ctx.strokeRect(-30, -8, 60, 32)
+
+          ctx.restore()
+        })
+
+        // Update and draw customers
+        if (gameState === 'playing') {
+          setCustomers((prev) =>
+            prev.map((customer) => {
+              let updated = { ...customer }
+
+              if (customer.state === 'entering') {
+                updated.x += 4
+                if (updated.x >= customer.targetX) {
+                  updated.x = customer.targetX
+                  updated.state = 'waiting'
+                }
+              } else if (customer.state === 'waiting') {
+                updated.patience -= deltaTime
+                updated.satisfaction = (updated.patience / updated.maxPatience) * 100
+                updated.rotation = Math.sin(timestamp / 500) * 0.05
+
+                if (updated.patience <= 0) {
+                  updated.state = 'leaving'
+                  updated.satisfaction = 0
+                }
+              } else if (customer.state === 'leaving') {
+                updated.x -= 4
+              }
+
+              return updated
+            })
+          )
+        }
+
+        customers.forEach((customer) => {
+          ctx.save()
+          ctx.translate(customer.x, customer.y + 80)
+          ctx.rotate(customer.rotation)
+          ctx.scale(customer.scale, customer.scale)
 
           // Shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'
           ctx.beginPath()
-          ctx.ellipse(0, 40, 30, 8, 0, 0, Math.PI * 2)
+          ctx.ellipse(0, 35, 25, 6, 0, 0, Math.PI * 2)
           ctx.fill()
 
           // VIP crown
-          if (updated.isVIP) {
-            ctx.save()
-            ctx.translate(0, -55)
-            ctx.fillStyle = '#FFD700'
-            ctx.font = 'bold 24px Arial'
+          if (customer.isVIP) {
+            ctx.font = '20px Arial'
             ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillText('👑', 0, 0)
-            ctx.restore()
+            ctx.fillText('👑', 0, -45)
           }
 
           // Body
-          ctx.fillStyle = updated.shirtColor
+          ctx.fillStyle = customer.shirtColor
           ctx.beginPath()
-          ctx.ellipse(0, 10, 22, 30, 0, 0, Math.PI * 2)
+          ctx.ellipse(0, 8, 18, 25, 0, 0, Math.PI * 2)
           ctx.fill()
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
-          ctx.fillRect(-15, 0, 30, 2)
 
           // Head
-          ctx.fillStyle = updated.skinColor
+          ctx.fillStyle = customer.skinColor
           ctx.beginPath()
-          ctx.arc(0, -20, 18, 0, Math.PI * 2)
+          ctx.arc(0, -18, 15, 0, Math.PI * 2)
           ctx.fill()
           ctx.strokeStyle = 'white'
           ctx.lineWidth = 2
@@ -391,71 +448,51 @@ export default function GamePage() {
           // Eyes
           ctx.fillStyle = '#000'
           ctx.beginPath()
-          ctx.arc(-6, -22, 2, 0, Math.PI * 2)
-          ctx.arc(6, -22, 2, 0, Math.PI * 2)
+          ctx.arc(-5, -20, 1.5, 0, Math.PI * 2)
+          ctx.arc(5, -20, 1.5, 0, Math.PI * 2)
           ctx.fill()
 
-          // Smile
-          if (updated.satisfaction > 30) {
-            ctx.strokeStyle = '#000'
-            ctx.lineWidth = 2
-            ctx.beginPath()
-            ctx.arc(0, -15, 6, 0, Math.PI, false)
-            ctx.stroke()
-          }
-
           // Order bubble
-          if (updated.state === 'waiting') {
-            const foodData = FOODS.find((f) => f.type === updated.order)
+          if (customer.state === 'waiting') {
+            const foodData = FOODS.find((f) => f.type === customer.order)
             if (foodData) {
               ctx.save()
-              ctx.translate(35, -30)
+              ctx.translate(28, -25)
               ctx.fillStyle = 'white'
-              roundRect(ctx, -20, -20, 40, 40, 8)
-              ctx.font = '28px Arial'
+              roundRect(ctx, -16, -16, 32, 32, 6)
+              ctx.font = '24px Arial'
               ctx.textAlign = 'center'
               ctx.textBaseline = 'middle'
               ctx.fillText(foodData.emoji, 0, 0)
               ctx.restore()
 
               // Patience bar
-              ctx.save()
-              ctx.translate(0, 50)
-              const barWidth = 60
-              const barHeight = 6
+              const barWidth = 50
+              const barHeight = 5
+              ctx.translate(0, 42)
               ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'
               roundRect(ctx, -barWidth / 2, 0, barWidth, barHeight, barHeight / 2)
-              const patiencePercent = Math.max(0, updated.patience / updated.maxPatience)
+              const patiencePercent = Math.max(0, customer.patience / customer.maxPatience)
               const barColor = patiencePercent > 0.6 ? '#10B981' : patiencePercent > 0.3 ? '#F59E0B' : '#EF4444'
               ctx.fillStyle = barColor
               roundRect(ctx, -barWidth / 2, 0, barWidth * patiencePercent, barHeight, barHeight / 2)
-              ctx.restore()
             }
           }
 
-          // Happy particles
-          if (updated.state === 'leaving' && updated.satisfaction > 0) {
-            ctx.save()
-            ctx.translate(0, -45)
-            ctx.font = '20px Arial'
+          if (customer.state === 'leaving' && customer.satisfaction > 0) {
+            ctx.font = '16px Arial'
             ctx.textAlign = 'center'
-            const offset = Math.sin(timestamp / 100) * 5
-            ctx.fillText('❤️', -10 + offset, 0)
-            ctx.fillText('⭐', 10 - offset, 0)
-            ctx.restore()
+            ctx.fillText('❤️', -8, -40)
+            ctx.fillText('⭐', 8, -40)
           }
 
           ctx.restore()
-
-          return updated
         })
-      )
 
-      // Update and draw ready food
-      setReadyFood((prev) =>
-        prev.map((food, index) => {
+        // Update and draw ready food
+        readyFood.forEach((food) => {
           const isSelected = selectedFood === food.type
-          const targetScale = isSelected ? 1.3 : 1
+          const targetScale = isSelected ? 1.2 : 1
           food.scale += (targetScale - food.scale) * 0.1
           food.pulse += 0.1
 
@@ -464,78 +501,228 @@ export default function GamePage() {
           ctx.scale(food.scale, food.scale)
 
           if (isSelected) {
-            ctx.save()
             ctx.globalAlpha = 0.3 + Math.sin(food.pulse) * 0.2
             ctx.fillStyle = '#F59E0B'
             ctx.beginPath()
-            ctx.arc(0, 0, 45, 0, Math.PI * 2)
+            ctx.arc(0, 0, 40, 0, Math.PI * 2)
             ctx.fill()
-            ctx.restore()
+            ctx.globalAlpha = 1
           }
 
           const foodData = FOODS.find((f) => f.type === food.type)
           if (foodData) {
             ctx.fillStyle = foodData.color
             ctx.beginPath()
-            ctx.arc(0, 0, 35, 0, Math.PI * 2)
+            ctx.arc(0, 0, 30, 0, Math.PI * 2)
             ctx.fill()
 
-            ctx.font = 'bold 40px Arial'
+            ctx.font = 'bold 32px Arial'
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
             ctx.fillText(foodData.emoji, 0, 0)
 
             if (isSelected) {
-              ctx.save()
-              ctx.translate(25, -25)
-              ctx.fillStyle = '#F59E0B'
-              ctx.font = 'bold 24px Arial'
-              ctx.fillText('⚡', 0, 0)
-              ctx.restore()
+              ctx.font = 'bold 20px Arial'
+              ctx.fillText('⚡', 20, -20)
             }
           }
 
           ctx.restore()
-
-          return food
         })
-      )
 
-      // Update and draw particles
-      setParticles((prev) =>
-        prev
-          .map((particle) => {
-            particle.x += particle.vx
-            particle.y += particle.vy
-            particle.vy += 0.2 // gravity
-            particle.life -= 0.016
+        // Particles
+        if (gameState === 'playing') {
+          setParticles((prev) =>
+            prev
+              .map((particle) => {
+                particle.x += particle.vx
+                particle.y += particle.vy
+                particle.vy += 0.2
+                particle.life -= 0.016
 
-            if (particle.life > 0) {
-              ctx.save()
-              ctx.globalAlpha = particle.life
-              ctx.fillStyle = particle.color
-              ctx.beginPath()
-              ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2)
-              ctx.fill()
-              ctx.restore()
-            }
+                if (particle.life > 0) {
+                  ctx.save()
+                  ctx.globalAlpha = particle.life
+                  ctx.fillStyle = particle.color
+                  ctx.beginPath()
+                  ctx.arc(particle.x, particle.y + 80, particle.size, 0, Math.PI * 2)
+                  ctx.fill()
+                  ctx.restore()
+                }
 
-            return particle
+                return particle
+              })
+              .filter((p) => p.life > 0)
+          )
+        }
+
+        // Top HUD
+        ctx.fillStyle = 'rgba(26, 26, 26, 0.95)'
+        ctx.fillRect(0, 0, canvas.width, 80)
+
+        // Stats
+        const statsY = 40
+        const statSpacing = canvas.width / 5
+
+        // Money
+        ctx.fillStyle = '#10B981'
+        ctx.font = 'bold 28px Arial'
+        ctx.textAlign = 'center'
+        ctx.fillText('💰', statSpacing, statsY - 5)
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 20px Arial'
+        ctx.fillText(`$${money}`, statSpacing, statsY + 20)
+
+        // Score
+        ctx.fillStyle = '#A78BFA'
+        ctx.font = 'bold 28px Arial'
+        ctx.fillText('⭐', statSpacing * 2, statsY - 5)
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 20px Arial'
+        ctx.fillText(`${score}`, statSpacing * 2, statsY + 20)
+
+        // Level
+        ctx.fillStyle = '#F59E0B'
+        ctx.font = 'bold 28px Arial'
+        ctx.fillText('🏆', statSpacing * 3, statsY - 5)
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 20px Arial'
+        ctx.fillText(`Lv.${level}`, statSpacing * 3, statsY + 20)
+
+        // Combo
+        ctx.fillStyle = combo > 0 ? '#F59E0B' : '#666'
+        ctx.font = 'bold 28px Arial'
+        ctx.fillText('🔥', statSpacing * 4, statsY - 5)
+        ctx.fillStyle = combo > 0 ? 'white' : '#666'
+        ctx.font = 'bold 20px Arial'
+        ctx.fillText(combo > 0 ? `${combo}x` : '-', statSpacing * 4, statsY + 20)
+
+        // Buttons (top right)
+        hudButtonsRef.current = []
+        const btnSize = 50
+        const btnMargin = 10
+        let btnX = canvas.width - btnSize - btnMargin
+
+        // Quit button
+        ctx.fillStyle = '#EF4444'
+        roundRect(ctx, btnX, 15, btnSize, btnSize, 12)
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 32px Arial'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('×', btnX + btnSize / 2, 40)
+        hudButtonsRef.current.push({
+          x: btnX,
+          y: 15,
+          width: btnSize,
+          height: btnSize,
+          label: 'quit',
+          action: quitGame,
+          color: '#EF4444',
+        })
+
+        btnX -= btnSize + btnMargin
+
+        // Pause button
+        ctx.fillStyle = '#F59E0B'
+        roundRect(ctx, btnX, 15, btnSize, btnSize, 12)
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 28px Arial'
+        ctx.fillText(gameState === 'paused' ? '▶' : '⏸', btnX + btnSize / 2, 40)
+        hudButtonsRef.current.push({
+          x: btnX,
+          y: 15,
+          width: btnSize,
+          height: btnSize,
+          label: 'pause',
+          action: togglePause,
+          color: '#F59E0B',
+        })
+
+        // Kitchen buttons
+        ctx.fillStyle = 'rgba(26, 26, 26, 0.95)'
+        ctx.fillRect(0, canvas.height - 120, canvas.width, 120)
+
+        kitchenButtonsRef.current = []
+        const btnWidth = Math.min(150, (canvas.width - 80) / 4)
+        const btnHeight = 100
+        const totalWidth = btnWidth * 4 + 30
+        const startX = (canvas.width - totalWidth) / 2
+
+        FOODS.forEach((food, index) => {
+          const x = startX + index * (btnWidth + 10)
+          const y = canvas.height - 110
+          const canAfford = money >= food.price
+          const isPreparingFood = preparing.has(food.type)
+
+          ctx.fillStyle = isPreparingFood ? '#F59E0B' : canAfford ? '#2a2a2a' : '#1a1a1a'
+          roundRect(ctx, x, y, btnWidth, btnHeight, 12)
+
+          if (isPreparingFood) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+            roundRect(ctx, x, y, btnWidth, btnHeight, 12)
+          }
+
+          ctx.font = '48px Arial'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(food.emoji, x + btnWidth / 2, y + 30)
+
+          ctx.fillStyle = canAfford || isPreparingFood ? 'white' : '#666'
+          ctx.font = 'bold 14px Arial'
+          ctx.fillText(food.name, x + btnWidth / 2, y + 65)
+
+          ctx.fillStyle = '#10B981'
+          ctx.font = 'bold 12px Arial'
+          ctx.fillText(`$${food.price}`, x + btnWidth / 2, y + 82)
+
+          if (isPreparingFood) {
+            ctx.fillStyle = 'white'
+            ctx.font = 'bold 10px Arial'
+            ctx.fillText('Cooking...', x + btnWidth / 2, y + 95)
+          }
+
+          kitchenButtonsRef.current.push({
+            x,
+            y,
+            width: btnWidth,
+            height: btnHeight,
+            label: food.name,
+            action: () => prepareFood(food.type),
+            color: food.color,
+            enabled: canAfford && !isPreparingFood,
           })
-          .filter((p) => p.life > 0)
-      )
+        })
+
+        // Paused overlay
+        if (gameState === 'paused') {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+          ctx.fillStyle = 'white'
+          ctx.font = 'bold 48px Arial'
+          ctx.textAlign = 'center'
+          ctx.fillText('⏸ PAUSED', canvas.width / 2, canvas.height / 2)
+
+          ctx.font = '24px Arial'
+          ctx.fillStyle = '#999'
+          ctx.fillText('Click pause button to resume', canvas.width / 2, canvas.height / 2 + 50)
+        }
+      }
 
       // Spawn customers
-      if (timestamp - lastCustomerTimeRef.current > Math.max(3000, 5000 - level * 200)) {
+      if (gameState === 'playing' && timestamp - lastCustomerTimeRef.current > Math.max(3000, 5000 - level * 200)) {
         spawnCustomer()
         lastCustomerTimeRef.current = timestamp
       }
 
       // Level up
-      const newLevel = Math.floor(score / 500) + 1
-      if (newLevel > level) {
-        setLevel(newLevel)
-        addParticles(canvas.width / 2, canvas.height / 2, '#FFD700', 50)
+      if (gameState === 'playing') {
+        const newLevel = Math.floor(score / 500) + 1
+        if (newLevel > level) {
+          setLevel(newLevel)
+          addParticles(canvas.width / 2, canvas.height / 2, '#FFD700', 50)
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(render)
@@ -548,48 +735,97 @@ export default function GamePage() {
         cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [isPlaying, isPaused, customers, readyFood, selectedFood, particles, level, score, spawnCustomer, addParticles])
+  }, [
+    gameState,
+    money,
+    score,
+    level,
+    combo,
+    customers,
+    readyFood,
+    selectedFood,
+    particles,
+    preparing,
+    canvasSize,
+    highScore,
+    spawnCustomer,
+    addParticles,
+    prepareFood,
+    togglePause,
+    quitGame,
+  ])
 
   // Canvas click handler
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isPlaying || isPaused) return
-
       const canvas = canvasRef.current
       if (!canvas) return
 
       const rect = canvas.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      const x = (e.clientX - rect.left) * scaleX
+      const y = (e.clientY - rect.top) * scaleY
 
-      // Check food clicks
-      readyFood.forEach((food) => {
-        const dx = x - food.x
-        const dy = y - food.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist < 35) {
-          setSelectedFood((prev) => (prev === food.type ? null : food.type))
+      if (gameState === 'menu') {
+        // Start button
+        const btnWidth = 300
+        const btnHeight = 80
+        const btnX = canvas.width / 2 - btnWidth / 2
+        const btnY = canvas.height / 2 + 150
+
+        if (x >= btnX && x <= btnX + btnWidth && y >= btnY && y <= btnY + btnHeight) {
+          startGame()
         }
-      })
+      } else if (gameState === 'playing' || gameState === 'paused') {
+        // HUD buttons
+        for (const btn of hudButtonsRef.current) {
+          if (x >= btn.x && x <= btn.x + btn.width && y >= btn.y && y <= btn.y + btn.height) {
+            btn.action()
+            return
+          }
+        }
 
-      // Check customer clicks
-      if (selectedFood) {
-        customers.forEach((customer) => {
-          if (customer.state === 'waiting') {
-            const dx = x - customer.x
-            const dy = y - customer.y
-            const dist = Math.sqrt(dx * dx + dy * dy)
-            if (dist < 40) {
-              serveFood(customer)
+        if (gameState === 'paused') return
+
+        // Kitchen buttons
+        for (const btn of kitchenButtonsRef.current) {
+          if (btn.enabled !== false && x >= btn.x && x <= btn.x + btn.width && y >= btn.y && y <= btn.y + btn.height) {
+            btn.action()
+            return
+          }
+        }
+
+        // Food selection
+        for (const food of readyFood) {
+          const dx = x - food.x
+          const dy = y - (food.y)
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < 30) {
+            setSelectedFood((prev) => (prev === food.type ? null : food.type))
+            return
+          }
+        }
+
+        // Customer click
+        if (selectedFood) {
+          for (const customer of customers) {
+            if (customer.state === 'waiting') {
+              const dx = x - customer.x
+              const dy = y - (customer.y + 80)
+              const dist = Math.sqrt(dx * dx + dy * dy)
+              if (dist < 35) {
+                serveFood(customer)
+                return
+              }
             }
           }
-        })
+        }
       }
     },
-    [isPlaying, isPaused, readyFood, customers, selectedFood, serveFood]
+    [gameState, customers, readyFood, selectedFood, startGame, serveFood, canvasSize]
   )
 
-  // Helper function for rounded rectangles
   function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
     ctx.beginPath()
     ctx.moveTo(x + r, y)
@@ -606,152 +842,15 @@ export default function GamePage() {
   }
 
   return (
-    <div ref={gameContainerRef} className="relative flex min-h-screen items-center justify-center bg-[#1a1a1a] p-4">
-      {/* Game Container */}
-      <div className="relative w-full max-w-5xl">
-        {/* Top HUD */}
-        <div className="mb-4 flex items-center justify-between rounded-2xl bg-[#2a2a2a] px-6 py-4 shadow-2xl">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#10B981]">
-                <span className="text-xl">💰</span>
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Money</div>
-                <div className="text-xl font-black text-white">${money}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#A78BFA]">
-                <span className="text-xl">⭐</span>
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Score</div>
-                <div className="text-xl font-black text-white">{score}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F59E0B]">
-                <span className="text-xl">🔥</span>
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Combo</div>
-                <div className="text-xl font-black text-white">{combo > 0 ? `${combo}x` : '-'}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isPlaying && (
-              <>
-                <button
-                  onClick={togglePause}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3a3a3a] text-white transition-all hover:bg-[#4a4a4a] hover:scale-105"
-                >
-                  {isPaused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
-                </button>
-                <button
-                  onClick={resetGame}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3a3a3a] text-white transition-all hover:bg-[#4a4a4a] hover:scale-105"
-                >
-                  <RotateCcw className="h-5 w-5" />
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => setIsMuted(!isMuted)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3a3a3a] text-white transition-all hover:bg-[#4a4a4a] hover:scale-105"
-            >
-              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </button>
-            <button
-              onClick={toggleFullscreen}
-              className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3a3a3a] text-white transition-all hover:bg-[#4a4a4a] hover:scale-105"
-            >
-              {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Game Canvas */}
-        {isPlaying ? (
-          <>
-            <canvas
-              ref={canvasRef}
-              width={900}
-              height={600}
-              onClick={handleCanvasClick}
-              className="w-full cursor-pointer rounded-2xl shadow-2xl"
-              style={{ imageRendering: 'crisp-edges' }}
-            />
-
-            {/* Kitchen Controls */}
-            <div className="mt-4 grid grid-cols-4 gap-3">
-              {FOODS.map((food) => {
-                const canAfford = money >= food.price
-                const isPreparingFood = preparing.has(food.type)
-
-                return (
-                  <button
-                    key={food.type}
-                    onClick={() => prepareFood(food.type)}
-                    disabled={!canAfford || isPreparingFood}
-                    className={`group relative overflow-hidden rounded-xl p-4 transition-all ${
-                      isPreparingFood
-                        ? 'bg-[#F59E0B] shadow-lg'
-                        : canAfford
-                          ? 'bg-[#2a2a2a] hover:bg-[#3a3a3a] hover:scale-105 shadow-lg'
-                          : 'cursor-not-allowed bg-[#1a1a1a] opacity-40'
-                    }`}
-                  >
-                    {isPreparingFood && <div className="absolute inset-0 animate-pulse bg-white/10" />}
-                    <div className="relative">
-                      <div className="mb-2 text-center text-5xl">{food.emoji}</div>
-                      <div className="mb-1 text-center text-sm font-bold text-white">{food.name}</div>
-                      <div className="flex items-center justify-center gap-1 rounded-full bg-[#10B981] px-2 py-1">
-                        <span className="text-xs font-bold text-white">${food.price}</span>
-                      </div>
-                      {isPreparingFood && (
-                        <div className="mt-2 text-center text-xs font-bold text-white">Cooking...</div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </>
-        ) : (
-          // Start Screen
-          <div className="rounded-3xl bg-[#2a2a2a] p-16 text-center shadow-2xl">
-            <div className="relative mx-auto mb-8 flex h-40 w-40 items-center justify-center">
-              <div className="absolute inset-0 animate-pulse rounded-full bg-[#F59E0B]/20" />
-              <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-[#F59E0B] text-6xl shadow-2xl">
-                ☕
-              </div>
-            </div>
-
-            <h1 className="mb-4 text-6xl font-black text-white">Café Tycoon</h1>
-            <p className="mx-auto mb-8 max-w-lg text-xl text-gray-400">
-              Build your café empire! Serve customers fast and master the combo system.
-            </p>
-
-            {highScore > 0 && (
-              <div className="mx-auto mb-8 flex max-w-sm items-center justify-center gap-2 rounded-2xl bg-[#3a3a3a] p-4">
-                <Trophy className="h-6 w-6 text-[#FFD700]" />
-                <span className="text-2xl font-black text-white">Best: {highScore}</span>
-              </div>
-            )}
-
-            <button
-              onClick={startGame}
-              className="group flex items-center gap-3 rounded-2xl bg-[#10B981] px-20 py-8 font-black text-white shadow-2xl transition-all hover:scale-105 hover:bg-[#059669]"
-            >
-              <Play className="h-8 w-8" />
-              <span className="text-3xl">Start Game</span>
-            </button>
-          </div>
-        )}
-      </div>
+    <div ref={containerRef} className="fixed inset-0 bg-[#1a1a1a]">
+      <canvas
+        ref={canvasRef}
+        width={canvasSize.width}
+        height={canvasSize.height}
+        onClick={handleCanvasClick}
+        className="h-full w-full cursor-pointer"
+        style={{ imageRendering: 'auto' }}
+      />
     </div>
   )
 }
