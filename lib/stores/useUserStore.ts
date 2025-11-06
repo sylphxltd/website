@@ -1,19 +1,19 @@
-import { create } from "zustand";
 import type { User } from "firebase/auth";
 import {
-	signInWithPopup,
-	signInWithEmailAndPassword,
-	createUserWithEmailAndPassword,
-	sendPasswordResetEmail,
-	sendSignInLinkToEmail,
 	GoogleAuthProvider,
-	signOut,
-	setPersistence,
 	browserLocalPersistence,
 	browserSessionPersistence,
-	onIdTokenChanged,
+	createUserWithEmailAndPassword,
 	getIdTokenResult,
+	onIdTokenChanged,
+	sendPasswordResetEmail,
+	sendSignInLinkToEmail,
+	setPersistence,
+	signInWithEmailAndPassword,
+	signInWithPopup,
+	signOut,
 } from "firebase/auth";
+import { create } from "zustand";
 import { auth } from "../firebase";
 
 interface UserState {
@@ -28,11 +28,7 @@ interface UserState {
 	setLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
 	signInWithGoogle: () => Promise<void>;
-	signInWithEmailPassword: (
-		email: string,
-		password: string,
-		rememberMe?: boolean,
-	) => Promise<void>;
+	signInWithEmailPassword: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
 	registerUser: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
 	resetPassword: (email: string) => Promise<void>;
 	sendMagicLink: (email: string) => Promise<void>;
@@ -86,14 +82,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 	signInWithEmailPassword: async (email: string, password: string, rememberMe = false) => {
 		set({ loading: true, error: null });
 		try {
-			await setPersistence(
-				auth,
-				rememberMe ? browserLocalPersistence : browserSessionPersistence,
-			);
+			await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
 			await signInWithEmailAndPassword(auth, email, password);
 		} catch (err: unknown) {
-			const message =
-				err instanceof Error ? err.message : "An error occurred during email sign-in";
+			const message = err instanceof Error ? err.message : "An error occurred during email sign-in";
 			set({ error: message });
 			throw err;
 		} finally {
@@ -104,10 +96,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 	registerUser: async (email: string, password: string, rememberMe = false) => {
 		set({ loading: true, error: null });
 		try {
-			await setPersistence(
-				auth,
-				rememberMe ? browserLocalPersistence : browserSessionPersistence,
-			);
+			await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
 			await createUserWithEmailAndPassword(auth, email, password);
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : "An error occurred during registration";
@@ -142,8 +131,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 			await sendSignInLinkToEmail(auth, email, actionCodeSettings);
 			window.localStorage.setItem("emailForSignIn", email);
 		} catch (err: unknown) {
-			const message =
-				err instanceof Error ? err.message : "An error occurred sending magic link";
+			const message = err instanceof Error ? err.message : "An error occurred sending magic link";
 			set({ error: message });
 			throw err;
 		} finally {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import { useUserStore } from "@/lib/stores/useUserStore";
+import { useEffect } from "react";
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
 	const initAuthListener = useUserStore((state) => state.initAuthListener);

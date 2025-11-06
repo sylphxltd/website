@@ -1,13 +1,13 @@
 {
-  "indexes": [
-    {
-      "collectionId": "adminChatSessions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "adminUid", "order": "ASCENDING" },
-        { "fieldPath": "lastUpdatedAt", "order": "DESCENDING" }
-      ]
-    }
-  ],
-  "fieldOverrides": []
+	"indexes": [
+		{
+			"collectionId": "adminChatSessions",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{ "fieldPath": "adminUid", "order": "ASCENDING" },
+				{ "fieldPath": "lastUpdatedAt", "order": "DESCENDING" }
+			]
+		}
+	],
+	"fieldOverrides": []
 }

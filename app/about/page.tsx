@@ -15,10 +15,10 @@ export default function AboutPage() {
 				<div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm p-8 mb-12 border border-gray-100">
 					<div className="prose max-w-none">
 						<p className="text-lg text-gray-600 leading-relaxed">
-							SylphX is a forward-thinking technology company dedicated to creating innovative digital
-							experiences that push the boundaries of what&apos;s possible. We specialize in developing
-							high-quality, high-performance applications, games, and immersive experiences across
-							multiple platforms.
+							SylphX is a forward-thinking technology company dedicated to creating innovative
+							digital experiences that push the boundaries of what&apos;s possible. We specialize in
+							developing high-quality, high-performance applications, games, and immersive
+							experiences across multiple platforms.
 						</p>
 
 						<p className="text-lg text-gray-600 leading-relaxed">
@@ -30,16 +30,16 @@ export default function AboutPage() {
 						<h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">Our Vision</h2>
 
 						<p className="text-lg text-gray-600 leading-relaxed">
-							We envision a future where technology enhances human creativity and connection. Our goal
-							is to develop tools and experiences that empower users, spark imagination, and create
-							meaningful interactions in both digital and augmented realities.
+							We envision a future where technology enhances human creativity and connection. Our
+							goal is to develop tools and experiences that empower users, spark imagination, and
+							create meaningful interactions in both digital and augmented realities.
 						</p>
 
 						<h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">Our Approach</h2>
 
 						<p className="text-lg text-gray-600 leading-relaxed">
-							At SylphX, we believe in a thoughtful, user-centered approach to product development. We
-							combine technical excellence with creative innovation, constantly exploring new
+							At SylphX, we believe in a thoughtful, user-centered approach to product development.
+							We combine technical excellence with creative innovation, constantly exploring new
 							technologies and methodologies to create exceptional digital experiences.
 						</p>
 
@@ -49,16 +49,16 @@ export default function AboutPage() {
 								technologies like AI, VR, and AR
 							</li>
 							<li className="text-gray-600">
-								<strong className="text-gray-900">Quality:</strong> Rigorous testing and optimization for
-								flawless performance
+								<strong className="text-gray-900">Quality:</strong> Rigorous testing and
+								optimization for flawless performance
 							</li>
 							<li className="text-gray-600">
 								<strong className="text-gray-900">User Experience:</strong> Intuitive design with
 								thoughtful attention to detail
 							</li>
 							<li className="text-gray-600">
-								<strong className="text-gray-900">Accessibility:</strong> Creating products that work for
-								everyone
+								<strong className="text-gray-900">Accessibility:</strong> Creating products that
+								work for everyone
 							</li>
 						</ul>
 					</div>

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { footerLinks } from "@/lib/navigation";
+import Link from "next/link";
 
 export default function Footer() {
 	const companyLinks = footerLinks.filter((link) =>

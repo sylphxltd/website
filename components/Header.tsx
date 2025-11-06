@@ -1,10 +1,10 @@
 "use client";
 
+import { coreNavigationLinks } from "@/lib/navigation";
+import { useUserStore } from "@/lib/stores/useUserStore";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUserStore } from "@/lib/stores/useUserStore";
-import { coreNavigationLinks } from "@/lib/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function Header() {
 	const pathname = usePathname();
