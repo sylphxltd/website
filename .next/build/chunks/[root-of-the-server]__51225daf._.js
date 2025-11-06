@@ -26,7 +26,7 @@ module.exports = mod;
 ]);
 const config = {
     plugins: {
-        '@tailwindcss/postcss': {},
+        tailwindcss: {},
         autoprefixer: {}
     }
 };
