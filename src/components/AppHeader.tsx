@@ -10,6 +10,7 @@ const headerLinks = [
   { name: 'Home', path: '/' },
   { name: 'Products', path: '/products' },
   { name: 'Technologies', path: '/technologies' },
+  { name: 'Game', path: '/game' },
   { name: 'About', path: '/about' },
   { name: 'Contact', path: '/contact' },
 ]
