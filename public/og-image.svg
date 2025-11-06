@@ -1,0 +1,40 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#F9FAFB"/>
+
+  <!-- Gradient Background Blob -->
+  <circle cx="600" cy="315" r="400" fill="url(#bgGradient)" opacity="0.1"/>
+
+  <!-- Logo Icon -->
+  <g transform="translate(450, 180)">
+    <rect width="80" height="80" rx="16" fill="url(#logoGradient)"/>
+    <path d="M300 40L60 100H80L60 140L120 80H100L120 40Z" transform="translate(-280, -25)" fill="white" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Brand Name -->
+  <text x="600" y="320" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="700" fill="url(#textGradient)" text-anchor="middle">Sylphx</text>
+
+  <!-- Tagline -->
+  <text x="600" y="380" font-family="Inter, system-ui, sans-serif" font-size="32" font-weight="500" fill="#6B7280" text-anchor="middle">Democratizing AI Through Elegant Code</text>
+
+  <!-- Description -->
+  <text x="600" y="440" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="400" fill="#9CA3AF" text-anchor="middle">Production-ready, open-source AI infrastructure</text>
+
+  <defs>
+    <linearGradient id="bgGradient" x1="200" y1="0" x2="1000" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="0.5" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+
+    <linearGradient id="logoGradient" x1="0" y1="0" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+
+    <linearGradient id="textGradient" x1="400" y1="280" x2="800" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+</svg>
