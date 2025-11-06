@@ -34,7 +34,7 @@ const COLORS = [
   '#10B981', // emerald
   '#06B6D4', // cyan
   '#EF4444', // red
-]
+] as const
 
 export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -62,7 +62,7 @@ export default function GamePage() {
         vy: (Math.random() - 0.5) * 2,
         mass: 2 + Math.random() * 3,
         radius: 3 + Math.random() * 4,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)] ?? COLORS[0],
+        color: (COLORS[Math.floor(Math.random() * COLORS.length)] ?? COLORS[0]) as string,
         trail: [],
       })
     }
@@ -333,7 +333,7 @@ export default function GamePage() {
         vy: (Math.random() - 0.5) * 4,
         mass: 3 + Math.random() * 5,
         radius: 4 + Math.random() * 6,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)] ?? COLORS[0],
+        color: (COLORS[Math.floor(Math.random() * COLORS.length)] ?? COLORS[0]) as string,
         trail: [],
       }
       particlesRef.current = [...particlesRef.current, newParticle]
