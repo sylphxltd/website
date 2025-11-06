@@ -27,7 +27,7 @@ export default function GamePage() {
   const [items, setItems] = useState<FallingItem[]>([])
   const [gameOver, setGameOver] = useState(false)
   const [highScore, setHighScore] = useState(0)
-  const gameLoopRef = useRef<number>()
+  const gameLoopRef = useRef<number | undefined>(undefined)
   const lastSpawnRef = useRef<number>(0)
   const keysPressed = useRef<Set<string>>(new Set())
 
