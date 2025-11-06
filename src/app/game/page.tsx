@@ -1,394 +1,519 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Code2, Bug, Zap, Trophy, RotateCcw, Heart } from 'lucide-react'
+import {
+  Sparkles,
+  Zap,
+  Wind,
+  Orbit,
+  Wand2,
+  RotateCcw,
+  Info,
+  Palette,
+  Settings,
+} from 'lucide-react'
 
-interface FallingItem {
-  id: number
+interface Particle {
   x: number
   y: number
-  type: 'code' | 'bug' | 'bonus'
-  icon: string
-  speed: number
+  vx: number
+  vy: number
+  mass: number
+  radius: number
+  color: string
+  trail: { x: number; y: number }[]
 }
 
-const CODE_SYMBOLS = ['{ }', '< >', '( )', '[ ]', '=>', 'fn', 'const', 'let']
-const GAME_WIDTH = 800
-const GAME_HEIGHT = 600
-const PLAYER_WIDTH = 80
-const ITEM_SIZE = 40
-const INITIAL_LIVES = 3
+type Mode = 'attract' | 'repel' | 'orbit' | 'blackhole' | 'create'
+
+const COLORS = [
+  '#4F46E5', // indigo
+  '#7C3AED', // purple
+  '#EC4899', // pink
+  '#F59E0B', // amber
+  '#10B981', // emerald
+  '#06B6D4', // cyan
+  '#EF4444', // red
+]
 
 export default function GamePage() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [mode, setMode] = useState<Mode>('attract')
+  const [particles, setParticles] = useState<Particle[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
-  const [score, setScore] = useState(0)
-  const [lives, setLives] = useState(INITIAL_LIVES)
-  const [playerX, setPlayerX] = useState(GAME_WIDTH / 2 - PLAYER_WIDTH / 2)
-  const [items, setItems] = useState<FallingItem[]>([])
-  const [gameOver, setGameOver] = useState(false)
-  const [highScore, setHighScore] = useState(0)
-  const gameLoopRef = useRef<number | undefined>(undefined)
-  const lastSpawnRef = useRef<number>(0)
-  const keysPressed = useRef<Set<string>>(new Set())
+  const [showInfo, setShowInfo] = useState(true)
+  const [particleCount, setParticleCount] = useState(0)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const animationFrameRef = useRef<number>()
+  const isMouseDownRef = useRef(false)
+  const particlesRef = useRef<Particle[]>([])
 
-  // Load high score from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('codeCatcherHighScore')
-    if (saved) setHighScore(parseInt(saved))
+  // Initialize with some particles
+  const initializeParticles = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const newParticles: Particle[] = []
+    for (let i = 0; i < 80; i++) {
+      newParticles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        mass: 2 + Math.random() * 3,
+        radius: 3 + Math.random() * 4,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)] ?? COLORS[0],
+        trail: [],
+      })
+    }
+    particlesRef.current = newParticles
+    setParticles(newParticles)
+    setParticleCount(newParticles.length)
   }, [])
 
-  // Save high score
   useEffect(() => {
-    if (score > highScore) {
-      setHighScore(score)
-      localStorage.setItem('codeCatcherHighScore', score.toString())
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    // Set canvas size
+    const updateSize = () => {
+      const rect = canvas.getBoundingClientRect()
+      canvas.width = rect.width
+      canvas.height = rect.height
     }
-  }, [score, highScore])
+    updateSize()
+    window.addEventListener('resize', updateSize)
 
-  const spawnItem = useCallback(() => {
-    const now = Date.now()
-    if (now - lastSpawnRef.current < 800) return
+    initializeParticles()
 
-    lastSpawnRef.current = now
-    const rand = Math.random()
-    const type = rand < 0.7 ? 'code' : rand < 0.9 ? 'bug' : 'bonus'
-    const icon =
-      type === 'code'
-        ? CODE_SYMBOLS[Math.floor(Math.random() * CODE_SYMBOLS.length)] ?? '{ }'
-        : type
+    return () => window.removeEventListener('resize', updateSize)
+  }, [initializeParticles])
 
-    const newItem: FallingItem = {
-      id: Date.now() + Math.random(),
-      x: Math.random() * (GAME_WIDTH - ITEM_SIZE),
-      y: -ITEM_SIZE,
-      type,
-      icon,
-      speed: 2 + Math.random() * 2,
-    }
+  const applyForce = useCallback(
+    (p: Particle, mouseX: number, mouseY: number, canvas: HTMLCanvasElement) => {
+      const dx = mouseX - p.x
+      const dy = mouseY - p.y
+      const distSq = dx * dx + dy * dy
+      const dist = Math.sqrt(distSq)
 
-    setItems((prev) => [...prev, newItem])
-  }, [])
+      if (dist < 5) return
 
-  const checkCollision = useCallback(
-    (item: FallingItem) => {
-      return (
-        item.y + ITEM_SIZE >= GAME_HEIGHT - 60 &&
-        item.y <= GAME_HEIGHT - 20 &&
-        item.x + ITEM_SIZE >= playerX &&
-        item.x <= playerX + PLAYER_WIDTH
-      )
+      switch (mode) {
+        case 'attract': {
+          const force = (300 * p.mass) / (distSq + 100)
+          p.vx += (dx / dist) * force * 0.01
+          p.vy += (dy / dist) * force * 0.01
+          break
+        }
+        case 'repel': {
+          const force = (500 * p.mass) / (distSq + 100)
+          p.vx -= (dx / dist) * force * 0.01
+          p.vy -= (dy / dist) * force * 0.01
+          break
+        }
+        case 'orbit': {
+          const force = 200 / (dist + 50)
+          p.vx += (-dy / dist) * force * 0.01
+          p.vy += (dx / dist) * force * 0.01
+          break
+        }
+        case 'blackhole': {
+          if (dist < 50) {
+            p.mass *= 0.95
+            p.radius *= 0.98
+            if (p.radius < 0.5) {
+              p.radius = 0
+            }
+          } else {
+            const force = (800 * p.mass) / (distSq + 50)
+            p.vx += (dx / dist) * force * 0.01
+            p.vy += (dy / dist) * force * 0.01
+          }
+          break
+        }
+      }
+
+      // Boundary collision
+      if (p.x < p.radius) {
+        p.x = p.radius
+        p.vx *= -0.8
+      }
+      if (p.x > canvas.width - p.radius) {
+        p.x = canvas.width - p.radius
+        p.vx *= -0.8
+      }
+      if (p.y < p.radius) {
+        p.y = p.radius
+        p.vy *= -0.8
+      }
+      if (p.y > canvas.height - p.radius) {
+        p.y = canvas.height - p.radius
+        p.vy *= -0.8
+      }
+
+      // Damping
+      p.vx *= 0.995
+      p.vy *= 0.995
+
+      // Update position
+      p.x += p.vx
+      p.y += p.vy
+
+      // Trail
+      if (p.trail.length > 15) {
+        p.trail.shift()
+      }
+      p.trail.push({ x: p.x, y: p.y })
     },
-    [playerX]
+    [mode]
   )
 
-  const gameLoop = useCallback(() => {
-    if (!isPlaying || gameOver) return
+  const animate = useCallback(() => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
 
-    // Spawn items
-    spawnItem()
+    // Clear with fade effect
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.15)'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Update items
-    setItems((prev) => {
-      const updated = prev
-        .map((item) => ({
-          ...item,
-          y: item.y + item.speed,
-        }))
-        .filter((item) => {
-          // Check collision
-          if (checkCollision(item)) {
-            if (item.type === 'code') {
-              setScore((s) => s + 10)
-            } else if (item.type === 'bonus') {
-              setScore((s) => s + 50)
-            } else if (item.type === 'bug') {
-              setLives((l) => {
-                const newLives = l - 1
-                if (newLives <= 0) {
-                  setGameOver(true)
-                  setIsPlaying(false)
-                }
-                return newLives
-              })
-            }
-            return false
-          }
+    const currentParticles = particlesRef.current
 
-          // Remove if off screen
-          if (item.y > GAME_HEIGHT) {
-            if (item.type === 'code') {
-              setLives((l) => {
-                const newLives = l - 1
-                if (newLives <= 0) {
-                  setGameOver(true)
-                  setIsPlaying(false)
-                }
-                return newLives
-              })
-            }
-            return false
-          }
-
-          return true
-        })
-
-      return updated
-    })
-
-    // Move player
-    if (keysPressed.current.has('ArrowLeft')) {
-      setPlayerX((x) => Math.max(0, x - 8))
-    }
-    if (keysPressed.current.has('ArrowRight')) {
-      setPlayerX((x) => Math.min(GAME_WIDTH - PLAYER_WIDTH, x + 8))
+    // Apply forces
+    if (isMouseDownRef.current) {
+      currentParticles.forEach((p) => {
+        applyForce(p, mousePos.x, mousePos.y, canvas)
+      })
     }
 
-    gameLoopRef.current = requestAnimationFrame(gameLoop)
-  }, [isPlaying, gameOver, spawnItem, checkCollision])
+    // Particle interaction (simplified for performance)
+    for (let i = 0; i < currentParticles.length; i++) {
+      const p1 = currentParticles[i]
+      if (!p1 || p1.radius === 0) continue
 
-  useEffect(() => {
-    if (isPlaying && !gameOver) {
-      gameLoopRef.current = requestAnimationFrame(gameLoop)
-      return () => {
-        if (gameLoopRef.current) {
-          cancelAnimationFrame(gameLoopRef.current)
+      for (let j = i + 1; j < currentParticles.length; j++) {
+        const p2 = currentParticles[j]
+        if (!p2 || p2.radius === 0) continue
+
+        const dx = p2.x - p1.x
+        const dy = p2.y - p1.y
+        const distSq = dx * dx + dy * dy
+        const dist = Math.sqrt(distSq)
+
+        if (dist < p1.radius + p2.radius) {
+          // Collision
+          const angle = Math.atan2(dy, dx)
+          const sin = Math.sin(angle)
+          const cos = Math.cos(angle)
+
+          // Separate particles
+          const overlap = (p1.radius + p2.radius - dist) / 2
+          p1.x -= overlap * cos
+          p1.y -= overlap * sin
+          p2.x += overlap * cos
+          p2.y += overlap * sin
+
+          // Elastic collision
+          const v1 = { x: p1.vx * cos + p1.vy * sin, y: p1.vy * cos - p1.vx * sin }
+          const v2 = { x: p2.vx * cos + p2.vy * sin, y: p2.vy * cos - p2.vx * sin }
+
+          const m1 = p1.mass
+          const m2 = p2.mass
+          const vx1 = ((m1 - m2) * v1.x + 2 * m2 * v2.x) / (m1 + m2)
+          const vx2 = ((m2 - m1) * v2.x + 2 * m1 * v1.x) / (m1 + m2)
+
+          p1.vx = vx1 * cos - v1.y * sin
+          p1.vy = v1.y * cos + vx1 * sin
+          p2.vx = vx2 * cos - v2.y * sin
+          p2.vy = v2.y * cos + vx2 * sin
+        } else if (dist < 150 && mode !== 'blackhole') {
+          // Attraction between particles
+          const force = (p1.mass * p2.mass) / (distSq + 1000)
+          const fx = (dx / dist) * force * 0.0005
+          const fy = (dy / dist) * force * 0.0005
+
+          p1.vx += fx
+          p1.vy += fy
+          p2.vx -= fx
+          p2.vy -= fy
+
+          // Draw connection
+          const alpha = Math.max(0, 1 - dist / 150)
+          ctx.strokeStyle = `rgba(79, 70, 229, ${alpha * 0.3})`
+          ctx.lineWidth = 0.5
+          ctx.beginPath()
+          ctx.moveTo(p1.x, p1.y)
+          ctx.lineTo(p2.x, p2.y)
+          ctx.stroke()
         }
       }
     }
-  }, [isPlaying, gameOver, gameLoop])
+
+    // Draw particles
+    currentParticles.forEach((p) => {
+      if (p.radius === 0) return
+
+      // Draw trail
+      ctx.strokeStyle = p.color + '40'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      p.trail.forEach((point, i) => {
+        if (i === 0) {
+          ctx.moveTo(point.x, point.y)
+        } else {
+          ctx.lineTo(point.x, point.y)
+        }
+      })
+      ctx.stroke()
+
+      // Draw particle
+      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius)
+      gradient.addColorStop(0, p.color + 'FF')
+      gradient.addColorStop(0.5, p.color + 'CC')
+      gradient.addColorStop(1, p.color + '00')
+
+      ctx.fillStyle = gradient
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Glow effect
+      ctx.shadowBlur = 10
+      ctx.shadowColor = p.color
+      ctx.fillStyle = p.color
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.radius * 0.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.shadowBlur = 0
+    })
+
+    // Draw mouse cursor effect
+    if (isMouseDownRef.current) {
+      const gradient = ctx.createRadialGradient(mousePos.x, mousePos.y, 0, mousePos.x, mousePos.y, 50)
+      const color = mode === 'blackhole' ? '#000' : mode === 'repel' ? '#EF4444' : '#4F46E5'
+      gradient.addColorStop(0, color + '40')
+      gradient.addColorStop(1, color + '00')
+      ctx.fillStyle = gradient
+      ctx.beginPath()
+      ctx.arc(mousePos.x, mousePos.y, 50, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // Clean up destroyed particles
+    particlesRef.current = currentParticles.filter((p) => p.radius > 0)
+    setParticleCount(particlesRef.current.length)
+
+    animationFrameRef.current = requestAnimationFrame(animate)
+  }, [mousePos, applyForce, mode])
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault()
-        keysPressed.current.add(e.key)
+    if (isPlaying) {
+      animationFrameRef.current = requestAnimationFrame(animate)
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current)
+        }
       }
     }
+  }, [isPlaying, animate])
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keysPressed.current.delete(e.key)
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    if (mode === 'create') {
+      const newParticle: Particle = {
+        x,
+        y,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4,
+        mass: 3 + Math.random() * 5,
+        radius: 4 + Math.random() * 6,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)] ?? COLORS[0],
+        trail: [],
+      }
+      particlesRef.current = [...particlesRef.current, newParticle]
+      setParticleCount(particlesRef.current.length)
+    } else {
+      isMouseDownRef.current = true
+      setMousePos({ x, y })
     }
-
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [])
-
-  const startGame = () => {
-    setIsPlaying(true)
-    setGameOver(false)
-    setScore(0)
-    setLives(INITIAL_LIVES)
-    setItems([])
-    setPlayerX(GAME_WIDTH / 2 - PLAYER_WIDTH / 2)
-    lastSpawnRef.current = 0
   }
 
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    setMousePos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    })
+  }
+
+  const handleMouseUp = () => {
+    isMouseDownRef.current = false
+  }
+
+  const modes = [
+    {
+      id: 'attract' as Mode,
+      name: 'Attract',
+      icon: Zap,
+      color: 'from-indigo-500 to-purple-600',
+      desc: 'Pull particles towards cursor',
+    },
+    {
+      id: 'repel' as Mode,
+      name: 'Repel',
+      icon: Wind,
+      color: 'from-red-500 to-orange-600',
+      desc: 'Push particles away',
+    },
+    {
+      id: 'orbit' as Mode,
+      name: 'Orbit',
+      icon: Orbit,
+      color: 'from-cyan-500 to-blue-600',
+      desc: 'Create orbital motion',
+    },
+    {
+      id: 'blackhole' as Mode,
+      name: 'Black Hole',
+      icon: Sparkles,
+      color: 'from-gray-800 to-gray-900',
+      desc: 'Consume nearby particles',
+    },
+    {
+      id: 'create' as Mode,
+      name: 'Create',
+      icon: Wand2,
+      color: 'from-emerald-500 to-green-600',
+      desc: 'Spawn new particles',
+    },
+  ]
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-gray-50 to-white pt-24 pb-16 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-24 pb-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mx-auto mb-12 max-w-4xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-white/70 px-4 py-2 text-sm font-medium text-indigo-800 backdrop-blur-sm dark:border-indigo-800/50 dark:bg-gray-900/70 dark:text-indigo-200">
-            <Code2 className="h-4 w-4" />
-            <span>Interactive Demo</span>
+        <div className="mx-auto mb-8 max-w-4xl text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-indigo-200/50 bg-white/10 px-4 py-2 text-sm font-medium text-indigo-200 backdrop-blur-sm">
+            <Sparkles className="h-4 w-4" />
+            <span>Interactive Physics Sandbox</span>
           </div>
-          <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl">
-            Code Catcher
-          </h1>
-          <p className="text-lg text-gray-700 dark:text-gray-200">
-            Catch the good code, avoid the bugs! Use{' '}
-            <kbd className="rounded bg-gray-200 px-2 py-1 text-sm font-mono dark:bg-gray-700">←</kbd>{' '}
-            <kbd className="rounded bg-gray-200 px-2 py-1 text-sm font-mono dark:bg-gray-700">→</kbd>{' '}
-            to move
+          <h1 className="mb-3 text-4xl font-bold text-white md:text-5xl">Gravity Sandbox</h1>
+          <p className="text-lg text-gray-300">
+            Real-time particle physics with gravitational forces
           </p>
         </div>
 
-        {/* Game Container */}
-        <div className="mx-auto max-w-4xl">
-          <div className="rounded-2xl border border-gray-200/50 bg-white/90 p-6 shadow-xl backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-800/90 md:p-8">
-            {/* Stats */}
-            <div className="mb-6 flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-yellow-500" />
-                  <div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Score</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{score}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Heart className="h-5 w-5 text-red-500" />
-                  <div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Lives</div>
-                    <div className="flex gap-1">
-                      {Array.from({ length: INITIAL_LIVES }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`h-6 w-6 rounded ${
-                            i < lives
-                              ? 'bg-red-500'
-                              : 'bg-gray-200 dark:bg-gray-700'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-600 dark:text-gray-400">High Score</div>
-                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                  {highScore}
-                </div>
-              </div>
-            </div>
-
-            {/* Game Canvas */}
-            <div
-              className="relative mx-auto overflow-hidden rounded-xl border-2 border-gray-300 bg-gradient-to-b from-gray-50 to-gray-100 dark:border-gray-600 dark:from-gray-900 dark:to-gray-800"
-              style={{
-                width: `min(${GAME_WIDTH}px, 100%)`,
-                height: `${GAME_HEIGHT}px`,
-                maxWidth: '100%',
-              }}
-            >
-              {/* Game items */}
-              {isPlaying &&
-                items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="absolute flex items-center justify-center font-mono text-2xl font-bold transition-none"
-                    style={{
-                      left: `${item.x}px`,
-                      top: `${item.y}px`,
-                      width: `${ITEM_SIZE}px`,
-                      height: `${ITEM_SIZE}px`,
-                    }}
-                  >
-                    {item.type === 'code' ? (
-                      <span className="text-indigo-600 dark:text-indigo-400">{item.icon}</span>
-                    ) : item.type === 'bonus' ? (
-                      <Zap className="h-8 w-8 text-yellow-500" />
-                    ) : (
-                      <Bug className="h-8 w-8 text-red-500" />
-                    )}
-                  </div>
-                ))}
-
-              {/* Player */}
-              {isPlaying && (
-                <div
-                  className="absolute bottom-5 flex items-center justify-center transition-none"
-                  style={{
-                    left: `${playerX}px`,
-                    width: `${PLAYER_WIDTH}px`,
-                    height: '50px',
-                  }}
+        {/* Controls */}
+        <div className="mx-auto mb-6 max-w-6xl">
+          <div className="rounded-2xl border border-gray-700/50 bg-gray-800/90 p-4 backdrop-blur-md md:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className={`rounded-lg px-6 py-2 font-semibold text-white transition-all ${
+                    isPlaying
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:shadow-lg'
+                      : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg'
+                  }`}
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg">
-                    <Code2 className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              )}
-
-              {/* Start/Game Over Screen */}
-              {!isPlaying && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                  <div className="rounded-2xl bg-white p-8 text-center shadow-2xl dark:bg-gray-800">
-                    {gameOver ? (
-                      <>
-                        <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
-                          Game Over!
-                        </h2>
-                        <p className="mb-2 text-xl text-gray-700 dark:text-gray-200">
-                          Final Score: <span className="font-bold text-indigo-600">{score}</span>
-                        </p>
-                        {score === highScore && score > 0 && (
-                          <p className="mb-6 text-yellow-600 dark:text-yellow-400">
-                            🎉 New High Score!
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">
-                          Ready to Play?
-                        </h2>
-                        <div className="mb-6 space-y-2 text-left text-gray-700 dark:text-gray-200">
-                          <p>
-                            ✅ Catch <span className="font-mono text-indigo-600">code</span>{' '}
-                            symbols: +10 points
-                          </p>
-                          <p>
-                            ⚡ Catch <span className="text-yellow-600">bonus</span>: +50 points
-                          </p>
-                          <p>
-                            ❌ Avoid <span className="text-red-600">bugs</span>: -1 life
-                          </p>
-                          <p>⚠️ Don't miss code symbols: -1 life</p>
-                        </div>
-                      </>
-                    )}
-                    <button
-                      onClick={startGame}
-                      className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-3 text-base font-semibold text-white transition-all hover:shadow-xl hover:shadow-indigo-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                    >
-                      {gameOver ? (
-                        <>
-                          <RotateCcw className="h-5 w-5" />
-                          Play Again
-                        </>
-                      ) : (
-                        <>
-                          <Code2 className="h-5 w-5" />
-                          Start Game
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Legend */}
-            <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-              <div className="rounded-lg bg-indigo-50 p-3 dark:bg-indigo-900/20">
-                <div className="mb-1 font-mono text-2xl text-indigo-600 dark:text-indigo-400">
-                  {'{ }'}
-                </div>
-                <div className="text-sm text-gray-700 dark:text-gray-300">Code +10</div>
+                  {isPlaying ? 'Pause' : 'Start'}
+                </button>
+                <button
+                  onClick={initializeParticles}
+                  className="flex items-center gap-2 rounded-lg bg-gray-700 px-4 py-2 font-semibold text-white transition-all hover:bg-gray-600"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
+                </button>
+                <button
+                  onClick={() => setShowInfo(!showInfo)}
+                  className="flex items-center gap-2 rounded-lg bg-gray-700 px-4 py-2 font-semibold text-white transition-all hover:bg-gray-600"
+                >
+                  <Info className="h-4 w-4" />
+                </button>
               </div>
-              <div className="rounded-lg bg-yellow-50 p-3 dark:bg-yellow-900/20">
-                <Zap className="mx-auto mb-1 h-8 w-8 text-yellow-500" />
-                <div className="text-sm text-gray-700 dark:text-gray-300">Bonus +50</div>
-              </div>
-              <div className="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-                <Bug className="mx-auto mb-1 h-8 w-8 text-red-500" />
-                <div className="text-sm text-gray-700 dark:text-gray-300">Bug -1 ❤️</div>
+              <div className="text-sm text-gray-300">
+                Particles: <span className="font-bold text-white">{particleCount}</span>
               </div>
             </div>
+
+            {/* Mode Selection */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+              {modes.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={`group relative overflow-hidden rounded-xl p-4 transition-all ${
+                    mode === m.id
+                      ? 'scale-105 ring-2 ring-white'
+                      : 'hover:scale-105'
+                  }`}
+                >
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${m.color} ${
+                      mode === m.id ? 'opacity-100' : 'opacity-70'
+                    }`}
+                  />
+                  <div className="relative">
+                    <m.icon className="mx-auto mb-2 h-6 w-6 text-white" />
+                    <div className="text-sm font-semibold text-white">{m.name}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {showInfo && (
+              <div className="mt-4 rounded-lg bg-gray-700/50 p-4">
+                <p className="text-sm text-gray-300">
+                  <strong className="text-white">{modes.find((m) => m.id === mode)?.name}:</strong>{' '}
+                  {modes.find((m) => m.id === mode)?.desc}
+                  {mode !== 'create' && ' (Click and drag)'}
+                  {mode === 'create' && ' (Click to spawn)'}
+                </p>
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Tech Stack Info */}
-          <div className="mt-8 rounded-2xl border border-gray-200/50 bg-white/70 p-6 backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-800/70">
-            <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">
-              Built With Modern Tech
+        {/* Canvas */}
+        <div className="mx-auto max-w-6xl">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            className="w-full cursor-crosshair rounded-2xl border border-gray-700/50 bg-gray-900 shadow-2xl"
+            style={{ height: '600px' }}
+          />
+        </div>
+
+        {/* Tech Stack */}
+        <div className="mx-auto mt-8 max-w-6xl">
+          <div className="rounded-2xl border border-gray-700/50 bg-gray-800/90 p-6 backdrop-blur-md">
+            <h3 className="mb-4 flex items-center gap-2 text-xl font-bold text-white">
+              <Settings className="h-5 w-5" />
+              Technical Features
             </h3>
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
               {[
-                { name: 'React 19', desc: 'Component Architecture' },
-                { name: 'TypeScript', desc: 'Type Safety' },
-                { name: 'requestAnimationFrame', desc: 'Smooth 60fps' },
-                { name: 'Tailwind CSS', desc: 'Responsive Design' },
+                { name: 'Canvas API', desc: '2D Graphics Rendering' },
+                { name: 'Physics Engine', desc: 'Gravity & Collision' },
+                { name: 'Particle System', desc: 'Real-time Simulation' },
+                { name: '60 FPS', desc: 'Smooth Animation' },
               ].map((tech) => (
                 <div key={tech.name} className="text-center">
-                  <div className="font-semibold text-gray-900 dark:text-white">{tech.name}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{tech.desc}</div>
+                  <div className="font-semibold text-white">{tech.name}</div>
+                  <div className="text-sm text-gray-400">{tech.desc}</div>
                 </div>
               ))}
             </div>
