@@ -44,7 +44,7 @@ export default function GamePage() {
   const [showInfo, setShowInfo] = useState(true)
   const [particleCount, setParticleCount] = useState(0)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number | undefined>(undefined)
   const isMouseDownRef = useRef(false)
   const particlesRef = useRef<Particle[]>([])
 
