@@ -52,7 +52,10 @@ export default function GamePage() {
     lastSpawnRef.current = now
     const rand = Math.random()
     const type = rand < 0.7 ? 'code' : rand < 0.9 ? 'bug' : 'bonus'
-    const icon = type === 'code' ? CODE_SYMBOLS[Math.floor(Math.random() * CODE_SYMBOLS.length)] : type
+    const icon =
+      type === 'code'
+        ? CODE_SYMBOLS[Math.floor(Math.random() * CODE_SYMBOLS.length)] ?? '{ }'
+        : type
 
     const newItem: FallingItem = {
       id: Date.now() + Math.random(),
