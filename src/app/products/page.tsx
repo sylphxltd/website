@@ -36,7 +36,7 @@ const products = [
         gradient: 'from-indigo-500 to-purple-600',
         badges: ['TypeScript', 'MCP', '94% Coverage'],
         links: {
-          github: 'https://github.com/sylphxltd/pdf-reader-mcp',
+          github: 'https://github.com/SylphxAI/pdf-reader-mcp',
           npm: 'https://www.npmjs.com/package/@sylphx/pdf-reader-mcp',
         },
         highlights: [
@@ -55,7 +55,7 @@ const products = [
         gradient: 'from-blue-500 to-cyan-600',
         badges: ['TypeScript', 'MCP', 'Security'],
         links: {
-          github: 'https://github.com/sylphxltd/filesystem-mcp',
+          github: 'https://github.com/SylphxAI/filesystem-mcp',
           npm: 'https://www.npmjs.com/package/@sylphx/filesystem-mcp',
         },
         highlights: [
@@ -74,7 +74,7 @@ const products = [
         gradient: 'from-purple-500 to-pink-600',
         badges: ['TypeScript', 'ChromaDB', 'Privacy-First'],
         links: {
-          github: 'https://github.com/sylphxltd/rag-server-mcp',
+          github: 'https://github.com/SylphxAI/rag-server-mcp',
         },
         highlights: [
           'ChromaDB + Ollama embeddings',
@@ -97,7 +97,7 @@ const products = [
         gradient: 'from-emerald-500 to-teal-600',
         badges: ['TypeScript', 'Framework-agnostic', 'Performance'],
         links: {
-          github: 'https://github.com/sylphxltd/zen',
+          github: 'https://github.com/SylphxAI/zen',
           npm: 'https://www.npmjs.com/package/@sylphx/zen',
         },
         highlights: [
@@ -116,7 +116,7 @@ const products = [
         gradient: 'from-orange-500 to-red-600',
         badges: ['TypeScript', 'Immutability', 'Zero Dependencies'],
         links: {
-          github: 'https://github.com/sylphxltd/craft',
+          github: 'https://github.com/SylphxAI/craft',
           npm: 'https://www.npmjs.com/package/@sylphx/craft',
         },
         highlights: [
@@ -139,7 +139,7 @@ const products = [
         gradient: 'from-violet-500 to-purple-600',
         badges: ['TypeScript', 'AI', 'Terminal + Web'],
         links: {
-          github: 'https://github.com/sylphxltd/flow',
+          github: 'https://github.com/SylphxAI/flow',
         },
         highlights: [
           '30x faster prompts',
@@ -156,7 +156,7 @@ const products = [
         gradient: 'from-blue-600 to-indigo-600',
         badges: ['TypeScript', 'tRPC', 'Multi-Provider'],
         links: {
-          github: 'https://github.com/sylphxltd/sylphx-code',
+          github: 'https://github.com/SylphxAI/sylphx-code',
         },
         highlights: [
           '30x faster than HTTP',
@@ -179,7 +179,7 @@ const products = [
         gradient: 'from-yellow-500 to-orange-600',
         badges: ['Dart', 'Flutter', 'Type-Safe'],
         links: {
-          github: 'https://github.com/sylphxltd/firestore_odm',
+          github: 'https://github.com/SylphxAI/firestore_odm',
           pub: 'https://pub.dev/packages/firestore_odm',
         },
         highlights: [
@@ -370,7 +370,7 @@ export default function ProductsPage() {
             All our tools are open-source and MIT licensed. We welcome contributions from the community.
           </p>
           <a
-            href="https://github.com/sylphxltd"
+            href="https://github.com/SylphxAI"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-8 py-3 text-base font-semibold text-white transition-all hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"

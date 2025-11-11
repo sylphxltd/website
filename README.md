@@ -119,7 +119,7 @@ bun run format
 
 ## 🧘 Zen 狀態管理
 
-項目使用 [@sylphx/zen](https://github.com/sylphxltd/zen) - 超輕量級狀態管理庫 (僅 1.45 kB gzipped)。
+項目使用 [@sylphx/zen](https://github.com/SylphxAI/zen) - 超輕量級狀態管理庫 (僅 1.45 kB gzipped)。
 
 ```typescript
 // 創建 store
@@ -179,7 +179,7 @@ MIT
 
 - Email: hi@sylphx.com
 - Twitter: [@sylphxlab](https://twitter.com/sylphxlab)
-- GitHub: [@sylphxltd](https://github.com/sylphxltd)
+- GitHub: [@SylphxAI](https://github.com/SylphxAI)
 
 ---
 

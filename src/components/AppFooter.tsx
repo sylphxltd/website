@@ -45,7 +45,7 @@ export function AppFooter() {
                 </svg>
               </a>
               <a
-                href="https://github.com/sylphxltd"
+                href="https://github.com/SylphxAI"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-500 transition-colors hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"

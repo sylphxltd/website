@@ -258,7 +258,7 @@ export default function AboutPage() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <a
-                href="https://github.com/sylphxltd"
+                href="https://github.com/SylphxAI"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-8 py-3 text-base font-semibold text-white transition-all hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"

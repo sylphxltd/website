@@ -227,13 +227,13 @@ export default function ContactPage() {
               </h3>
               <div className="space-y-3">
                 <a
-                  href="https://github.com/sylphxltd"
+                  href="https://github.com/SylphxAI"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                 >
                   <Github className="h-5 w-5" />
-                  <span className="font-medium">github.com/sylphxltd</span>
+                  <span className="font-medium">github.com/SylphxAI</span>
                 </a>
                 <a
                   href="https://www.npmjs.com/org/sylphx"
@@ -272,7 +272,7 @@ export default function ContactPage() {
               technical questions. We're active in our community and respond quickly.
             </p>
             <a
-              href="https://github.com/sylphxltd"
+              href="https://github.com/SylphxAI"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-8 py-3 text-base font-semibold text-white transition-all hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
