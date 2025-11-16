@@ -1,5 +1,5 @@
 import { Route } from '@solidjs/router'
-import type { Component } from 'solid-js'
+import type { Component, ParentComponent } from 'solid-js'
 import { AppHeader } from './components/AppHeader'
 import { AppFooter } from './components/AppFooter'
 import { ToastContainer } from './components/Toast'
@@ -18,7 +18,7 @@ const Privacy = lazy(() => import('./pages/Privacy'))
 const Terms = lazy(() => import('./pages/Terms'))
 const Cookies = lazy(() => import('./pages/Cookies'))
 
-const App: Component = () => {
+const Layout: ParentComponent = (props) => {
   return (
     <MetaProvider>
       <Title>Sylphx - Democratizing AI Through Elegant Code</Title>
@@ -38,20 +38,26 @@ const App: Component = () => {
       <Meta name="twitter:site" content="@sylphxlab" />
 
       <AppHeader />
-      <main class="min-h-screen">
-        <Route path="/" component={Home} />
-        <Route path="/about" component={About} />
-        <Route path="/products" component={Products} />
-        <Route path="/technologies" component={Technologies} />
-        <Route path="/careers" component={Careers} />
-        <Route path="/contact" component={Contact} />
-        <Route path="/privacy" component={Privacy} />
-        <Route path="/terms" component={Terms} />
-        <Route path="/cookies" component={Cookies} />
-      </main>
+      <main class="min-h-screen">{props.children}</main>
       <AppFooter />
       <ToastContainer />
     </MetaProvider>
+  )
+}
+
+const App: Component = () => {
+  return (
+    <>
+      <Route path="/" component={() => <Layout><Home /></Layout>} />
+      <Route path="/about" component={() => <Layout><About /></Layout>} />
+      <Route path="/products" component={() => <Layout><Products /></Layout>} />
+      <Route path="/technologies" component={() => <Layout><Technologies /></Layout>} />
+      <Route path="/careers" component={() => <Layout><Careers /></Layout>} />
+      <Route path="/contact" component={() => <Layout><Contact /></Layout>} />
+      <Route path="/privacy" component={() => <Layout><Privacy /></Layout>} />
+      <Route path="/terms" component={() => <Layout><Terms /></Layout>} />
+      <Route path="/cookies" component={() => <Layout><Cookies /></Layout>} />
+    </>
   )
 }
 
