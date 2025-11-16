@@ -33,7 +33,7 @@ const Layout: ParentComponent = (props) => {
       />
       <Meta property="og:image" content="https://sylphx.com/og-image.svg" />
       <Meta name="twitter:card" content="summary_large_image" />
-      <Meta name="twitter:site" content="@sylphxlab" />
+      <Meta name="twitter:site" content="@SylphxAI" />
 
       <AppHeader />
       <main class="min-h-screen">{props.children}</main>
