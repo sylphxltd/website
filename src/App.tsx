@@ -43,10 +43,10 @@ const Layout: ParentComponent = (props) => {
   )
 }
 
-const App: Component = () => {
+const App: ParentComponent = (props) => {
   return (
     <Layout>
-      <div>App Content</div>
+      {props.children}
     </Layout>
   )
 }
