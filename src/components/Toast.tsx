@@ -1,13 +1,6 @@
-'use client'
-
-import { useDeepMap } from '@/hooks/useZen'
-import {
-  type ToastState,
-  type ToastType,
-  getTimeLeftPercentage,
-  removeToast,
-  toastStore,
-} from '@/stores/toast'
+import { For, Show } from 'solid-js'
+import type { Component } from 'solid-js'
+import { type ToastType, getTimeLeftPercentage, removeToast, toasts } from '@/stores/toast'
 
 const toastStyles: Record<ToastType, { bg: string; border: string; icon: string }> = {
   success: {
@@ -32,47 +25,46 @@ const toastStyles: Record<ToastType, { bg: string; border: string; icon: string 
   },
 }
 
-export function ToastContainer() {
-  const state = useDeepMap<ToastState>(toastStore)
-
-  if (state.toasts.length === 0) return null
-
+export const ToastContainer: Component = () => {
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex flex-col items-end justify-end gap-2 p-4 sm:p-6">
-      {state.toasts.map((toast) => {
-        const style = toastStyles[toast.type]
-        const percentage = getTimeLeftPercentage(toast)
+    <Show when={toasts().length > 0}>
+      <div class="pointer-events-none fixed inset-0 z-50 flex flex-col items-end justify-end gap-2 p-4 sm:p-6">
+        <For each={toasts()}>
+          {(toast) => {
+            const style = toastStyles[toast.type]
+            const percentage = () => getTimeLeftPercentage(toast)
 
-        return (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto relative overflow-hidden rounded-lg border-l-4 ${style.border} ${style.bg} shadow-lg transition-all duration-300`}
-          >
-            <div className="flex items-start gap-3 p-4">
-              <span className="text-xl">{style.icon}</span>
-              <p className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-                {toast.message}
-              </p>
-              <button
-                type="button"
-                onClick={() => removeToast(toast.id)}
-                className="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
-                aria-label="Close"
+            return (
+              <div
+                class={`pointer-events-auto relative overflow-hidden rounded-lg border-l-4 ${style.border} ${style.bg} shadow-lg transition-all duration-300`}
               >
-                ✕
-              </button>
-            </div>
-            {toast.timeout > 0 && (
-              <div className="h-1 bg-gray-200 dark:bg-gray-700">
-                <div
-                  className={`h-full ${style.border.replace('border', 'bg')} transition-all duration-100`}
-                  style={{ width: `${percentage}%` }}
-                />
+                <div class="flex items-start gap-3 p-4">
+                  <span class="text-xl">{style.icon}</span>
+                  <p class="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {toast.message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => removeToast(toast.id)}
+                    class="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <Show when={toast.timeout > 0}>
+                  <div class="h-1 bg-gray-200 dark:bg-gray-700">
+                    <div
+                      class={`h-full ${style.border.replace('border', 'bg')} transition-all duration-100`}
+                      style={{ width: `${percentage()}%` }}
+                    />
+                  </div>
+                </Show>
               </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
+            )
+          }}
+        </For>
+      </div>
+    </Show>
   )
 }

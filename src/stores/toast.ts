@@ -1,4 +1,4 @@
-import { deepMap, get, setDeepMapPath as setPath } from '@sylphx/zen'
+import { createSignal, createEffect, onCleanup } from 'solid-js'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -11,26 +11,17 @@ export interface Toast {
   timeLeft: number
 }
 
-export interface ToastState {
-  toasts: Toast[]
-  lastId: number
-  timer: number | null
-}
-
-// ASSUMPTION: Using deepMap for nested state structure
-export const toastStore = deepMap<ToastState>({
-  toasts: [],
-  lastId: 0,
-  timer: null,
-})
+// ASSUMPTION: Using SolidJS signals for reactive state management
+const [toasts, setToasts] = createSignal<Toast[]>([])
+let lastId = 0
+let timer: number | null = null
 
 // Update toasts and remove expired ones
 function updateToasts() {
-  const state = get(toastStore)
   const now = Date.now()
   const toastsToRemove: number[] = []
 
-  const updatedToasts = state.toasts.map((toast) => {
+  const updatedToasts = toasts().map((toast) => {
     const elapsed = now - toast.startTime
     const timeLeft = Math.max(0, toast.timeout - elapsed)
 
@@ -43,28 +34,25 @@ function updateToasts() {
 
   const filteredToasts = updatedToasts.filter((toast) => !toastsToRemove.includes(toast.id))
 
-  setPath(toastStore, ['toasts'], filteredToasts)
+  setToasts(filteredToasts)
 
   // Stop timer if no toasts
-  if (filteredToasts.length === 0 && state.timer !== null) {
-    window.clearInterval(state.timer)
-    setPath(toastStore, ['timer'], null)
+  if (filteredToasts.length === 0 && timer !== null) {
+    window.clearInterval(timer)
+    timer = null
   }
 }
 
 // Start timer
 function startTimer() {
-  const state = get(toastStore)
-  if (state.timer === null) {
-    const timerId = window.setInterval(updateToasts, 100)
-    setPath(toastStore, ['timer'], timerId)
+  if (timer === null) {
+    timer = window.setInterval(updateToasts, 100)
   }
 }
 
 // Add toast
 export function addToast(message: string, type: ToastType = 'info', timeout = 5000) {
-  const state = get(toastStore)
-  const id = state.lastId + 1
+  const id = ++lastId
   const nowTime = Date.now()
 
   const newToast: Toast = {
@@ -76,11 +64,10 @@ export function addToast(message: string, type: ToastType = 'info', timeout = 50
     timeLeft: timeout,
   }
 
-  setPath(toastStore, ['toasts'], [...state.toasts, newToast])
-  setPath(toastStore, ['lastId'], id)
+  setToasts((prev) => [...prev, newToast])
 
   // Start timer if first toast
-  if (state.toasts.length === 0) {
+  if (toasts().length === 1) {
     startTimer()
   }
 
@@ -106,27 +93,24 @@ export function infoToast(message: string, timeout?: number) {
 
 // Remove toast
 export function removeToast(id: number) {
-  const state = get(toastStore)
-  const filteredToasts = state.toasts.filter((toast) => toast.id !== id)
+  const filteredToasts = toasts().filter((toast) => toast.id !== id)
 
-  setPath(toastStore, ['toasts'], filteredToasts)
+  setToasts(filteredToasts)
 
   // Stop timer if no toasts
-  if (filteredToasts.length === 0 && state.timer !== null) {
-    window.clearInterval(state.timer)
-    setPath(toastStore, ['timer'], null)
+  if (filteredToasts.length === 0 && timer !== null) {
+    window.clearInterval(timer)
+    timer = null
   }
 }
 
 // Clear all toasts
 export function clearToasts() {
-  const state = get(toastStore)
+  setToasts([])
 
-  setPath(toastStore, ['toasts'], [])
-
-  if (state.timer !== null) {
-    window.clearInterval(state.timer)
-    setPath(toastStore, ['timer'], null)
+  if (timer !== null) {
+    window.clearInterval(timer)
+    timer = null
   }
 }
 
@@ -135,3 +119,6 @@ export function getTimeLeftPercentage(toast: Toast): number {
   if (toast.timeout <= 0) return 100
   return (toast.timeLeft / toast.timeout) * 100
 }
+
+// Export toasts signal
+export { toasts }
